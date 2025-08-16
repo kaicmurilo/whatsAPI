@@ -21,6 +21,11 @@ const contactController = require('./controllers/contactController')
 
 // API endpoint to check if server is alive
 routes.get('/ping', healthController.ping)
+
+// Cache management endpoints
+routes.get('/cache/status', healthController.cacheStatus)
+routes.post('/cache/clear', [middleware.apikey], healthController.clearCache)
+
 // API basic callback
 if (enableLocalCallbackExample) {
   routes.post('/localCallbackExample', [middleware.apikey, middleware.rateLimiter], healthController.localCallbackExample)

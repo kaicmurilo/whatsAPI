@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  redis:
+    build: .
+    container_name: whatsapp-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    environment:
+      - REDIS_PASSWORD=your_redis_password_here  # Altere para uma senha segura
+    restart: unless-stopped
+    networks:
+      - redis_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: whatsapp-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - REDIS_PASSWORD=your_redis_password_here  # Mesma senha do Redis
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - redis_network
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  redis_network:
+    driver: bridge 

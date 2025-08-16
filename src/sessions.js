@@ -3,6 +3,7 @@ const fs = require('fs')
 const sessions = new Map()
 const { baseWebhookURL, sessionFolderPath, maxAttachmentSize, setMessagesAsSeen, webVersion, webVersionCacheType, recoverSessions } = require('./config')
 const { triggerWebhook, waitForNestedObject, checkIfEventisEnabled } = require('./utils')
+const { cacheHelpers } = require('./utils/cache')
 
 // Function to validate if the session is ready
 const validateSession = async (sessionId) => {
@@ -230,6 +231,15 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('message', async (message) => {
         triggerWebhook(sessionWebhook, sessionId, 'message', { message })
+        
+        // Invalidar cache de mensagens quando nova mensagem chegar
+        try {
+          const chat = await message.getChat()
+          await cacheHelpers.invalidateMessageCache(sessionId, chat.id._serialized)
+        } catch (error) {
+          console.log('Erro ao invalidar cache de mensagens:', error.message)
+        }
+        
         if (message.hasMedia && message._data?.size < maxAttachmentSize) {
           // custom service event
           checkIfEventisEnabled('media').then(_ => {
@@ -262,6 +272,15 @@ const initializeEvents = (client, sessionId) => {
     .then(_ => {
       client.on('message_create', async (message) => {
         triggerWebhook(sessionWebhook, sessionId, 'message_create', { message })
+        
+        // Invalidar cache de mensagens quando mensagem for criada
+        try {
+          const chat = await message.getChat()
+          await cacheHelpers.invalidateMessageCache(sessionId, chat.id._serialized)
+        } catch (error) {
+          console.log('Erro ao invalidar cache de mensagens:', error.message)
+        }
+        
         if (setMessagesAsSeen) {
           const chat = await message.getChat()
           chat.sendSeen()
@@ -347,6 +366,15 @@ const deleteSession = async (sessionId, validation) => {
     while (client.pupBrowser.isConnected()) {
       await new Promise(resolve => setTimeout(resolve, 100))
     }
+    
+    // Limpar cache da sessão
+    try {
+      await cacheHelpers.clearSessionCache(sessionId)
+      console.log(`Cache limpo para sessão ${sessionId}`)
+    } catch (error) {
+      console.log('Erro ao limpar cache da sessão:', error.message)
+    }
+    
     await deleteSessionFolder(sessionId)
     sessions.delete(sessionId)
   } catch (error) {

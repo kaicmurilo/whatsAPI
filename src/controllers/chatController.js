@@ -1,5 +1,6 @@
 const { sessions } = require('../sessions')
 const { sendErrorResponse } = require('../utils')
+const { cacheHelpers } = require('../utils/cache')
 
 /**
  * @function
@@ -141,10 +142,23 @@ const fetchMessages = async (req, res) => {
     }
   */
     const { chatId, searchOptions } = req.body
-    const client = sessions.get(req.params.sessionId)
-    const chat = await client.getChatById(chatId)
-    if (!chat) { sendErrorResponse(res, 404, 'Chat not Found') }
-    const messages = await chat.fetchMessages(searchOptions)
+    const sessionId = req.params.sessionId
+    const limit = searchOptions?.limit || 50
+    
+    // Tentar buscar do cache primeiro
+    let messages = await cacheHelpers.getMessages(sessionId, chatId, limit)
+    
+    if (!messages) {
+      // Se não estiver no cache, buscar do WhatsApp
+      const client = sessions.get(sessionId)
+      const chat = await client.getChatById(chatId)
+      if (!chat) { sendErrorResponse(res, 404, 'Chat not Found') }
+      messages = await chat.fetchMessages(searchOptions)
+      
+      // Salvar no cache
+      await cacheHelpers.setMessages(sessionId, chatId, messages, limit)
+    }
+    
     res.json({ success: true, messages })
   } catch (error) {
     sendErrorResponse(res, 500, error.message)

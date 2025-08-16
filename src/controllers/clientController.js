@@ -1,6 +1,7 @@
 const { MessageMedia, Location, Buttons, List, Poll } = require('whatsapp-web.js')
 const { sessions } = require('../sessions')
 const { sendErrorResponse } = require('../utils')
+const { cacheHelpers } = require('../utils/cache')
 
 /**
  * Send a message to a chat using the WhatsApp API
@@ -295,8 +296,20 @@ const setStatus = async (req, res) => {
  */
 const getContacts = async (req, res) => {
   try {
-    const client = sessions.get(req.params.sessionId)
-    const contacts = await client.getContacts()
+    const sessionId = req.params.sessionId
+    
+    // Tentar buscar do cache primeiro
+    let contacts = await cacheHelpers.getContacts(sessionId)
+    
+    if (!contacts) {
+      // Se não estiver no cache, buscar do WhatsApp
+      const client = sessions.get(sessionId)
+      contacts = await client.getContacts()
+      
+      // Salvar no cache
+      await cacheHelpers.setContacts(sessionId, contacts)
+    }
+    
     res.json({ success: true, contacts })
   } catch (error) {
     sendErrorResponse(res, 500, error.message)
@@ -319,8 +332,20 @@ const getContacts = async (req, res) => {
  */
 const getChats = async (req, res) => {
   try {
-    const client = sessions.get(req.params.sessionId)
-    const chats = await client.getChats()
+    const sessionId = req.params.sessionId
+    
+    // Tentar buscar do cache primeiro
+    let chats = await cacheHelpers.getChats(sessionId)
+    
+    if (!chats) {
+      // Se não estiver no cache, buscar do WhatsApp
+      const client = sessions.get(sessionId)
+      chats = await client.getChats()
+      
+      // Salvar no cache
+      await cacheHelpers.setChats(sessionId, chats)
+    }
+    
     res.json({ success: true, chats })
   } catch (error) {
     sendErrorResponse(res, 500, error.message)
@@ -357,8 +382,20 @@ const getProfilePictureUrl = async (req, res) => {
   */
   try {
     const { contactId } = req.body
-    const client = sessions.get(req.params.sessionId)
-    const result = await client.getProfilePicUrl(contactId)
+    const sessionId = req.params.sessionId
+    
+    // Tentar buscar do cache primeiro
+    let result = await cacheHelpers.getProfilePic(sessionId, contactId)
+    
+    if (!result) {
+      // Se não estiver no cache, buscar do WhatsApp
+      const client = sessions.get(sessionId)
+      result = await client.getProfilePicUrl(contactId)
+      
+      // Salvar no cache
+      await cacheHelpers.setProfilePic(sessionId, contactId, result)
+    }
+    
     res.json({ success: true, result })
   } catch (error) {
     sendErrorResponse(res, 500, error.message)
