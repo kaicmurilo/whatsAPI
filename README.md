@@ -1,5 +1,8 @@
 # WhatsApp REST API
 
+> Este código é uma melhoria baseada no projeto original disponível em [https://github.com/pedroherpeto/whatsapp-api](https://github.com/pedroherpeto/whatsapp-api).
+
+
 API REST wrapper para a biblioteca [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js), fornecendo uma interface fácil de usar para interagir com a plataforma WhatsApp Web.
 Foi projetada para ser usada como um container Docker, escalável, segura e fácil de integrar com outros projetos não-NodeJs.
 
