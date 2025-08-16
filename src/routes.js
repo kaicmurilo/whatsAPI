@@ -199,16 +199,34 @@ if (enableSwaggerEndpoint) {
     }
   })
   
-  // Rota do Swagger em inglês
+  // Rota do Swagger em inglês - usando interface customizada
   routes.get('/api-docs/en', (req, res) => {
-    const swaggerDocument = getSwaggerConfig('en')
-    res.send(swaggerUi.generateHTML(swaggerDocument))
+    const fs = require('fs')
+    const path = require('path')
+    const htmlPath = path.join(__dirname, '..', 'swagger-ui-custom.html')
+    
+    if (fs.existsSync(htmlPath)) {
+      res.sendFile(htmlPath)
+    } else {
+      // Fallback para interface padrão
+      const swaggerDocument = getSwaggerConfig('en')
+      res.send(swaggerUi.generateHTML(swaggerDocument))
+    }
   })
   
-  // Rota do Swagger em português
+  // Rota do Swagger em português - usando interface customizada
   routes.get('/api-docs/pt', (req, res) => {
-    const swaggerDocument = getSwaggerConfig('pt')
-    res.send(swaggerUi.generateHTML(swaggerDocument))
+    const fs = require('fs')
+    const path = require('path')
+    const htmlPath = path.join(__dirname, '..', 'swagger-ui-custom.html')
+    
+    if (fs.existsSync(htmlPath)) {
+      res.sendFile(htmlPath)
+    } else {
+      // Fallback para interface padrão
+      const swaggerDocument = getSwaggerConfig('pt')
+      res.send(swaggerUi.generateHTML(swaggerDocument))
+    }
   })
   
   // Rota para servir arquivos estáticos do Swagger UI
@@ -234,8 +252,8 @@ if (enableSwaggerEndpoint) {
     })
   })
   
-  // Rota dinâmica para qualquer idioma (retorna JSON para a interface customizada)
-  routes.get('/api-docs/:language', (req, res) => {
+  // Rota para JSON da documentação (usada pela interface customizada)
+  routes.get('/api-docs/json/:language', (req, res) => {
     const { language } = req.params
     
     if (!isLanguageAvailable(language)) {
