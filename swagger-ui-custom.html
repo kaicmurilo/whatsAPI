@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp API - Documentação Multilíngue</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui.css" />
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow: -moz-scrollbars-vertical;
+            overflow-y: scroll;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        
+        body {
+            margin: 0;
+            background: #fafafa;
+        }
+        
+        .language-selector {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .language-selector select {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+        }
+        
+        .language-selector select:focus {
+            outline: none;
+            border-color: #4990e2;
+            box-shadow: 0 0 0 2px rgba(73, 144, 226, 0.2);
+        }
+        
+        .language-selector label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .swagger-ui {
+            margin-top: 20px;
+        }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: #666;
+        }
+        
+        .loading::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #4990e2;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            color: #d32f2f;
+            background: #ffebee;
+            border: 1px solid #ffcdd2;
+            border-radius: 8px;
+            margin: 20px;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="language-selector">
+        <label for="languageSelect">🌍 Idioma / Language</label>
+        <select id="languageSelect" onchange="changeLanguage()">
+            <option value="pt">🇧🇷 Português</option>
+            <option value="en">🇺🇸 English</option>
+        </select>
+    </div>
+    
+    <div id="swagger-ui"></div>
+    <div id="loading" class="loading">Carregando documentação...</div>
+    <div id="error" class="error-message" style="display: none;"></div>
+
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.9.0/swagger-ui-standalone-preset.js"></script>
+    <script>
+        let currentLanguage = 'pt';
+        let swaggerUI = null;
+        
+        // Configurações do Swagger UI
+        const swaggerConfig = {
+            dom_id: '#swagger-ui',
+            deepLinking: true,
+            presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIStandalonePreset
+            ],
+            plugins: [
+                SwaggerUIBundle.plugins.DownloadUrl
+            ],
+            layout: "StandaloneLayout",
+            validatorUrl: null,
+            onComplete: function() {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'none';
+            },
+            onFailure: function(data) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'flex';
+                document.getElementById('error').innerHTML = `
+                    <div>
+                        <h3>❌ Erro ao carregar documentação</h3>
+                        <p>Não foi possível carregar a documentação no idioma selecionado.</p>
+                        <p><strong>Erro:</strong> ${data.message || 'Erro desconhecido'}</p>
+                        <button onclick="loadSwaggerDoc(currentLanguage)" style="padding: 8px 16px; background: #4990e2; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Tentar novamente
+                        </button>
+                    </div>
+                `;
+            }
+        };
+        
+        // Função para carregar documentação
+        async function loadSwaggerDoc(language) {
+            try {
+                document.getElementById('loading').style.display = 'flex';
+                document.getElementById('error').style.display = 'none';
+                
+                console.log(`Carregando documentação para idioma: ${language}`);
+                
+                // Adicionar timeout para evitar travamentos
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 segundos
+                
+                const response = await fetch(`/api-docs/${language}`, {
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId);
+                
+                console.log(`Resposta recebida: ${response.status} ${response.statusText}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const swaggerDoc = await response.json();
+                console.log('Documentação carregada com sucesso:', swaggerDoc.info?.title);
+                
+                // Limpar container anterior
+                const container = document.getElementById('swagger-ui');
+                container.innerHTML = '';
+                
+                // Criar nova instância
+                swaggerUI = SwaggerUIBundle({
+                    ...swaggerConfig,
+                    spec: swaggerDoc
+                });
+                
+                // Atualizar texto de loading
+                const loadingText = language === 'pt' ? 'Carregando documentação...' : 'Loading documentation...';
+                document.getElementById('loading').textContent = loadingText;
+                
+            } catch (error) {
+                console.error('Erro ao carregar documentação:', error);
+                
+                // Se não for inglês, tentar fallback para inglês
+                if (language !== 'en') {
+                    console.log('Tentando fallback para inglês...');
+                    setTimeout(() => {
+                        fallbackToEnglish();
+                    }, 1000);
+                    return;
+                }
+                
+                // Se já tentou inglês e falhou, mostrar erro
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'flex';
+                
+                let errorMessage = error.message;
+                if (error.name === 'AbortError') {
+                    errorMessage = 'Timeout: A requisição demorou muito para responder';
+                }
+                
+                document.getElementById('error').innerHTML = `
+                    <div>
+                        <h3>❌ Erro ao carregar documentação</h3>
+                        <p>Não foi possível carregar a documentação no idioma selecionado.</p>
+                        <p><strong>Erro:</strong> ${errorMessage}</p>
+                        <p><strong>Idioma tentado:</strong> ${language}</p>
+                        <button onclick="loadSwaggerDoc(currentLanguage)" style="padding: 8px 16px; background: #4990e2; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
+                            Tentar novamente
+                        </button>
+                        <button onclick="loadSwaggerDoc('pt')" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Tentar Português
+                        </button>
+                    </div>
+                `;
+            }
+        }
+        
+        // Função para trocar idioma
+        function changeLanguage() {
+            const select = document.getElementById('languageSelect');
+            const newLanguage = select.value;
+            
+            if (newLanguage !== currentLanguage) {
+                currentLanguage = newLanguage;
+                loadSwaggerDoc(currentLanguage);
+            }
+        }
+        
+        // Função de fallback para inglês
+        function fallbackToEnglish() {
+            console.log('Tentando fallback para inglês...');
+            currentLanguage = 'en';
+            document.getElementById('languageSelect').value = 'en';
+            loadSwaggerDoc('en');
+        }
+        
+        // Detectar idioma do navegador
+        function detectBrowserLanguage() {
+            const browserLang = navigator.language || navigator.userLanguage;
+            if (browserLang.startsWith('pt')) {
+                document.getElementById('languageSelect').value = 'pt';
+                currentLanguage = 'pt';
+            } else {
+                document.getElementById('languageSelect').value = 'en';
+                currentLanguage = 'en';
+            }
+        }
+        
+        // Carregar documentação inicial
+        document.addEventListener('DOMContentLoaded', function() {
+            // Aplicar detecção de idioma primeiro
+            detectBrowserLanguage();
+            // Depois carregar a documentação
+            loadSwaggerDoc(currentLanguage);
+        });
+    </script>
+</body>
+</html> 

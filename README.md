@@ -1,176 +1,475 @@
 # WhatsApp REST API
 
-REST API wrapper for the [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js) library, providing an easy-to-use interface to interact with the WhatsApp Web platform. 
-It is designed to be used as a docker container, scalable, secure, and easy to integrate with other non-NodeJs projects.
+API REST wrapper para a biblioteca [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js), fornecendo uma interface fácil de usar para interagir com a plataforma WhatsApp Web.
+Foi projetada para ser usada como um container Docker, escalável, segura e fácil de integrar com outros projetos não-NodeJs.
 
-This project is a work in progress: star it, create issues, features or pull requests ❣️
+Este projeto está em desenvolvimento: dê uma estrela, crie issues, funcionalidades ou pull requests ❣️
 
-**NOTE**: I can't guarantee you will not be blocked by using this method, although it has worked for me. WhatsApp does not allow bots or unofficial clients on their platform, so this shouldn't be considered totally safe.
+**OBSERVAÇÃO**: Não posso garantir que você não será bloqueado ao usar este método, embora tenha funcionado para mim. O WhatsApp não permite bots ou clientes não oficiais em sua plataforma, então isso não deve ser considerado totalmente seguro.
 
-## Table of Contents
+## Índice
 
-[1. Quick Start with Docker](#quick-start-with-docker)
+[1. Início Rápido com Docker](#início-rápido-com-docker)
 
-[2. Features](#features)
+[2. Funcionalidades](#funcionalidades)
 
-[3. Run Locally](#run-locally)
+[3. Executar Localmente](#executar-localmente)
 
-[4. Testing](#testing)
+[4. Testes](#testes)
 
-[5. Documentation](#documentation)
+[5. Documentação](#documentação)
 
-[6. Deploy to Production](#deploy-to-production)
+[6. Webhooks](#webhooks)
 
-[7. Contributing](#contributing)
+[7. Deploy em Produção](#deploy-em-produção)
 
-[8. License](#license)
+[8. Contribuindo](#contribuindo)
 
-[9. Star History](#star-history)
+[9. Licença](#licença)
 
-## Quick Start with Docker
+[10. Histórico de Estrelas](#histórico-de-estrelas)
+
+## Início Rápido com Docker
 
 [![dockeri.co](https://dockerico.blankenship.io/image/chrishubert/whatsapp-web-api)](https://hub.docker.com/r/chrishubert/whatsapp-web-api)
 
-1. Clone the repository:
+1. Clone o repositório:
 
 ```bash
 git clone https://github.com/chrishubert/whatsapp-api.git
 cd whatsapp-api
 ```
 
-3. Run the Docker Compose:
+3. Execute o Docker Compose:
 
 ```bash
 docker-compose pull && docker-compose up
 ```
-4. Visit http://localhost:3000/session/start/ABCD
+4. Visite http://localhost:3000/session/start/ABCD
 
-5. Scan the QR on your console using WhatsApp mobile app -> Linked Device -> Link a Device (it may take time to setup the session)
+5. Escaneie o QR no seu console usando o aplicativo WhatsApp mobile -> Dispositivo Vinculado -> Vincular um Dispositivo (pode demorar para configurar a sessão)
 
-6. Visit http://localhost:3000/client/getContacts/ABCD
+6. Visite http://localhost:3000/client/getContacts/ABCD
 
-7. EXTRA: Look at all the callbacks data in `./session/message_log.txt`
+7. EXTRA: Veja todos os dados de callbacks em `./session/message_log.txt`
 
-![Quick Start](./assets/basic_start.gif)
+![Início Rápido](./assets/basic_start.gif)
 
-## Features
+## Funcionalidades
 
-1. API and Callbacks
+1. API e Callbacks
 
-| Actions                      | Status | Sessions                                | Status | Callbacks                                      | Status |
+| Ações                        | Status | Sessões                                | Status | Callbacks                                      | Status |
 | ----------------------------| ------| ----------------------------------------| ------| ----------------------------------------------| ------|
-| Send Image Message           | ✅     | Initiate session                       | ✅    | Callback QR code                               | ✅     |
-| Send Video Message           | ✅     | Terminate session                      | ✅    | Callback new message                           | ✅     |
-| Send Audio Message           | ✅     | Terminate inactive sessions            | ✅    | Callback status change                         | ✅     |
-| Send Document Message        | ✅     | Terminate all sessions                 | ✅    | Callback message media attachment              | ✅     |
-| Send File URL                | ✅     | Healthcheck                            | ✅    |                                                |        |
-| Send Button Message          | ✅     | Local test callback                    |        |                                                |        |
-| Send Contact Message         | ✅     |                                        |        |                                                |        |
-| Send List Message            | ✅     |                                        |        |                                                |        |
-| Set Status                   | ✅     |                                        |        |                                                |        |
-| Send Button With Media       | ✅     |                                        |        |                                                |        |
-| Is On Whatsapp?              | ✅     |                                        |        |                                                |        |
-| Download Profile Pic         | ✅     |                                        |        |                                                |        |
-| User Status                  | ✅     |                                        |        |                                                |        |
-| Block/Unblock User           | ✅     |                                        |        |                                                |        |
-| Update Profile Picture       | ✅     |                                        |        |                                                |        |
-| Create Group                 | ✅     |                                        |        |                                                |        |
-| Leave Group                  | ✅     |                                        |        |                                                |        |
-| All Groups                   | ✅     |                                        |        |                                                |        |
-| Invite User                  | ✅     |                                        |        |                                                |        |
-| Make Admin                   | ✅     |                                        |        |                                                |        |
-| Demote Admin                 | ✅     |                                        |        |                                                |        |
-| Group Invite Code            | ✅     |                                        |        |                                                |        |
-| Update Group Participants    | ✅     |                                        |        |                                                |        |
-| Update Group Setting         | ✅     |                                        |        |                                                |        |
-| Update Group Subject         | ✅     |                                        |        |                                                |        |
-| Update Group Description     | ✅     |                                        |        |                                                |        |
+| Enviar Mensagem de Imagem   | ✅     | Iniciar sessão                         | ✅    | Callback código QR                             | ✅     |
+| Enviar Mensagem de Vídeo    | ✅     | Encerrar sessão                        | ✅    | Callback nova mensagem                         | ✅     |
+| Enviar Mensagem de Áudio    | ✅     | Encerrar sessões inativas              | ✅    | Callback mudança de status                     | ✅     |
+| Enviar Mensagem de Documento| ✅     | Encerrar todas as sessões              | ✅    | Callback anexo de mídia da mensagem            | ✅     |
+| Enviar URL de Arquivo       | ✅     | Healthcheck                            | ✅    |                                                |        |
+| Enviar Mensagem com Botão   | ✅     | Callback de teste local                |        |                                                |        |
+| Enviar Mensagem de Contato  | ✅     |                                        |        |                                                |        |
+| Enviar Mensagem de Lista    | ✅     |                                        |        |                                                |        |
+| Definir Status              | ✅     |                                        |        |                                                |        |
+| Enviar Botão com Mídia      | ✅     |                                        |        |                                                |        |
+| Está no WhatsApp?           | ✅     |                                        |        |                                                |        |
+| Baixar Foto do Perfil       | ✅     |                                        |        |                                                |        |
+| Status do Usuário           | ✅     |                                        |        |                                                |        |
+| Bloquear/Desbloquear Usuário| ✅     |                                        |        |                                                |        |
+| Atualizar Foto do Perfil    | ✅     |                                        |        |                                                |        |
+| Criar Grupo                  | ✅     |                                        |        |                                                |        |
+| Sair do Grupo               | ✅     |                                        |        |                                                |        |
+| Todos os Grupos             | ✅     |                                        |        |                                                |        |
+| Convidar Usuário            | ✅     |                                        |        |                                                |        |
+| Tornar Admin                | ✅     |                                        |        |                                                |        |
+| Remover Admin               | ✅     |                                        |        |                                                |        |
+| Código de Convite do Grupo  | ✅     |                                        |        |                                                |        |
+| Atualizar Participantes     | ✅     |                                        |        |                                                |        |
+| Atualizar Configuração      | ✅     |                                        |        |                                                |        |
+| Atualizar Assunto do Grupo  | ✅     |                                        |        |                                                |        |
+| Atualizar Descrição         | ✅     |                                        |        |                                                |        |
 
-3. Handle multiple client sessions (session data saved locally), identified by unique id
+3. Gerencia múltiplas sessões de cliente (dados da sessão salvos localmente), identificadas por ID único
 
-4. All endpoints may be secured by a global API key
+4. Todos os endpoints podem ser protegidos por uma chave de API global
 
-5. On server start, all existing sessions are restored
+5. Na inicialização do servidor, todas as sessões existentes são restauradas
 
-6. Set messages automatically as read
+6. Define mensagens automaticamente como lidas
 
-7. Disable any of the callbacks
+7. Desabilita qualquer um dos callbacks
 
-## Run Locally
+## Executar Localmente
 
-1. Clone the repository:
+1. Clone o repositório:
 
 ```bash
 git clone https://github.com/chrishubert/whatsapp-api.git
 cd whatsapp-api
 ```
 
-2. Install the dependencies:
+2. Instale as dependências:
 
 ```bash
 npm install
 ```
 
-3. Copy the `.env.example` file to `.env` and update the required environment variables:
+3. Copie o arquivo `.env.example` para `.env` e atualize as variáveis de ambiente necessárias:
 
 ```bash
 cp .env.example .env
 ```
 
-4. Run the application:
+4. Execute a aplicação:
 
 ```bash
 npm run start
 ```
 
-5. Access the API at `http://localhost:3000`
+5. Acesse a API em `http://localhost:3000`
 
-## Testing
+## Testes
 
-Run the test suite with the following command:
+Execute a suíte de testes com o seguinte comando:
 
 ```bash
 npm run test
 ```
 
-## Documentation
+## Documentação
 
-API documentation can be found in the [`swagger.json`](https://raw.githubusercontent.com/chrishubert/whatsapp-api/master/swagger.json) file. See this file directly into [Swagger Editor](https://editor.swagger.io/?url=https://raw.githubusercontent.com/chrishubert/whatsapp-api/master/swagger.json) or any other OpenAPI-compatible tool to view and interact with the API documentation.
+A documentação da API pode ser encontrada no arquivo [`swagger.json`](https://raw.githubusercontent.com/chrishubert/whatsapp-api/master/swagger.json). Veja este arquivo diretamente no [Swagger Editor](https://editor.swagger.io/?url=https://raw.githubusercontent.com/chrishubert/whatsapp-api/master/swagger.json) ou em qualquer outra ferramenta compatível com OpenAPI para visualizar e interagir com a documentação da API.
 
-This documentation is straightforward if you are familiar with whatsapp-web.js library (https://docs.wwebjs.dev/)
-If you are still confused - open an issue and I'll improve it.
+Esta documentação é direta se você estiver familiarizado com a biblioteca whatsapp-web.js (https://docs.wwebjs.dev/)
+Se você ainda estiver confuso - abra uma issue e eu vou melhorá-la.
 
-Also, there is an option to run the documentation endpoint locally by setting the `ENABLE_SWAGGER_ENDPOINT` environment variable. Restart the service and go to `/api-docs` endpoint to see it.
+Além disso, há uma opção para executar o endpoint de documentação localmente definindo a variável de ambiente `ENABLE_SWAGGER_ENDPOINT`. Reinicie o serviço e vá para o endpoint `/api-docs` para vê-lo.
 
-By default, all callback events are delivered to the webhook defined with the `BASE_WEBHOOK_URL` environment variable.
-This can be overridden by setting the `*_WEBHOOK_URL` environment variable, where `*` is your sessionId.
-For example, if you have the sessionId defined as `DEMO`, the environment variable must be `DEMO_WEBHOOK_URL`.
+Por padrão, todos os eventos de callback são entregues ao webhook definido com a variável de ambiente `BASE_WEBHOOK_URL`.
+Isso pode ser substituído definindo a variável de ambiente `*_WEBHOOK_URL`, onde `*` é seu sessionId.
+Por exemplo, se você tiver o sessionId definido como `DEMO`, a variável de ambiente deve ser `DEMO_WEBHOOK_URL`.
 
-By setting the `DISABLED_CALLBACKS` environment variable you can specify what events you are **not** willing to receive on your webhook.
+Definindo a variável de ambiente `DISABLED_CALLBACKS` você pode especificar quais eventos você **não** está disposto a receber no seu webhook.
 
-### Scanning QR code
+### Escaneando código QR
 
-In order to validate a new WhatsApp Web instance you need to scan the QR code using your mobile phone. Official documentation can be found at (https://faq.whatsapp.com/1079327266110265/?cms_platform=android) page. The service itself delivers the QR code content as a webhook event or you can use the REST endpoints (`/session/qr/:sessionId` or `/session/qr/:sessionId/image` to get the QR code as a png image). 
+Para validar uma nova instância do WhatsApp Web, você precisa escanear o código QR usando seu telefone celular. A documentação oficial pode ser encontrada na página (https://faq.whatsapp.com/1079327266110265/?cms_platform=android). O próprio serviço entrega o conteúdo do código QR como um evento de webhook ou você pode usar os endpoints REST (`/session/qr/:sessionId` ou `/session/qr/:sessionId/image` para obter o código QR como uma imagem png).
 
-## Deploy to Production
+## Webhooks
 
-- Load the docker image in docker-compose, or your Kubernetes environment
-- Disable the `ENABLE_LOCAL_CALLBACK_EXAMPLE` environment variable
-- Set the `API_KEY` environment variable to protect the REST endpoints
-- Run periodically the `/api/terminateInactiveSessions` endpoint to prevent useless sessions to take up space and resources(only in case you are not in control of the sessions)
+Os webhooks permitem que você receba notificações em tempo real sobre eventos do WhatsApp, como novas mensagens, mudanças de status e códigos QR. Esta funcionalidade é essencial para criar aplicações reativas que respondem automaticamente aos eventos do WhatsApp.
 
-## Contributing
+### Configuração de Webhooks
 
-Please read [CONTRIBUTING.md](./CONTRIBUTING.md) for details on our code of conduct, and the process for submitting pull requests to us.
+#### Variáveis de Ambiente
 
-## Disclaimer
+- `BASE_WEBHOOK_URL`: URL base para todos os webhooks (ex: `https://seu-dominio.com/webhook`)
+- `SESSIONID_WEBHOOK_URL`: URL específica para uma sessão (ex: `DEMO_WEBHOOK_URL=https://seu-dominio.com/webhook/demo`)
+- `DISABLED_CALLBACKS`: Lista de callbacks desabilitados (ex: `qr,status`)
 
-This project is not affiliated, associated, authorized, endorsed by, or in any way officially connected with WhatsApp or any of its subsidiaries or its affiliates. The official WhatsApp website can be found at https://whatsapp.com. "WhatsApp" as well as related names, marks, emblems and images are registered trademarks of their respective owners.
+#### Tipos de Eventos Disponíveis
 
-## License
+| Evento | Descrição | Payload |
+|--------|-----------|---------|
+| `qr` | Código QR para autenticação | `{ "event": "qr", "sessionId": "session", "data": "qr_code_data" }` |
+| `ready` | Cliente pronto | `{ "event": "ready", "sessionId": "session" }` |
+| `message` | Nova mensagem recebida | `{ "event": "message", "sessionId": "session", "data": { ... } }` |
+| `message_ack` | Confirmação de entrega | `{ "event": "message_ack", "sessionId": "session", "data": { ... } }` |
+| `status` | Mudança de status | `{ "event": "status", "sessionId": "session", "data": { ... } }` |
+| `media` | Mídia anexada | `{ "event": "media", "sessionId": "session", "data": { ... } }` |
 
-This project is licensed under the MIT License - see the [LICENSE.md](./LICENSE.md) file for details.
+### Exemplos de Implementação
 
-## Star History
+#### Python (Flask)
 
-[![Star History Chart](https://api.star-history.com/svg?repos=chrishubert/whatsapp-api&type=Date)](https://star-history.com/#chrishubert/whatsapp-api&Date)
+```python
+from flask import Flask, request, jsonify
+import requests
+import json
+
+app = Flask(__name__)
+
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    """Endpoint para receber webhooks do WhatsApp API"""
+    try:
+        data = request.get_json()
+        event = data.get('event')
+        session_id = data.get('sessionId')
+        
+        print(f"Evento recebido: {event} da sessão: {session_id}")
+        
+        if event == 'message':
+            # Processar nova mensagem
+            message_data = data.get('data', {})
+            from_number = message_data.get('from')
+            message_text = message_data.get('body', '')
+            
+            print(f"Mensagem de {from_number}: {message_text}")
+            
+            # Exemplo: responder automaticamente
+            if message_text.lower() == 'oi':
+                send_message(session_id, from_number, "Olá! Como posso ajudar?")
+        
+        elif event == 'qr':
+            # Código QR disponível para escaneamento
+            qr_data = data.get('data')
+            print(f"Código QR para sessão {session_id}: {qr_data}")
+        
+        elif event == 'ready':
+            print(f"Cliente {session_id} está pronto!")
+        
+        return jsonify({"status": "success"}), 200
+    
+    except Exception as e:
+        print(f"Erro ao processar webhook: {e}")
+        return jsonify({"error": str(e)}), 500
+
+def send_message(session_id, to_number, message):
+    """Enviar mensagem via WhatsApp API"""
+    api_url = f"http://localhost:3000/client/sendText/{session_id}"
+    payload = {
+        "number": to_number,
+        "text": message
+    }
+    
+    try:
+        response = requests.post(api_url, json=payload)
+        return response.json()
+    except Exception as e:
+        print(f"Erro ao enviar mensagem: {e}")
+        return None
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
+```
+
+#### Node.js (Express)
+
+```javascript
+const express = require('express');
+const axios = require('axios');
+const app = express();
+
+app.use(express.json());
+
+// Endpoint para receber webhooks
+app.post('/webhook', async (req, res) => {
+    try {
+        const { event, sessionId, data } = req.body;
+        
+        console.log(`Evento recebido: ${event} da sessão: ${sessionId}`);
+        
+        switch (event) {
+            case 'message':
+                // Processar nova mensagem
+                const fromNumber = data?.from;
+                const messageText = data?.body || '';
+                
+                console.log(`Mensagem de ${fromNumber}: ${messageText}`);
+                
+                // Exemplo: responder automaticamente
+                if (messageText.toLowerCase() === 'oi') {
+                    await sendMessage(sessionId, fromNumber, 'Olá! Como posso ajudar?');
+                }
+                break;
+                
+            case 'qr':
+                // Código QR disponível para escaneamento
+                const qrData = data;
+                console.log(`Código QR para sessão ${sessionId}: ${qrData}`);
+                break;
+                
+            case 'ready':
+                console.log(`Cliente ${sessionId} está pronto!`);
+                break;
+                
+            case 'message_ack':
+                console.log(`Mensagem confirmada: ${data?.id}`);
+                break;
+                
+            case 'status':
+                console.log(`Status alterado: ${data?.status}`);
+                break;
+                
+            default:
+                console.log(`Evento não tratado: ${event}`);
+        }
+        
+        res.json({ status: 'success' });
+        
+    } catch (error) {
+        console.error('Erro ao processar webhook:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Função para enviar mensagem
+async function sendMessage(sessionId, toNumber, message) {
+    try {
+        const response = await axios.post(
+            `http://localhost:3000/client/sendText/${sessionId}`,
+            {
+                number: toNumber,
+                text: message
+            }
+        );
+        return response.data;
+    } catch (error) {
+        console.error('Erro ao enviar mensagem:', error);
+        return null;
+    }
+}
+
+// Função para iniciar sessão
+async function startSession(sessionId) {
+    try {
+        const response = await axios.post(
+            `http://localhost:3000/session/start/${sessionId}`
+        );
+        console.log(`Sessão ${sessionId} iniciada`);
+        return response.data;
+    } catch (error) {
+        console.error('Erro ao iniciar sessão:', error);
+        return null;
+    }
+}
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`Servidor webhook rodando na porta ${PORT}`);
+    
+    // Iniciar sessão automaticamente
+    startSession('DEMO');
+});
+```
+
+#### Python (FastAPI)
+
+```python
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
+import httpx
+import asyncio
+from typing import Dict, Any
+
+app = FastAPI()
+
+@app.post("/webhook")
+async def webhook_handler(request: Request):
+    """Endpoint para receber webhooks do WhatsApp API"""
+    try:
+        data = await request.json()
+        event = data.get('event')
+        session_id = data.get('sessionId')
+        
+        print(f"Evento recebido: {event} da sessão: {session_id}")
+        
+        if event == 'message':
+            # Processar nova mensagem
+            message_data = data.get('data', {})
+            from_number = message_data.get('from')
+            message_text = message_data.get('body', '')
+            
+            print(f"Mensagem de {from_number}: {message_text}")
+            
+            # Exemplo: responder automaticamente
+            if message_text.lower() == 'oi':
+                await send_message_async(session_id, from_number, "Olá! Como posso ajudar?")
+        
+        elif event == 'qr':
+            qr_data = data.get('data')
+            print(f"Código QR para sessão {session_id}: {qr_data}")
+        
+        elif event == 'ready':
+            print(f"Cliente {session_id} está pronto!")
+        
+        return JSONResponse(content={"status": "success"})
+    
+    except Exception as e:
+        print(f"Erro ao processar webhook: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def send_message_async(session_id: str, to_number: str, message: str):
+    """Enviar mensagem via WhatsApp API (assíncrono)"""
+    api_url = f"http://localhost:3000/client/sendText/{session_id}"
+    payload = {
+        "number": to_number,
+        "text": message
+    }
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(api_url, json=payload)
+            return response.json()
+        except Exception as e:
+            print(f"Erro ao enviar mensagem: {e}")
+            return None
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=5000)
+```
+
+### Configuração do Docker Compose
+
+Para testar webhooks localmente, você pode usar o seguinte `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+
+services:
+  whatsapp-api:
+    image: chrishubert/whatsapp-web-api
+    ports:
+      - "3000:3000"
+    environment:
+      - BASE_WEBHOOK_URL=http://webhook-server:5000/webhook
+      - ENABLE_SWAGGER_ENDPOINT=true
+    volumes:
+      - ./sessions:/app/sessions
+
+  webhook-server:
+    build: ./webhook-server  # Seu servidor webhook
+    ports:
+      - "5000:5000"
+    environment:
+      - WHATSAPP_API_URL=http://whatsapp-api:3000
+```
+
+### Testando Webhooks
+
+1. **Inicie o servidor webhook** (Python ou Node.js)
+2. **Configure a variável de ambiente** `BASE_WEBHOOK_URL` apontando para seu servidor
+3. **Inicie uma sessão** do WhatsApp
+4. **Envie uma mensagem** para o número conectado
+5. **Verifique os logs** do seu servidor webhook
+
+### Dicas de Produção
+
+- **Use HTTPS** para webhooks em produção
+- **Implemente retry logic** para falhas de entrega
+- **Valide assinaturas** se implementado pela API
+- **Monitore logs** para debugging
+- **Use filas** para processamento assíncrono de mensagens
+
+## Deploy em Produção
+
+- Carregue a imagem docker no docker-compose, ou seu ambiente Kubernetes
+- Desabilite a variável de ambiente `ENABLE_LOCAL_CALLBACK_EXAMPLE`
+- Defina a variável de ambiente `API_KEY` para proteger os endpoints REST
+- Execute periodicamente o endpoint `/api/terminateInactiveSessions` para evitar que sessões inúteis ocupem espaço e recursos (apenas no caso de você não ter controle das sessões)
+
+
+## Aviso Legal
+
+Este projeto não é afiliado, associado, autorizado, endossado por, ou de qualquer forma oficialmente conectado com o WhatsApp ou qualquer uma de suas subsidiárias ou afiliadas. O site oficial do WhatsApp pode ser encontrado em https://whatsapp.com. "WhatsApp" bem como nomes relacionados, marcas, emblemas e imagens são marcas registradas de seus respectivos proprietários.
+
+## Licença
+
+Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE.md](./LICENSE.md) para detalhes.
+
+
+
+
+https://www.youtube.com/watch?v=-PR--fZVCkg
+https://github.com/pedroherpeto/whatsapp-api 

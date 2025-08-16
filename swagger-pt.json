@@ -1,0 +1,1035 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "WhatsApp API",
+    "description": "API Wrapper para WhatsAppWebJS - Interface REST para interagir com o WhatsApp Web",
+    "version": "1.0.0"
+  },
+  "host": "",
+  "tags": [
+    {
+      "name": "Sessão",
+      "description": "Gerenciamento de múltiplas sessões, criação e exclusão"
+    },
+    {
+      "name": "Cliente",
+      "description": "Todas as funções relacionadas ao cliente WhatsApp"
+    },
+    {
+      "name": "Mensagem",
+      "description": "Pode falhar se a mensagem for muito antiga (Apenas das últimas 100 mensagens do chat)"
+    },
+    {
+      "name": "Chat",
+      "description": "Operações relacionadas a chats individuais"
+    },
+    {
+      "name": "Grupo",
+      "description": "Operações relacionadas a grupos do WhatsApp"
+    },
+    {
+      "name": "Contato",
+      "description": "Operações relacionadas a contatos"
+    },
+    {
+      "name": "Diversos",
+      "description": "Endpoints diversos e utilitários"
+    }
+  ],
+  "paths": {
+    "/ping": {
+      "get": {
+        "tags": [
+          "Diversos"
+        ],
+        "summary": "Verificar Status da API",
+        "description": "Verifica se a API está funcionando corretamente",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "API funcionando normalmente"
+          }
+        }
+      }
+    },
+    "/localCallbackExample": {
+      "post": {
+        "tags": [
+          "Diversos"
+        ],
+        "summary": "Exemplo de Webhook Local",
+        "description": "Endpoint de exemplo para receber webhooks localmente (para testes)",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Chave da API para autenticação"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook recebido com sucesso"
+          },
+          "403": {
+            "description": "Acesso negado - Chave da API inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/session/start/{sessionId}": {
+      "get": {
+        "tags": [
+          "Sessão"
+        ],
+        "summary": "Iniciar Nova Sessão",
+        "description": "Inicia uma nova sessão para o ID de sessão fornecido.",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único para a sessão (alfanumérico e - permitidos)",
+            "example": "f8377d8d-a589-4242-9ba6-9486a04ef80c"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status da sessão iniciada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartSessionResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Acesso negado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Entidade não processável.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/session/status/{sessionId}": {
+      "get": {
+        "tags": [
+          "Sessão"
+        ],
+        "summary": "Obter Status da Sessão",
+        "description": "Status da sessão com o ID de sessão fornecido.",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único para a sessão (alfanumérico e - permitidos)",
+            "example": "f8377d8d-a589-4242-9ba6-9486a04ef80c"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status da sessão.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusSessionResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Acesso negado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Entidade não processável.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/session/qr/{sessionId}": {
+      "get": {
+        "tags": [
+          "Sessão"
+        ],
+        "summary": "Obter Código QR",
+        "description": "Retorna o código QR para autenticação da sessão.",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único para a sessão",
+            "example": "f8377d8d-a589-4242-9ba6-9486a04ef80c"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Código QR da sessão.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QrSessionResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Acesso negado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Entidade não processável.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/session/qr/{sessionId}/image": {
+      "get": {
+        "tags": [
+          "Sessão"
+        ],
+        "summary": "Obter Imagem do Código QR",
+        "description": "Retorna a imagem do código QR para autenticação da sessão.",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único para a sessão",
+            "example": "f8377d8d-a589-4242-9ba6-9486a04ef80c"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Imagem do código QR da sessão.",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Acesso negado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Entidade não processável.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/session/terminate/{sessionId}": {
+      "get": {
+        "tags": [
+          "Sessão"
+        ],
+        "summary": "Encerrar Sessão",
+        "description": "Encerra a sessão com o ID fornecido.",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único para a sessão",
+            "example": "f8377d8d-a589-4242-9ba6-9486a04ef80c"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sessão encerrada com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminateSessionResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Acesso negado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Entidade não processável.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/session/terminateInactive": {
+      "get": {
+        "tags": [
+          "Sessão"
+        ],
+        "summary": "Encerrar Sessões Inativas",
+        "description": "Encerra todas as sessões inativas.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Sessões inativas encerradas com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminateInactiveSessionsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Acesso negado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/session/terminateAll": {
+      "get": {
+        "tags": [
+          "Sessão"
+        ],
+        "summary": "Encerrar Todas as Sessões",
+        "description": "Encerra todas as sessões ativas.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Todas as sessões encerradas com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TerminateAllSessionsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Acesso negado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/client/getContacts/{sessionId}": {
+      "get": {
+        "tags": [
+          "Cliente"
+        ],
+        "summary": "Obter Contatos",
+        "description": "Retorna todos os contatos do WhatsApp.",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único para a sessão",
+            "example": "f8377d8d-a589-4242-9ba6-9486a04ef80c"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de contatos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetContactsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Acesso negado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Entidade não processável.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/client/sendMessage/{sessionId}": {
+      "post": {
+        "tags": [
+          "Cliente"
+        ],
+        "summary": "Enviar Mensagem",
+        "description": "Envia uma mensagem para um número específico.",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único para a sessão",
+            "example": "f8377d8d-a589-4242-9ba6-9486a04ef80c"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "string",
+                    "description": "Número do destinatário (formato: 5511999999999)",
+                    "example": "5511999999999"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "Texto da mensagem",
+                    "example": "Olá! Como você está?"
+                  },
+                  "options": {
+                    "type": "object",
+                    "description": "Opções adicionais para a mensagem",
+                    "properties": {
+                      "linkPreview": {
+                        "type": "boolean",
+                        "description": "Habilitar preview de links",
+                        "default": false
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "number",
+                  "message"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mensagem enviada com sucesso.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendMessageResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Acesso negado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Entidade não processável.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/client/getState/{sessionId}": {
+      "get": {
+        "tags": [
+          "Cliente"
+        ],
+        "summary": "Obter Estado do Cliente",
+        "description": "Retorna o estado atual do cliente WhatsApp.",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Identificador único para a sessão",
+            "example": "f8377d8d-a589-4242-9ba6-9486a04ef80c"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Estado do cliente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetStateResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Acesso negado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Entidade não processável.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro do servidor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": "Chave da API para autenticação"
+      }
+    },
+    "schemas": {
+      "StartSessionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indica se a operação foi bem-sucedida"
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensagem descritiva do resultado"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Status da sessão",
+                "enum": ["STARTING", "QRCODE", "WORKING", "FAILED", "STOPPED"]
+              },
+              "qrcode": {
+                "type": "string",
+                "description": "Código QR para autenticação (se aplicável)"
+              }
+            }
+          }
+        }
+      },
+      "StatusSessionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indica se a operação foi bem-sucedida"
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensagem descritiva do resultado"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "description": "Status da sessão",
+                "enum": ["STARTING", "QRCODE", "WORKING", "FAILED", "STOPPED"]
+              },
+              "qrcode": {
+                "type": "string",
+                "description": "Código QR para autenticação (se aplicável)"
+              }
+            }
+          }
+        }
+      },
+      "QrSessionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indica se a operação foi bem-sucedida"
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensagem descritiva do resultado"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "qrcode": {
+                "type": "string",
+                "description": "Código QR para autenticação"
+              }
+            }
+          }
+        }
+      },
+      "TerminateSessionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indica se a operação foi bem-sucedida"
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensagem descritiva do resultado"
+          }
+        }
+      },
+      "TerminateInactiveSessionsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indica se a operação foi bem-sucedida"
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensagem descritiva do resultado"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "terminatedSessions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Lista de sessões encerradas"
+              }
+            }
+          }
+        }
+      },
+      "TerminateAllSessionsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indica se a operação foi bem-sucedida"
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensagem descritiva do resultado"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "terminatedSessions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Lista de sessões encerradas"
+              }
+            }
+          }
+        }
+      },
+      "GetContactsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indica se a operação foi bem-sucedida"
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensagem descritiva do resultado"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "ID do contato"
+                },
+                "name": {
+                  "type": "string",
+                  "description": "Nome do contato"
+                },
+                "number": {
+                  "type": "string",
+                  "description": "Número do contato"
+                },
+                "isGroup": {
+                  "type": "boolean",
+                  "description": "Indica se é um grupo"
+                }
+              }
+            },
+            "description": "Lista de contatos"
+          }
+        }
+      },
+      "SendMessageResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indica se a operação foi bem-sucedida"
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensagem descritiva do resultado"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "messageId": {
+                "type": "string",
+                "description": "ID da mensagem enviada"
+              },
+              "timestamp": {
+                "type": "number",
+                "description": "Timestamp da mensagem"
+              }
+            }
+          }
+        }
+      },
+      "GetStateResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Indica se a operação foi bem-sucedida"
+          },
+          "message": {
+            "type": "string",
+            "description": "Mensagem descritiva do resultado"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "description": "Estado atual do cliente",
+                "enum": ["CONFLICT", "CONNECTED", "DEPRECATED_VERSION", "OPENING", "PAIRING", "PROXYBLOCK", "SMB_TOS_BLOCK", "TIMEOUT", "TOS_BLOCK", "UNLAUNCHED", "UNPAIRED", "UNPAIRED_IDLE"]
+              }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Sempre false para erros"
+          },
+          "error": {
+            "type": "string",
+            "description": "Mensagem de erro descritiva"
+          }
+        }
+      },
+      "ForbiddenResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Sempre false para erros de acesso"
+          },
+          "error": {
+            "type": "string",
+            "description": "Mensagem de erro de acesso negado"
+          }
+        }
+      }
+    }
+  }
+} 

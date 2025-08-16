@@ -1,8 +1,8 @@
 const express = require('express')
 const routes = express.Router()
 const swaggerUi = require('swagger-ui-express')
-const swaggerDocument = require('../swagger.json')
 const { enableLocalCallbackExample, enableSwaggerEndpoint } = require('./config')
+const { getSwaggerConfig, getAvailableLanguages, isLanguageAvailable } = require('../swagger-config')
 
 const middleware = require('./middleware')
 const healthController = require('./controllers/healthController')
@@ -181,7 +181,73 @@ contactRouter.post('/getProfilePicUrl/:sessionId', [middleware.sessionNameValida
  */
 if (enableSwaggerEndpoint) {
   routes.use('/api-docs', swaggerUi.serve)
-  routes.get('/api-docs', swaggerUi.setup(swaggerDocument) /* #swagger.ignore = true */)
+  
+  // Rota principal - Página de seleção de idioma
+  routes.get('/api-docs', (req, res) => {
+    const fs = require('fs')
+    const path = require('path')
+    const htmlPath = path.join(__dirname, '..', 'swagger-language-selector.html')
+    
+    if (fs.existsSync(htmlPath)) {
+      const html = fs.readFileSync(htmlPath, 'utf8')
+      res.setHeader('Content-Type', 'text/html')
+      res.send(html)
+    } else {
+      // Fallback para interface padrão em inglês
+      const swaggerDocument = getSwaggerConfig('en')
+      res.send(swaggerUi.generateHTML(swaggerDocument))
+    }
+  })
+  
+  // Rota do Swagger em inglês
+  routes.get('/api-docs/en', (req, res) => {
+    const swaggerDocument = getSwaggerConfig('en')
+    res.send(swaggerUi.generateHTML(swaggerDocument))
+  })
+  
+  // Rota do Swagger em português
+  routes.get('/api-docs/pt', (req, res) => {
+    const swaggerDocument = getSwaggerConfig('pt')
+    res.send(swaggerUi.generateHTML(swaggerDocument))
+  })
+  
+  // Rota para servir arquivos estáticos do Swagger UI
+  routes.get('/api-docs/swagger-ui-custom.html', (req, res) => {
+    const fs = require('fs')
+    const path = require('path')
+    const htmlPath = path.join(__dirname, '..', 'swagger-ui-custom.html')
+    
+    if (fs.existsSync(htmlPath)) {
+      res.sendFile(htmlPath)
+    } else {
+      res.status(404).send('Arquivo não encontrado')
+    }
+  })
+  
+  // Rota para listar idiomas disponíveis
+  routes.get('/api-docs/languages', (req, res) => {
+    const languages = getAvailableLanguages()
+    res.json({
+      success: true,
+      message: 'Idiomas disponíveis para documentação',
+      data: languages
+    })
+  })
+  
+  // Rota dinâmica para qualquer idioma (retorna JSON para a interface customizada)
+  routes.get('/api-docs/:language', (req, res) => {
+    const { language } = req.params
+    
+    if (!isLanguageAvailable(language)) {
+      return res.status(404).json({
+        success: false,
+        error: `Idioma '${language}' não disponível. Use /api-docs/languages para ver idiomas disponíveis.`
+      })
+    }
+    
+    const swaggerDocument = getSwaggerConfig(language)
+    res.json(swaggerDocument)
+  })
 }
 
 module.exports = { routes }

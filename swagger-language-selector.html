@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp API - Selecione o Idioma</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        .logo {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #25D366;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 2rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1rem;
+            margin-bottom: 40px;
+            line-height: 1.5;
+        }
+        
+        .language-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .language-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            border: none;
+            border-radius: 15px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .language-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .language-btn:hover::before {
+            left: 100%;
+        }
+        
+        .language-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-pt {
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+        }
+        
+        .btn-en {
+            background: linear-gradient(135deg, #4990e2 0%, #2E5BBA 100%);
+        }
+        
+        .flag {
+            font-size: 1.5rem;
+            margin-right: 15px;
+        }
+        
+        .language-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .language-name {
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+        
+        .language-desc {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            font-weight: 400;
+        }
+        
+        .features {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+        
+        .features h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+        
+        .feature-list {
+            list-style: none;
+            text-align: left;
+        }
+        
+        .feature-list li {
+            color: #666;
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .feature-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #25D366;
+            font-weight: bold;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            color: #999;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .language-btn {
+                padding: 15px;
+                font-size: 1rem;
+            }
+            
+            .flag {
+                font-size: 1.2rem;
+                margin-right: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">📱</div>
+        <h1>WhatsApp API</h1>
+        <p class="subtitle">Selecione o idioma da documentação que você prefere</p>
+        
+        <div class="language-buttons">
+            <a href="/api-docs/pt" class="language-btn btn-pt">
+                <span class="flag">🇧🇷</span>
+                <div class="language-info">
+                    <div class="language-name">Português</div>
+                    <div class="language-desc">Documentação em português brasileiro</div>
+                </div>
+            </a>
+            
+            <a href="/api-docs/en" class="language-btn btn-en">
+                <span class="flag">🇺🇸</span>
+                <div class="language-info">
+                    <div class="language-name">English</div>
+                    <div class="language-desc">Documentation in English</div>
+                </div>
+            </a>
+        </div>
+        
+        <div class="features">
+            <h3>✨ Funcionalidades da API</h3>
+            <ul class="feature-list">
+                <li>Envio de mensagens de texto, mídia e documentos</li>
+                <li>Gerenciamento de grupos e contatos</li>
+                <li>Webhooks em tempo real</li>
+                <li>Múltiplas sessões simultâneas</li>
+                <li>Interface REST completa</li>
+            </ul>
+        </div>
+        
+        <div class="footer">
+            <p>Documentação interativa com Swagger UI</p>
+            <p>Escolha o idioma e comece a usar a API!</p>
+        </div>
+    </div>
+</body>
+</html> 
