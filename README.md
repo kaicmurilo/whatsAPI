@@ -3,57 +3,29 @@
 API REST wrapper para a biblioteca [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js), fornecendo uma interface fácil de usar para interagir com a plataforma WhatsApp Web.
 Foi projetada para ser usada como um container Docker, escalável, segura e fácil de integrar com outros projetos não-NodeJs.
 
-Este projeto está em desenvolvimento: dê uma estrela, crie issues, funcionalidades ou pull requests ❣️
+Este projeto está em desenvolvimento: dê uma estrela, crie issues, funcionalidades.
 
 **OBSERVAÇÃO**: Não posso garantir que você não será bloqueado ao usar este método, embora tenha funcionado para mim. O WhatsApp não permite bots ou clientes não oficiais em sua plataforma, então isso não deve ser considerado totalmente seguro.
 
 ## Índice
 
-[1. Início Rápido com Docker](#início-rápido-com-docker)
+[1. Funcionalidades](#funcionalidades)
 
-[2. Funcionalidades](#funcionalidades)
+[2. Executar Localmente](#executar-localmente)
 
-[3. Executar Localmente](#executar-localmente)
+[3. Testes](#testes)
 
-[4. Testes](#testes)
+[4. Documentação](#documentação)
 
-[5. Documentação](#documentação)
+[5. Webhooks](#webhooks)
 
-[6. Webhooks](#webhooks)
+[6. Deploy em Produção](#deploy-em-produção)
 
-[7. Deploy em Produção](#deploy-em-produção)
+[7. Contribuindo](#contribuindo)
 
-[8. Contribuindo](#contribuindo)
+[8. Licença](#licença)
 
-[9. Licença](#licença)
-
-[10. Histórico de Estrelas](#histórico-de-estrelas)
-
-## Início Rápido com Docker
-
-[![dockeri.co](https://dockerico.blankenship.io/image/chrishubert/whatsapp-web-api)](https://hub.docker.com/r/chrishubert/whatsapp-web-api)
-
-1. Clone o repositório:
-
-```bash
-git clone https://github.com/chrishubert/whatsapp-api.git
-cd whatsapp-api
-```
-
-3. Execute o Docker Compose:
-
-```bash
-docker-compose pull && docker-compose up
-```
-4. Visite http://localhost:3000/session/start/ABCD
-
-5. Escaneie o QR no seu console usando o aplicativo WhatsApp mobile -> Dispositivo Vinculado -> Vincular um Dispositivo (pode demorar para configurar a sessão)
-
-6. Visite http://localhost:3000/client/getContacts/ABCD
-
-7. EXTRA: Veja todos os dados de callbacks em `./session/message_log.txt`
-
-![Início Rápido](./assets/basic_start.gif)
+[9. Histórico de Estrelas](#histórico-de-estrelas)
 
 ## Funcionalidades
 
@@ -88,22 +60,22 @@ docker-compose pull && docker-compose up
 | Atualizar Assunto do Grupo  | ✅     |                                        |        |                                                |        |
 | Atualizar Descrição         | ✅     |                                        |        |                                                |        |
 
-3. Gerencia múltiplas sessões de cliente (dados da sessão salvos localmente), identificadas por ID único
+2. Gerencia múltiplas sessões de cliente (dados da sessão salvos localmente), identificadas por ID único
 
-4. Todos os endpoints podem ser protegidos por uma chave de API global
+3. Todos os endpoints podem ser protegidos por uma chave de API global
 
-5. Na inicialização do servidor, todas as sessões existentes são restauradas
+4. Na inicialização do servidor, todas as sessões existentes são restauradas
 
-6. Define mensagens automaticamente como lidas
+5. Define mensagens automaticamente como lidas
 
-7. Desabilita qualquer um dos callbacks
+6. Desabilita qualquer um dos callbacks
 
 ## Executar Localmente
 
 1. Clone o repositório:
 
 ```bash
-git clone https://github.com/chrishubert/whatsapp-api.git
+git clone https://github.com/kaicmurilo/whatsAPI.git
 cd whatsapp-api
 ```
 
@@ -137,7 +109,7 @@ npm run test
 
 ## Documentação
 
-A documentação da API pode ser encontrada no arquivo [`swagger.json`](https://raw.githubusercontent.com/chrishubert/whatsapp-api/master/swagger.json). Veja este arquivo diretamente no [Swagger Editor](https://editor.swagger.io/?url=https://raw.githubusercontent.com/chrishubert/whatsapp-api/master/swagger.json) ou em qualquer outra ferramenta compatível com OpenAPI para visualizar e interagir com a documentação da API.
+A documentação da API pode ser encontrada no arquivo [`swagger.json`](https://raw.githubusercontent.com/kaicmurilo/whatsAPI/master/swagger.json). Veja este arquivo diretamente no [Swagger Editor](https://editor.swagger.io/?url=https://raw.githubusercontent.com/kaicmurilo/whatsAPI/master/swagger.json) ou em qualquer outra ferramenta compatível com OpenAPI para visualizar e interagir com a documentação da API.
 
 Esta documentação é direta se você estiver familiarizado com a biblioteca whatsapp-web.js (https://docs.wwebjs.dev/)
 Se você ainda estiver confuso - abra uma issue e eu vou melhorá-la.
@@ -459,6 +431,9 @@ services:
 - Defina a variável de ambiente `API_KEY` para proteger os endpoints REST
 - Execute periodicamente o endpoint `/api/terminateInactiveSessions` para evitar que sessões inúteis ocupem espaço e recursos (apenas no caso de você não ter controle das sessões)
 
+## Contribuindo
+
+Contribuições são bem-vindas! Por favor, leia o arquivo [CONTRIBUTING.md](./CONTRIBUTING.md) para detalhes sobre como contribuir para este projeto.
 
 ## Aviso Legal
 
@@ -468,8 +443,6 @@ Este projeto não é afiliado, associado, autorizado, endossado por, ou de qualq
 
 Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE.md](./LICENSE.md) para detalhes.
 
+## Histórico de Estrelas
 
-
-
-https://www.youtube.com/watch?v=-PR--fZVCkg
-https://github.com/pedroherpeto/whatsapp-api 
+[![Star History Chart](https://api.star-history.com/svg?repos=kaicmurilo/whatsAPI&type=Date)](https://star-history.com/#kaicmurilo/whatsAPI&Date) 
