@@ -1,4 +1,3 @@
-require('./routes')
 const { restoreSessions } = require('./sessions')
 const { routes } = require('./routes')
 const app = require('express')()
