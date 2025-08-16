@@ -216,12 +216,39 @@ npm run test
 
 ## Documentação
 
-A documentação da API pode ser encontrada no arquivo [`swagger.json`](https://raw.githubusercontent.com/kaicmurilo/whatsAPI/master/swagger.json). Veja este arquivo diretamente no [Swagger Editor](https://editor.swagger.io/?url=https://raw.githubusercontent.com/kaicmurilo/whatsAPI/master/swagger.json) ou em qualquer outra ferramenta compatível com OpenAPI para visualizar e interagir com a documentação da API.
+A documentação da API está disponível em **inglês** e **português**:
 
-Esta documentação é direta se você estiver familiarizado com a biblioteca whatsapp-web.js (https://docs.wwebjs.dev/)
-Se você ainda estiver confuso - abra uma issue e eu vou melhorá-la.
+### 📖 Documentação Online
+- **Inglês**: [`swagger.json`](https://raw.githubusercontent.com/kaicmurilo/whatsAPI/master/swagger.json)
+- **Português**: [`swagger-pt.json`](https://raw.githubusercontent.com/kaicmurilo/whatsAPI/master/swagger-pt.json)
 
-Além disso, há uma opção para executar o endpoint de documentação localmente definindo a variável de ambiente `ENABLE_SWAGGER_ENDPOINT`. Reinicie o serviço e vá para o endpoint `/api-docs` para vê-lo.
+### 🔧 Visualizar Documentação
+- **Swagger Editor**: [Visualizar em inglês](https://editor.swagger.io/?url=https://raw.githubusercontent.com/kaicmurilo/whatsAPI/master/swagger.json)
+- **Local**: Acesse `http://localhost:3000/api-docs` (requer `ENABLE_SWAGGER_ENDPOINT=true`)
+
+### 📝 Gerar Documentação
+
+```bash
+# Gerar documentação em inglês
+npm run swagger
+
+# Sincronizar documentação em português
+npm run swagger:sync-pt
+```
+
+### 🌐 Seleção de Idioma
+A documentação local (`/api-docs`) permite escolher entre:
+- 🇺🇸 **Inglês** (`/api-docs/en`)
+- 🇧🇷 **Português** (`/api-docs/pt`)
+
+### 📚 Recursos
+- **92+ endpoints** documentados
+- **Exemplos práticos** para cada endpoint
+- **Schemas completos** de request/response
+- **Autenticação** via API Key
+- **Webhooks** e callbacks
+
+Esta documentação é direta se você estiver familiarizado com a biblioteca [whatsapp-web.js](https://docs.wwebjs.dev/).
 
 Por padrão, todos os eventos de callback são entregues ao webhook definido com a variável de ambiente `BASE_WEBHOOK_URL`.
 Isso pode ser substituído definindo a variável de ambiente `*_WEBHOOK_URL`, onde `*` é seu sessionId.

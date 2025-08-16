@@ -7,6 +7,7 @@
     "start": "node server.js",
     "test": "jest --runInBand",
     "swagger": "node swagger.js",
+    "swagger:sync-pt": "node scripts/sync-swagger-pt.js",
     "debug": "node --inspect server.js",
     "test:cache": "node scripts/test-cache.js",
     "redis:start": "cd docker-redis && ./start-redis.sh",
