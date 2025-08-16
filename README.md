@@ -442,7 +442,3 @@ Este projeto não é afiliado, associado, autorizado, endossado por, ou de qualq
 ## Licença
 
 Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE.md](./LICENSE.md) para detalhes.
-
-## Histórico de Estrelas
-
-[![Star History Chart](https://api.star-history.com/svg?repos=kaicmurilo/whatsAPI&type=Date)](https://star-history.com/#kaicmurilo/whatsAPI&Date) 
