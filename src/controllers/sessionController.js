@@ -19,6 +19,20 @@ const startSession = async (req, res) => {
   // #swagger.description = 'Starts a session for the given session ID.'
   try {
     const sessionId = req.params.sessionId
+    
+    // Se o cliente está autenticado, atualizar status da sessão
+    if (req.client && req.session) {
+      try {
+        const { query } = require('../database')
+        await query(
+          'UPDATE whatsapp_sessions SET status = $1 WHERE session_id = $2 AND client_id = $3',
+          ['starting', sessionId, req.client.client_id]
+        )
+      } catch (error) {
+        console.error('Erro ao atualizar status da sessão:', error)
+      }
+    }
+    
     const setupSessionReturn = setupSession(sessionId)
     if (!setupSessionReturn.success) {
       /* #swagger.responses[422] = {
@@ -44,7 +58,21 @@ const startSession = async (req, res) => {
     */
     // wait until the client is created
     waitForNestedObject(setupSessionReturn.client, 'pupPage')
-      .then(res.json({ success: true, message: setupSessionReturn.message }))
+      .then(async () => {
+        // Se o cliente está autenticado, atualizar status para connected
+        if (req.client && req.session) {
+          try {
+            const { query } = require('../database')
+            await query(
+              'UPDATE whatsapp_sessions SET status = $1 WHERE session_id = $2 AND client_id = $3',
+              ['connected', sessionId, req.client.client_id]
+            )
+          } catch (error) {
+            console.error('Erro ao atualizar status da sessão:', error)
+          }
+        }
+        res.json({ success: true, message: setupSessionReturn.message })
+      })
       .catch((err) => { sendErrorResponse(res, 500, err.message) })
   } catch (error) {
   /* #swagger.responses[500] = {
@@ -213,6 +241,20 @@ const terminateSession = async (req, res) => {
       return res.json(validation)
     }
     await deleteSession(sessionId, validation)
+    
+    // Se o cliente está autenticado, atualizar status da sessão
+    if (req.client && req.session) {
+      try {
+        const { query } = require('../database')
+        await query(
+          'UPDATE whatsapp_sessions SET status = $1 WHERE session_id = $2 AND client_id = $3',
+          ['terminated', sessionId, req.client.client_id]
+        )
+      } catch (error) {
+        console.error('Erro ao atualizar status da sessão:', error)
+      }
+    }
+    
     /* #swagger.responses[200] = {
       description: "Sessions terminated.",
       content: {

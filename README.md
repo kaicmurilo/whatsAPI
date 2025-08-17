@@ -14,23 +14,25 @@ Este projeto está em desenvolvimento: dê uma estrela, crie issues, funcionalid
 
 [1. Funcionalidades](#funcionalidades)
 
-[2. Executar Localmente](#executar-localmente)
+[2. Sistema de Autenticação](#sistema-de-autenticação)
 
-[3. Sistema de Cache](#sistema-de-cache)
+[3. Executar Localmente](#executar-localmente)
 
-[4. Testes](#testes)
+[4. Sistema de Cache](#sistema-de-cache)
 
-[5. Documentação](#documentação)
+[5. Testes](#testes)
 
-[6. Webhooks](#webhooks)
+[6. Documentação](#documentação)
 
-[7. Deploy em Produção](#deploy-em-produção)
+[7. Webhooks](#webhooks)
 
-[8. Contribuindo](#contribuindo)
+[8. Deploy em Produção](#deploy-em-produção)
 
-[9. Licença](#licença)
+[9. Contribuindo](#contribuindo)
 
-[10. Histórico de Estrelas](#histórico-de-estrelas)
+[10. Licença](#licença)
+
+[11. Histórico de Estrelas](#histórico-de-estrelas)
 
 ## Funcionalidades
 
@@ -77,6 +79,52 @@ Este projeto está em desenvolvimento: dê uma estrela, crie issues, funcionalid
 
 7. **Sistema de Cache Inteligente** - Cache Redis para melhorar performance e reduzir requests ao WhatsApp
 
+8. **Sistema de Autenticação Completo** - Gerenciamento de clientes, tokens JWT e controle de acesso
+
+## Sistema de Autenticação
+
+O projeto agora inclui um sistema completo de autenticação e autorização:
+
+### 🎯 Características
+
+- **Gerenciamento de Clientes**: Criação, atualização e remoção de clientes
+- **Autenticação JWT**: Tokens de acesso e renovação seguros
+- **Controle de Escopo**: Permissões granulares por endpoint
+- **Banco PostgreSQL**: Armazenamento seguro de dados
+- **Segurança**: Criptografia de senhas e validação de tokens
+
+### 🚀 Início Rápido
+
+```bash
+# 1. Iniciar PostgreSQL
+npm run postgres:start
+
+# 2. Inicializar banco de dados
+npm run db:init
+
+# 3. Criar cliente
+curl -X POST http://localhost:3000/auth/clients \
+  -H "Content-Type: application/json" \
+  -d '{
+    "client_name": "Meu App",
+    "description": "Aplicação de teste"
+  }'
+
+# 4. Autenticar e obter token
+curl -X POST http://localhost:3000/auth/authenticate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "client_id": "SEU_CLIENT_ID",
+    "client_secret": "SEU_CLIENT_SECRET",
+    "scope": "read write"
+  }'
+```
+
+### 📚 Documentação Completa
+
+Para mais detalhes sobre o sistema de autenticação, consulte:
+- [Documentação Completa do Sistema de Autenticação](docs/AUTH_SYSTEM.md)
+
 ## Executar Localmente
 
 1. Clone o repositório:
@@ -98,13 +146,48 @@ npm install
 cp .env.example .env
 ```
 
-4. Execute a aplicação:
+4. Inicie os serviços necessários:
+
+```bash
+# Iniciar PostgreSQL (para autenticação)
+npm run postgres:start
+
+# Iniciar Redis (para cache)
+npm run redis:start
+
+# Inicializar banco de dados
+npm run db:init
+```
+
+5. Execute a aplicação:
 
 ```bash
 npm run start
 ```
 
-5. Acesse a API em `http://localhost:3000`
+6. Acesse a API em `http://localhost:3000`
+
+### 🔧 Comandos Úteis
+
+```bash
+# Gerenciar PostgreSQL
+npm run postgres:start    # Iniciar PostgreSQL
+npm run postgres:stop     # Parar PostgreSQL
+npm run postgres:logs     # Ver logs do PostgreSQL
+
+# Gerenciar Redis
+npm run redis:start       # Iniciar Redis
+npm run redis:stop        # Parar Redis
+npm run redis:logs        # Ver logs do Redis
+
+# Gerenciar banco de dados
+npm run db:init           # Inicializar banco
+npm run db:reset          # Reset completo do banco
+
+# Acessar interfaces web
+# pgAdmin: http://localhost:8082 (admin@whatsapp.com / admin123)
+# Redis Commander: http://localhost:8081
+```
 
 ## Sistema de Cache
 
@@ -213,6 +296,52 @@ Execute a suíte de testes com o seguinte comando:
 ```bash
 npm run test
 ```
+
+### 🗄️ Validação de Banco de Dados
+
+A aplicação inclui validação automática do banco de dados PostgreSQL:
+
+#### Teste de Validação
+```bash
+npm run test:database
+```
+
+#### Validação Automática
+- ✅ Verificação de conexão na inicialização
+- ✅ Teste de credenciais e permissões
+- ✅ Endpoint de status: `GET /database/status`
+- ✅ Logs detalhados de diagnóstico
+
+#### Scripts Disponíveis
+```bash
+# Teste de validação do banco
+npm run test:database
+
+# Teste de cenários de validação (estrutura, dados, índices)
+npm run test:database-scenarios
+
+# Teste de autenticação
+npm run test:auth
+
+# Teste de propriedade de sessão
+npm run test:session-ownership
+
+# Teste de admin master
+npm run test:admin-master
+```
+
+Para mais detalhes, consulte a [documentação de validação de banco](docs/DATABASE_VALIDATION.md).
+
+### 🧹 Código Limpo
+
+A aplicação segue princípios de código limpo e responsabilidade única:
+
+- ✅ **Separação de responsabilidades** em serviços dedicados
+- ✅ **AppInitializer**: Gerencia inicialização de todos os serviços
+- ✅ **AppCleanup**: Gerencia encerramento limpo da aplicação
+- ✅ **app.js simplificado**: Foco apenas na configuração do Express
+
+Para mais detalhes, consulte a [documentação de estrutura de código](docs/CODE_STRUCTURE.md).
 
 ## Documentação
 

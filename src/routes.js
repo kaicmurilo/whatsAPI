@@ -13,6 +13,16 @@ const groupChatController = require('./controllers/groupChatController')
 const messageController = require('./controllers/messageController')
 const contactController = require('./controllers/contactController')
 
+// Importar rotas de autenticação
+const authRoutes = require('./routes/authRoutes')
+
+/**
+ * ================
+ * AUTH ENDPOINTS
+ * ================
+ */
+routes.use('/auth', authRoutes)
+
 /**
  * ================
  * HEALTH ENDPOINTS
@@ -25,6 +35,9 @@ routes.get('/ping', healthController.ping)
 // Cache management endpoints
 routes.get('/cache/status', healthController.cacheStatus)
 routes.post('/cache/clear', [middleware.apikey], healthController.clearCache)
+
+// Database status endpoint
+routes.get('/database/status', healthController.databaseStatus)
 
 // API basic callback
 if (enableLocalCallbackExample) {
@@ -41,13 +54,68 @@ sessionRouter.use(middleware.apikey)
 sessionRouter.use(middleware.sessionSwagger)
 routes.use('/session', sessionRouter)
 
-sessionRouter.get('/start/:sessionId', middleware.sessionNameValidation, sessionController.startSession)
-sessionRouter.get('/status/:sessionId', middleware.sessionNameValidation, sessionController.statusSession)
-sessionRouter.get('/qr/:sessionId', middleware.sessionNameValidation, sessionController.sessionQrCode)
-sessionRouter.get('/qr/:sessionId/image', middleware.sessionNameValidation, sessionController.sessionQrCodeImage)
-sessionRouter.get('/terminate/:sessionId', middleware.sessionNameValidation, sessionController.terminateSession)
-sessionRouter.get('/terminateInactive', sessionController.terminateInactiveSessions)
-sessionRouter.get('/terminateAll', sessionController.terminateAllSessions)
+// Rotas que requerem autenticação e verificação de propriedade da sessão
+sessionRouter.get('/start/:sessionId', 
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken, 
+  middleware.requireActiveClient,
+  middleware.requireSessionOwnershipOrCreate,
+  middleware.sessionNameValidation, 
+  sessionController.startSession
+)
+
+sessionRouter.get('/status/:sessionId', 
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken, 
+  middleware.requireActiveClient,
+  middleware.requireSessionOwnership,
+  middleware.sessionNameValidation, 
+  sessionController.statusSession
+)
+
+sessionRouter.get('/qr/:sessionId', 
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken, 
+  middleware.requireActiveClient,
+  middleware.requireSessionOwnership,
+  middleware.sessionNameValidation, 
+  sessionController.sessionQrCode
+)
+
+sessionRouter.get('/qr/:sessionId/image', 
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken, 
+  middleware.requireActiveClient,
+  middleware.requireSessionOwnership,
+  middleware.sessionNameValidation, 
+  sessionController.sessionQrCodeImage
+)
+
+sessionRouter.get('/terminate/:sessionId', 
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken, 
+  middleware.requireActiveClient,
+  middleware.requireSessionOwnership,
+  middleware.sessionNameValidation, 
+  sessionController.terminateSession
+)
+
+// Rotas administrativas (requerem escopo admin)
+sessionRouter.get('/terminateInactive', 
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken, 
+  middleware.requireActiveClient,
+  middleware.requireScope('admin'),
+  sessionController.terminateInactiveSessions
+)
+
+sessionRouter.get('/terminateAll', 
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken, 
+  middleware.requireActiveClient,
+  middleware.requireScope('admin'),
+  sessionController.terminateAllSessions
+)
 
 /**
  * ================
@@ -57,43 +125,60 @@ sessionRouter.get('/terminateAll', sessionController.terminateAllSessions)
 
 const clientRouter = express.Router()
 clientRouter.use(middleware.apikey)
-sessionRouter.use(middleware.clientSwagger)
+clientRouter.use(middleware.clientSwagger)
 routes.use('/client', clientRouter)
 
-clientRouter.get('/getClassInfo/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getClassInfo)
-clientRouter.post('/acceptInvite/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.acceptInvite)
-clientRouter.post('/archiveChat/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.archiveChat)
-clientRouter.post('/createGroup/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.createGroup)
-clientRouter.post('/getBlockedContacts/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getBlockedContacts)
-clientRouter.post('/getChatById/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getChatById)
-clientRouter.post('/getChatLabels/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getChatLabels)
-clientRouter.get('/getChats/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getChats)
-clientRouter.post('/getChatsByLabelId/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getChatsByLabelId)
-clientRouter.post('/getCommonGroups/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getCommonGroups)
-clientRouter.post('/getContactById/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getContactById)
-clientRouter.get('/getContacts/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getContacts)
-clientRouter.post('/getInviteInfo/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getInviteInfo)
-clientRouter.post('/getLabelById/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getLabelById)
-clientRouter.post('/getLabels/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getLabels)
-clientRouter.post('/getNumberId/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getNumberId)
-clientRouter.post('/isRegisteredUser/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.isRegisteredUser)
-clientRouter.post('/getProfilePicUrl/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getProfilePictureUrl)
-clientRouter.get('/getState/:sessionId', [middleware.sessionNameValidation], clientController.getState)
-clientRouter.post('/markChatUnread/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.markChatUnread)
-clientRouter.post('/muteChat/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.muteChat)
-clientRouter.post('/pinChat/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.pinChat)
-clientRouter.post('/searchMessages/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.searchMessages)
-clientRouter.post('/sendMessage/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.sendMessage)
-clientRouter.post('/sendPresenceAvailable/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.sendPresenceAvailable)
-clientRouter.post('/sendPresenceUnavailable/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.sendPresenceUnavailable)
-clientRouter.post('/sendSeen/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.sendSeen)
-clientRouter.post('/setDisplayName/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.setDisplayName)
-clientRouter.post('/setProfilePicture/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.setProfilePicture)
-clientRouter.post('/setStatus/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.setStatus)
-clientRouter.post('/unarchiveChat/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.unarchiveChat)
-clientRouter.post('/unmuteChat/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.unmuteChat)
-clientRouter.post('/unpinChat/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.unpinChat)
-clientRouter.get('/getWWebVersion/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], clientController.getWWebVersion)
+// Função para criar middleware de autenticação e verificação de sessão
+const createClientMiddleware = (controllerMethod) => [
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken,
+  middleware.requireActiveClient,
+  middleware.requireSessionOwnership,
+  middleware.sessionNameValidation,
+  middleware.sessionValidation,
+  controllerMethod
+]
+
+clientRouter.get('/getClassInfo/:sessionId', createClientMiddleware(clientController.getClassInfo))
+clientRouter.post('/acceptInvite/:sessionId', createClientMiddleware(clientController.acceptInvite))
+clientRouter.post('/archiveChat/:sessionId', createClientMiddleware(clientController.archiveChat))
+clientRouter.post('/createGroup/:sessionId', createClientMiddleware(clientController.createGroup))
+clientRouter.post('/getBlockedContacts/:sessionId', createClientMiddleware(clientController.getBlockedContacts))
+clientRouter.post('/getChatById/:sessionId', createClientMiddleware(clientController.getChatById))
+clientRouter.post('/getChatLabels/:sessionId', createClientMiddleware(clientController.getChatLabels))
+clientRouter.get('/getChats/:sessionId', createClientMiddleware(clientController.getChats))
+clientRouter.post('/getChatsByLabelId/:sessionId', createClientMiddleware(clientController.getChatsByLabelId))
+clientRouter.post('/getCommonGroups/:sessionId', createClientMiddleware(clientController.getCommonGroups))
+clientRouter.post('/getContactById/:sessionId', createClientMiddleware(clientController.getContactById))
+clientRouter.get('/getContacts/:sessionId', createClientMiddleware(clientController.getContacts))
+clientRouter.post('/getInviteInfo/:sessionId', createClientMiddleware(clientController.getInviteInfo))
+clientRouter.post('/getLabelById/:sessionId', createClientMiddleware(clientController.getLabelById))
+clientRouter.post('/getLabels/:sessionId', createClientMiddleware(clientController.getLabels))
+clientRouter.post('/getNumberId/:sessionId', createClientMiddleware(clientController.getNumberId))
+clientRouter.post('/isRegisteredUser/:sessionId', createClientMiddleware(clientController.isRegisteredUser))
+clientRouter.post('/getProfilePicUrl/:sessionId', createClientMiddleware(clientController.getProfilePictureUrl))
+clientRouter.get('/getState/:sessionId', [
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken,
+  middleware.requireActiveClient,
+  middleware.requireSessionOwnership,
+  middleware.sessionNameValidation
+], clientController.getState)
+clientRouter.post('/markChatUnread/:sessionId', createClientMiddleware(clientController.markChatUnread))
+clientRouter.post('/muteChat/:sessionId', createClientMiddleware(clientController.muteChat))
+clientRouter.post('/pinChat/:sessionId', createClientMiddleware(clientController.pinChat))
+clientRouter.post('/searchMessages/:sessionId', createClientMiddleware(clientController.searchMessages))
+clientRouter.post('/sendMessage/:sessionId', createClientMiddleware(clientController.sendMessage))
+clientRouter.post('/sendPresenceAvailable/:sessionId', createClientMiddleware(clientController.sendPresenceAvailable))
+clientRouter.post('/sendPresenceUnavailable/:sessionId', createClientMiddleware(clientController.sendPresenceUnavailable))
+clientRouter.post('/sendSeen/:sessionId', createClientMiddleware(clientController.sendSeen))
+clientRouter.post('/setDisplayName/:sessionId', createClientMiddleware(clientController.setDisplayName))
+clientRouter.post('/setProfilePicture/:sessionId', createClientMiddleware(clientController.setProfilePicture))
+clientRouter.post('/setStatus/:sessionId', createClientMiddleware(clientController.setStatus))
+clientRouter.post('/unarchiveChat/:sessionId', createClientMiddleware(clientController.unarchiveChat))
+clientRouter.post('/unmuteChat/:sessionId', createClientMiddleware(clientController.unmuteChat))
+clientRouter.post('/unpinChat/:sessionId', createClientMiddleware(clientController.unpinChat))
+clientRouter.get('/getWWebVersion/:sessionId', createClientMiddleware(clientController.getWWebVersion))
 
 /**
  * ================
@@ -102,17 +187,28 @@ clientRouter.get('/getWWebVersion/:sessionId', [middleware.sessionNameValidation
  */
 const chatRouter = express.Router()
 chatRouter.use(middleware.apikey)
-sessionRouter.use(middleware.chatSwagger)
+chatRouter.use(middleware.chatSwagger)
 routes.use('/chat', chatRouter)
 
-chatRouter.post('/getClassInfo/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], chatController.getClassInfo)
-chatRouter.post('/clearMessages/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], chatController.clearMessages)
-chatRouter.post('/clearState/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], chatController.clearState)
-chatRouter.post('/delete/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], chatController.deleteChat)
-chatRouter.post('/fetchMessages/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], chatController.fetchMessages)
-chatRouter.post('/getContact/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], chatController.getContact)
-chatRouter.post('/sendStateRecording/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], chatController.sendStateRecording)
-chatRouter.post('/sendStateTyping/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], chatController.sendStateTyping)
+// Função para criar middleware de autenticação e verificação de sessão
+const createChatMiddleware = (controllerMethod) => [
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken,
+  middleware.requireActiveClient,
+  middleware.requireSessionOwnership,
+  middleware.sessionNameValidation,
+  middleware.sessionValidation,
+  controllerMethod
+]
+
+chatRouter.post('/getClassInfo/:sessionId', createChatMiddleware(chatController.getClassInfo))
+chatRouter.post('/clearMessages/:sessionId', createChatMiddleware(chatController.clearMessages))
+chatRouter.post('/clearState/:sessionId', createChatMiddleware(chatController.clearState))
+chatRouter.post('/delete/:sessionId', createChatMiddleware(chatController.deleteChat))
+chatRouter.post('/fetchMessages/:sessionId', createChatMiddleware(chatController.fetchMessages))
+chatRouter.post('/getContact/:sessionId', createChatMiddleware(chatController.getContact))
+chatRouter.post('/sendStateRecording/:sessionId', createChatMiddleware(chatController.sendStateRecording))
+chatRouter.post('/sendStateTyping/:sessionId', createChatMiddleware(chatController.sendStateTyping))
 
 /**
  * ================
@@ -121,21 +217,32 @@ chatRouter.post('/sendStateTyping/:sessionId', [middleware.sessionNameValidation
  */
 const groupChatRouter = express.Router()
 groupChatRouter.use(middleware.apikey)
-sessionRouter.use(middleware.groupChatSwagger)
+groupChatRouter.use(middleware.groupChatSwagger)
 routes.use('/groupChat', groupChatRouter)
 
-groupChatRouter.post('/getClassInfo/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], groupChatController.getClassInfo)
-groupChatRouter.post('/addParticipants/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], groupChatController.addParticipants)
-groupChatRouter.post('/demoteParticipants/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], groupChatController.demoteParticipants)
-groupChatRouter.post('/getInviteCode/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], groupChatController.getInviteCode)
-groupChatRouter.post('/leave/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], groupChatController.leave)
-groupChatRouter.post('/promoteParticipants/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], groupChatController.promoteParticipants)
-groupChatRouter.post('/removeParticipants/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], groupChatController.removeParticipants)
-groupChatRouter.post('/revokeInvite/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], groupChatController.revokeInvite)
-groupChatRouter.post('/setDescription/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], groupChatController.setDescription)
-groupChatRouter.post('/setInfoAdminsOnly/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], groupChatController.setInfoAdminsOnly)
-groupChatRouter.post('/setMessagesAdminsOnly/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], groupChatController.setMessagesAdminsOnly)
-groupChatRouter.post('/setSubject/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], groupChatController.setSubject)
+// Função para criar middleware de autenticação e verificação de sessão
+const createGroupChatMiddleware = (controllerMethod) => [
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken,
+  middleware.requireActiveClient,
+  middleware.requireSessionOwnership,
+  middleware.sessionNameValidation,
+  middleware.sessionValidation,
+  controllerMethod
+]
+
+groupChatRouter.post('/getClassInfo/:sessionId', createGroupChatMiddleware(groupChatController.getClassInfo))
+groupChatRouter.post('/addParticipants/:sessionId', createGroupChatMiddleware(groupChatController.addParticipants))
+groupChatRouter.post('/demoteParticipants/:sessionId', createGroupChatMiddleware(groupChatController.demoteParticipants))
+groupChatRouter.post('/getInviteCode/:sessionId', createGroupChatMiddleware(groupChatController.getInviteCode))
+groupChatRouter.post('/leave/:sessionId', createGroupChatMiddleware(groupChatController.leave))
+groupChatRouter.post('/promoteParticipants/:sessionId', createGroupChatMiddleware(groupChatController.promoteParticipants))
+groupChatRouter.post('/removeParticipants/:sessionId', createGroupChatMiddleware(groupChatController.removeParticipants))
+groupChatRouter.post('/revokeInvite/:sessionId', createGroupChatMiddleware(groupChatController.revokeInvite))
+groupChatRouter.post('/setDescription/:sessionId', createGroupChatMiddleware(groupChatController.setDescription))
+groupChatRouter.post('/setInfoAdminsOnly/:sessionId', createGroupChatMiddleware(groupChatController.setInfoAdminsOnly))
+groupChatRouter.post('/setMessagesAdminsOnly/:sessionId', createGroupChatMiddleware(groupChatController.setMessagesAdminsOnly))
+groupChatRouter.post('/setSubject/:sessionId', createGroupChatMiddleware(groupChatController.setSubject))
 
 /**
  * ================
@@ -144,41 +251,63 @@ groupChatRouter.post('/setSubject/:sessionId', [middleware.sessionNameValidation
  */
 const messageRouter = express.Router()
 messageRouter.use(middleware.apikey)
-sessionRouter.use(middleware.messageSwagger)
+messageRouter.use(middleware.messageSwagger)
 routes.use('/message', messageRouter)
 
-messageRouter.post('/getClassInfo/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], messageController.getClassInfo)
-messageRouter.post('/delete/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], messageController.deleteMessage)
-messageRouter.post('/downloadMedia/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], messageController.downloadMedia)
-messageRouter.post('/forward/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], messageController.forward)
-messageRouter.post('/getInfo/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], messageController.getInfo)
-messageRouter.post('/getMentions/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], messageController.getMentions)
-messageRouter.post('/getOrder/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], messageController.getOrder)
-messageRouter.post('/getPayment/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], messageController.getPayment)
-messageRouter.post('/getQuotedMessage/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], messageController.getQuotedMessage)
-messageRouter.post('/react/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], messageController.react)
-messageRouter.post('/reply/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], messageController.reply)
-messageRouter.post('/star/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], messageController.star)
-messageRouter.post('/unstar/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], messageController.unstar)
+// Função para criar middleware de autenticação e verificação de sessão
+const createMessageMiddleware = (controllerMethod) => [
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken,
+  middleware.requireActiveClient,
+  middleware.requireSessionOwnership,
+  middleware.sessionNameValidation,
+  middleware.sessionValidation,
+  controllerMethod
+]
+
+messageRouter.post('/getClassInfo/:sessionId', createMessageMiddleware(messageController.getClassInfo))
+messageRouter.post('/delete/:sessionId', createMessageMiddleware(messageController.deleteMessage))
+messageRouter.post('/downloadMedia/:sessionId', createMessageMiddleware(messageController.downloadMedia))
+messageRouter.post('/forward/:sessionId', createMessageMiddleware(messageController.forward))
+messageRouter.post('/getInfo/:sessionId', createMessageMiddleware(messageController.getInfo))
+messageRouter.post('/getMentions/:sessionId', createMessageMiddleware(messageController.getMentions))
+messageRouter.post('/getOrder/:sessionId', createMessageMiddleware(messageController.getOrder))
+messageRouter.post('/getPayment/:sessionId', createMessageMiddleware(messageController.getPayment))
+messageRouter.post('/getQuotedMessage/:sessionId', createMessageMiddleware(messageController.getQuotedMessage))
+messageRouter.post('/react/:sessionId', createMessageMiddleware(messageController.react))
+messageRouter.post('/reply/:sessionId', createMessageMiddleware(messageController.reply))
+messageRouter.post('/star/:sessionId', createMessageMiddleware(messageController.star))
+messageRouter.post('/unstar/:sessionId', createMessageMiddleware(messageController.unstar))
 
 /**
  * ================
- * MESSAGE ENDPOINTS
+ * CONTACT ENDPOINTS
  * ================
  */
 const contactRouter = express.Router()
 contactRouter.use(middleware.apikey)
-sessionRouter.use(middleware.contactSwagger)
+contactRouter.use(middleware.contactSwagger)
 routes.use('/contact', contactRouter)
 
-contactRouter.post('/getClassInfo/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], contactController.getClassInfo)
-contactRouter.post('/block/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], contactController.block)
-contactRouter.post('/getAbout/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], contactController.getAbout)
-contactRouter.post('/getChat/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], contactController.getChat)
-contactRouter.post('/unblock/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], contactController.unblock)
-contactRouter.post('/getFormattedNumber/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], contactController.getFormattedNumber)
-contactRouter.post('/getCountryCode/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], contactController.getCountryCode)
-contactRouter.post('/getProfilePicUrl/:sessionId', [middleware.sessionNameValidation, middleware.sessionValidation], contactController.getProfilePicUrl)
+// Função para criar middleware de autenticação e verificação de sessão
+const createContactMiddleware = (controllerMethod) => [
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken,
+  middleware.requireActiveClient,
+  middleware.requireSessionOwnership,
+  middleware.sessionNameValidation,
+  middleware.sessionValidation,
+  controllerMethod
+]
+
+contactRouter.post('/getClassInfo/:sessionId', createContactMiddleware(contactController.getClassInfo))
+contactRouter.post('/block/:sessionId', createContactMiddleware(contactController.block))
+contactRouter.post('/getAbout/:sessionId', createContactMiddleware(contactController.getAbout))
+contactRouter.post('/getChat/:sessionId', createContactMiddleware(contactController.getChat))
+contactRouter.post('/unblock/:sessionId', createContactMiddleware(contactController.unblock))
+contactRouter.post('/getFormattedNumber/:sessionId', createContactMiddleware(contactController.getFormattedNumber))
+contactRouter.post('/getCountryCode/:sessionId', createContactMiddleware(contactController.getCountryCode))
+contactRouter.post('/getProfilePicUrl/:sessionId', createContactMiddleware(contactController.getProfilePicUrl))
 /**
  * ================
  * SWAGGER ENDPOINTS

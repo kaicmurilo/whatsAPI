@@ -1,4 +1,5 @@
 const { cache } = require('../utils/cache')
+const { validateDatabaseConnection } = require('../database')
 
 /**
  * Health check endpoint
@@ -156,9 +157,109 @@ const clearCache = async (req, res) => {
   }
 }
 
+/**
+ * Database status endpoint
+ */
+const databaseStatus = async (req, res) => {
+  // #swagger.summary = 'Database status'
+  // #swagger.description = 'Check database connection and credentials'
+  try {
+    const dbValidation = await validateDatabaseConnection()
+    
+    if (dbValidation.success) {
+      /* #swagger.responses[200] = {
+        description: "Database is healthy",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                database: {
+                  type: "object",
+                  properties: {
+                    connected: { type: "boolean" },
+                    user: { type: "string" },
+                    database: { type: "string" },
+                    version: { type: "string" },
+                    permissions: { type: "boolean" },
+                    tables: {
+                      type: "array",
+                      items: { type: "string" }
+                    },
+                    activeClients: { type: "number" }
+                  }
+                },
+                timestamp: { type: "string" }
+              }
+            }
+          }
+        }
+      }
+      */
+      res.json({
+        success: true,
+        database: {
+          connected: true,
+          user: dbValidation.user,
+          database: dbValidation.database,
+          version: dbValidation.version,
+          permissions: true,
+          tables: dbValidation.tables,
+          activeClients: dbValidation.activeClients
+        },
+        timestamp: new Date().toISOString()
+      })
+    } else {
+      /* #swagger.responses[503] = {
+        description: "Database is unhealthy",
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                success: { type: "boolean" },
+                database: {
+                  type: "object",
+                  properties: {
+                    connected: { type: "boolean" },
+                    error: { type: "string" },
+                    code: { type: "string" },
+                    details: { type: "object" }
+                  }
+                },
+                timestamp: { type: "string" }
+              }
+            }
+          }
+        }
+      }
+      */
+      res.status(503).json({
+        success: false,
+        database: {
+          connected: false,
+          error: dbValidation.error,
+          code: dbValidation.code,
+          details: dbValidation.details || null
+        },
+        timestamp: new Date().toISOString()
+      })
+    }
+  } catch (error) {
+    console.error('databaseStatus ERROR:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    })
+  }
+}
+
 module.exports = {
   ping,
   localCallbackExample,
   cacheStatus,
-  clearCache
+  clearCache,
+  databaseStatus
 }

@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  postgres:
+    build: .
+    container_name: my-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      - POSTGRES_DB=whatsapp_auth
+      - POSTGRES_USER=whatsapp_user
+      - POSTGRES_PASSWORD=your_postgres_password_here  # Altere para uma senha segura
+    restart: unless-stopped
+    networks:
+      - postgres_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whatsapp_user -d whatsapp_auth"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: my-pgadmin
+    ports:
+      - "8082:80"
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@whatsapp.com
+      - PGADMIN_DEFAULT_PASSWORD=admin123  # Altere para uma senha segura
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - postgres_network
+
+volumes:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  postgres_network:
+    driver: bridge 

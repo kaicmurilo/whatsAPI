@@ -1,7 +1,19 @@
-const { globalApiKey, rateLimitMax, rateLimitWindowMs } = require('./config')
+const { globalApiKey, rateLimitMax, rateLimitWindowMs, enableAuth } = require('./config')
 const { sendErrorResponse } = require('./utils')
 const { validateSession } = require('./sessions')
 const rateLimiting = require('express-rate-limit')
+
+// Importar middleware de autenticação
+const { 
+  authenticateToken, 
+  requireActiveClient, 
+  requireScope,
+  requireAnyScope,
+  requireAllScopes,
+  requireSessionOwnership,
+  requireSessionOwnershipOrCreate,
+  checkAuthEnabled 
+} = require('./middleware/authMiddleware')
 
 const apikey = async (req, res, next) => {
   /*
@@ -184,5 +196,14 @@ module.exports = {
   messageSwagger,
   chatSwagger,
   groupChatSwagger,
-  rateLimiter
+  rateLimiter,
+  // Middleware de autenticação
+  authenticateToken,
+  requireActiveClient,
+  requireScope,
+  requireAnyScope,
+  requireAllScopes,
+  requireSessionOwnership,
+  requireSessionOwnershipOrCreate,
+  checkAuthEnabled
 }
