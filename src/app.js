@@ -12,8 +12,39 @@ const AppCleanup = require('./services/appCleanup')
 // Initialize Express app
 app.disable('x-powered-by')
 
-// Middleware de segurança
-app.use(helmet())
+// Middleware de segurança com configuração personalizada para Swagger UI
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "https://unpkg.com",
+        "https://cdn.jsdelivr.net"
+      ],
+      styleSrc: [
+        "'self'",
+        "'unsafe-inline'",
+        "https://unpkg.com",
+        "https://fonts.googleapis.com"
+      ],
+      fontSrc: [
+        "'self'",
+        "https://fonts.gstatic.com",
+        "data:"
+      ],
+      imgSrc: [
+        "'self'",
+        "data:",
+        "https:"
+      ],
+      connectSrc: [
+        "'self'"
+      ]
+    }
+  }
+}))
 app.use(cors())
 
 // Middleware para parsing de JSON
