@@ -324,7 +324,7 @@
           "Sessão"
         ],
         "summary": "Obter Código QR da Sessão",
-        "description": "Código QR da sessão com o ID de sessão fornecido.",
+        "description": "Código QR da sessão com o ID de sessão fornecido. Retorna o código QR como uma string de texto que pode ser usada para gerar imagens QR ou para fins de depuração.",
         "parameters": [
           {
             "name": "sessionId",
@@ -339,7 +339,25 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "Dados do código QR como string de texto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "qr": {
+                      "type": "string",
+                      "description": "String de dados do código QR",
+                      "example": "2@..."
+                    }
+                  }
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden.",
@@ -385,7 +403,7 @@
           "Sessão"
         ],
         "summary": "Obter Código QR da Sessão como Imagem",
-        "description": "Código QR como imagem da sessão com o ID de sessão fornecido.",
+        "description": "Código QR como imagem da sessão com o ID de sessão fornecido. Retorna uma imagem PNG que pode ser exibida em navegadores ou aplicações. O código QR é gerado quando a sessão do WhatsApp requer autenticação.",
         "parameters": [
           {
             "name": "sessionId",
@@ -400,9 +418,15 @@
         ],
         "responses": {
           "200": {
-            "description": "QR image.",
+            "description": "Imagem QR em formato PNG. A imagem pode ser exibida diretamente em navegadores ou salva em arquivo.",
             "content": {
-              "image/png": {}
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                },
+                "example": "iVBORw0KGgoAAAANSUhEUgAA..."
+              }
             }
           },
           "403": {

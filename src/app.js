@@ -37,10 +37,12 @@ app.use(helmet({
       imgSrc: [
         "'self'",
         "data:",
+        "blob:",
         "https:"
       ],
       connectSrc: [
-        "'self'"
+        "'self'",
+        "blob:"
       ]
     }
   }

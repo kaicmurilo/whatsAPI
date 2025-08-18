@@ -147,13 +147,23 @@ const sessionQrCode = async (req, res) => {
   // #swagger.description = 'QR code of the session with the given session ID.'
   try {
     const sessionId = req.params.sessionId
+    console.log(`📱 Requisição de QR code para sessão: ${sessionId}`)
+    
     const session = sessions.get(sessionId)
     if (!session) {
+      console.log(`❌ Sessão não encontrada: ${sessionId}`)
       return res.json({ success: false, message: 'session_not_found' })
     }
+    
     if (session.qr) {
+      console.log(`✅ QR code disponível para sessão: ${sessionId}`)
+      console.log(`📊 Tamanho do QR code: ${session.qr.length} caracteres`)
+      console.log(`🔗 QR code: ${session.qr.substring(0, 50)}...`)
+      
       return res.json({ success: true, qr: session.qr })
     }
+    
+    console.log(`⚠️ QR code não disponível para sessão: ${sessionId} (não está pronto ou já foi escaneado)`)
     return res.json({ success: false, message: 'qr code not ready or already scanned' })
   } catch (error) {
     console.log('sessionQrCode ERROR', error)
@@ -186,12 +196,23 @@ const sessionQrCodeImage = async (req, res) => {
   // #swagger.description = 'QR code as image of the session with the given session ID.'
   try {
     const sessionId = req.params.sessionId
+    console.log(`📱 Requisição de imagem QR para sessão: ${sessionId}`)
+    
     const session = sessions.get(sessionId)
     if (!session) {
+      console.log(`❌ Sessão não encontrada: ${sessionId}`)
       return res.json({ success: false, message: 'session_not_found' })
     }
+    
     if (session.qr) {
+      console.log(`✅ QR code disponível para sessão: ${sessionId}`)
+      console.log(`📊 Tamanho do QR code: ${session.qr.length} caracteres`)
+      
       const qrImage = qr.image(session.qr)
+      
+      // Log adicional sobre a imagem gerada
+      console.log(`🖼️ Gerando imagem PNG do QR code para sessão: ${sessionId}`)
+      
       /* #swagger.responses[200] = {
           description: "QR image.",
           content: {
@@ -202,8 +223,12 @@ const sessionQrCodeImage = async (req, res) => {
       res.writeHead(200, {
         'Content-Type': 'image/png'
       })
+      
+      console.log(`📤 Enviando imagem QR para sessão: ${sessionId}`)
       return qrImage.pipe(res)
     }
+    
+    console.log(`⚠️ QR code não disponível para sessão: ${sessionId} (não está pronto ou já foi escaneado)`)
     return res.json({ success: false, message: 'qr code not ready or already scanned' })
   } catch (error) {
     console.log('sessionQrCodeImage ERROR', error)

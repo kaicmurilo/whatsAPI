@@ -30,7 +30,18 @@ routes.use('/auth', authRoutes)
  */
 
 // API endpoint to check if server is alive
-routes.get('/ping', healthController.ping)
+routes.get('/ping', healthController.healthCheck)
+
+// Test QR endpoint (no authentication required)
+routes.get('/test-qr', healthController.testQr)
+
+// Test QR endpoint with authentication
+routes.get('/test-qr-auth', 
+  middleware.checkAuthEnabled,
+  middleware.authenticateToken, 
+  middleware.requireActiveClient,
+  healthController.testQrWithAuth
+)
 
 // Cache management endpoints
 routes.get('/cache/status', healthController.cacheStatus)

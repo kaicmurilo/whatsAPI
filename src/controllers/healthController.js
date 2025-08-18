@@ -1,36 +1,72 @@
 const { cache } = require('../utils/cache')
 const { validateDatabaseConnection } = require('../database')
+const qr = require('qr-image')
 
 /**
  * Health check endpoint
  */
-const ping = async (req, res) => {
+const healthCheck = async (req, res) => {
   // #swagger.summary = 'Health check'
-  // #swagger.description = 'Check if the server is alive'
+  // #swagger.description = 'Returns the health status of the API'
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  })
+}
+
+/**
+ * Test QR endpoint without authentication
+ */
+const testQr = async (req, res) => {
+  // #swagger.summary = 'Test QR generation'
+  // #swagger.description = 'Generates a test QR code for testing purposes'
   try {
-    const cacheStatus = cache.getStatus()
+    const testData = 'https://example.com/test'
+    console.log('🧪 Gerando QR code de teste...')
     
-    /* #swagger.responses[200] = {
-      description: "Server is alive",
-      content: {
-        "application/json": {
-          schema: { "$ref": "#/definitions/PingResponse" }
-        }
-      }
-    }
-    */
-    res.json({
-      success: true,
-      message: 'pong',
-      timestamp: new Date().toISOString(),
-      cache: cacheStatus
+    const qrImage = qr.image(testData)
+    
+    res.writeHead(200, {
+      'Content-Type': 'image/png',
+      'Cache-Control': 'no-cache'
     })
+    
+    console.log('📤 Enviando QR code de teste')
+    return qrImage.pipe(res)
   } catch (error) {
-    console.error('ping ERROR:', error)
-    res.status(500).json({
-      success: false,
-      error: error.message
+    console.error('❌ Erro ao gerar QR de teste:', error)
+    res.status(500).json({ error: 'Erro ao gerar QR code de teste' })
+  }
+}
+
+/**
+ * Test QR endpoint with authentication simulation
+ */
+const testQrWithAuth = async (req, res) => {
+  // #swagger.summary = 'Test QR generation with auth'
+  // #swagger.description = 'Generates a test QR code with authentication simulation'
+  try {
+    console.log('🔐 Testando QR com autenticação...')
+    console.log('📋 Headers recebidos:', req.headers)
+    console.log('👤 Cliente:', req.client)
+    console.log('🎫 Token:', req.token)
+    
+    const testData = 'https://example.com/test-auth'
+    console.log('🧪 Gerando QR code de teste com auth...')
+    
+    const qrImage = qr.image(testData)
+    
+    res.writeHead(200, {
+      'Content-Type': 'image/png',
+      'Cache-Control': 'no-cache'
     })
+    
+    console.log('📤 Enviando QR code de teste com auth')
+    return qrImage.pipe(res)
+  } catch (error) {
+    console.error('❌ Erro ao gerar QR de teste com auth:', error)
+    res.status(500).json({ error: 'Erro ao gerar QR code de teste com auth' })
   }
 }
 
@@ -257,7 +293,9 @@ const databaseStatus = async (req, res) => {
 }
 
 module.exports = {
-  ping,
+  healthCheck,
+  testQr,
+  testQrWithAuth,
   localCallbackExample,
   cacheStatus,
   clearCache,

@@ -305,6 +305,11 @@ const initializeEvents = (client, sessionId) => {
   client.on('qr', (qr) => {
     // inject qr code into session
     client.qr = qr
+    console.log(`🔄 Novo QR code gerado para sessão: ${sessionId}`)
+    console.log(`📊 Tamanho do QR code: ${qr.length} caracteres`)
+    console.log(`🔗 QR code: ${qr.substring(0, 50)}...`)
+    console.log(`📱 QR code disponível em: /session/qr/${sessionId} (texto) ou /session/qr/${sessionId}/image (imagem)`)
+    
     checkIfEventisEnabled('qr')
       .then(_ => {
         triggerWebhook(sessionWebhook, sessionId, 'qr', { qr })
@@ -314,6 +319,9 @@ const initializeEvents = (client, sessionId) => {
   checkIfEventisEnabled('ready')
     .then(_ => {
       client.on('ready', () => {
+        console.log(`✅ Cliente WhatsApp pronto para sessão: ${sessionId}`)
+        console.log(`📱 QR code escaneado com sucesso para sessão: ${sessionId}`)
+        console.log(`🚀 Sessão ${sessionId} está pronta para uso`)
         triggerWebhook(sessionWebhook, sessionId, 'ready')
       })
     })

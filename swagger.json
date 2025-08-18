@@ -324,7 +324,7 @@
           "Session"
         ],
         "summary": "Get session QR code",
-        "description": "QR code of the session with the given session ID.",
+        "description": "QR code of the session with the given session ID. Returns the QR code as a text string that can be used to generate QR images or for debugging purposes.",
         "parameters": [
           {
             "name": "sessionId",
@@ -339,7 +339,25 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "QR code data as text string",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "qr": {
+                      "type": "string",
+                      "description": "QR code data string",
+                      "example": "2@..."
+                    }
+                  }
+                }
+              }
+            }
           },
           "403": {
             "description": "Forbidden.",
@@ -385,7 +403,7 @@
           "Session"
         ],
         "summary": "Get session QR code as image",
-        "description": "QR code as image of the session with the given session ID.",
+        "description": "QR code as image of the session with the given session ID. Returns a PNG image that can be displayed in browsers or applications. The QR code is generated when the WhatsApp session requires authentication.",
         "parameters": [
           {
             "name": "sessionId",
@@ -400,9 +418,15 @@
         ],
         "responses": {
           "200": {
-            "description": "QR image.",
+            "description": "QR image as PNG format. The image can be displayed directly in browsers or saved to file.",
             "content": {
-              "image/png": {}
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                },
+                "example": "iVBORw0KGgoAAAANSUhEUgAA..."
+              }
             }
           },
           "403": {

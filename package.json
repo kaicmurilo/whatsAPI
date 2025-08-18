@@ -10,6 +10,8 @@
     "swagger:sync-pt": "node scripts/sync-swagger-pt.js",
     "debug": "node --inspect server.js",
     "test:cache": "node scripts/test-cache.js",
+    "test:qr-logs": "node scripts/test-qr-logs.js",
+    "test:qr-csp": "node scripts/test-qr-csp.js",
     "redis:start": "cd docker-redis && ./start-redis.sh",
     "redis:stop": "cd docker-redis && docker-compose down",
     "redis:logs": "cd docker-redis && docker-compose logs -f",
