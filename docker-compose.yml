@@ -13,14 +13,18 @@ services:
       - "3000:3000"
     restart: always
     environment:
-      - API_KEY=comunidadezdg  # OPTIONAL
+      # ⚠️ SEGURANÇA: Use variáveis de ambiente ou secrets do Docker
+      - API_KEY=${API_KEY:-your_secure_api_key_here}
       - BASE_WEBHOOK_URL=http://localhost:3000
-      - ENABLE_LOCAL_CALLBACK_EXAMPLE=TRUE # OPTIONAL, NOT RECOMMENDED FOR PRODUCTION
+      - ENABLE_LOCAL_CALLBACK_EXAMPLE=FALSE # ⚠️ DESABILITADO POR SEGURANÇA
       - MAX_ATTACHMENT_SIZE=5000000 # IN BYTES
       - SET_MESSAGES_AS_SEEN=TRUE # WILL MARK THE MESSAGES AS READ AUTOMATICALLY
       # ALL CALLBACKS: auth_failure|authenticated|call|change_state|disconnected|group_join|group_leave|group_update|loading_screen|media_uploaded|message|message_ack|message_create|message_reaction|message_revoke_everyone|qr|ready|contact_changed
       - DISABLED_CALLBACKS=message_ack  # PREVENT SENDING CERTAIN TYPES OF CALLBACKS BACK TO THE WEBHOOK
       - ENABLE_SWAGGER_ENDPOINT=TRUE # OPTIONAL, ENABLES THE /api-docs ENDPOINT
+      # Configurações de segurança adicionais
+      - JWT_SECRET=${JWT_SECRET:-your_secure_jwt_secret_here}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-your_secure_postgres_password_here}
     deploy:
       mode: replicated
       replicas: 1

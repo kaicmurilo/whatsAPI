@@ -22,16 +22,33 @@ const postgresConfig = {
   port: process.env.POSTGRES_PORT || 5432,
   database: process.env.POSTGRES_DB || 'whatsapp_auth',
   user: process.env.POSTGRES_USER || 'whatsapp_user',
-  password: process.env.POSTGRES_PASSWORD || 'your_postgres_password_here'
+  password: process.env.POSTGRES_PASSWORD
 }
 
 // JWT Configuration
-const jwtSecret = process.env.JWT_SECRET || 'your_jwt_secret_here_change_this'
+const jwtSecret = process.env.JWT_SECRET
 const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '24h'
 const jwtRefreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d'
 
 // Auth Configuration
 const enableAuth = (process.env.ENABLE_AUTH || 'true').toLowerCase() === 'true'
+
+// Validações de segurança
+if (!jwtSecret) {
+  console.error('❌ JWT_SECRET não configurado ou usando valor padrão inseguro')
+  process.exit(1)
+}
+
+if (!postgresConfig.password) {
+  console.error('❌ POSTGRES_PASSWORD não configurado ou usando valor padrão inseguro')
+  process.exit(1)
+}
+
+// Validar força do JWT secret
+if (!jwtSecret) {
+  console.error('❌ JWT_SECRET não configurado')
+  process.exit(1)
+}
 
 module.exports = {
   sessionFolderPath,

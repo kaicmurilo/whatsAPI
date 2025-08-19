@@ -45,7 +45,17 @@ app.use(helmet({
         "blob:"
       ]
     }
-  }
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  },
+  noSniff: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  frameguard: { action: 'deny' },
+  xssFilter: true,
+  hidePoweredBy: true
 }))
 app.use(cors())
 

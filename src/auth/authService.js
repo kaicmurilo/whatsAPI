@@ -41,9 +41,13 @@ class AuthService {
       [userId, userName, hashedSecret, userDocumentoIdentificacao, description]
     )
 
+    // Retornar dados do usuário sem a senha, mas incluir a senha temporariamente para o primeiro acesso
+    const userData = { ...result.rows[0] }
+    delete userData.user_secret // Remover senha criptografada
+    
     return {
-      ...result.rows[0],
-      user_secret: userSecret // Retorna a senha não criptografada apenas uma vez
+      ...userData,
+      temporary_secret: userSecret // Retorna apenas uma vez para configuração inicial
     }
   }
 

@@ -202,8 +202,6 @@ const validateDatabaseConnection = async () => {
     const result = await client.query('SELECT NOW() as current_time, version() as version')
     console.log('✅ Conexão com banco de dados estabelecida com sucesso')
     console.log('📊 Informações do banco:')
-    console.log(`   👤 Usuário: ${config.postgresConfig.user}`)
-    console.log(`   🗄️  Banco: ${config.postgresConfig.database}`)
     console.log(`   📋 Versão PostgreSQL: ${result.rows[0].version.split(' ')[0]} ${result.rows[0].version.split(' ')[1]}`)
     
     // Testar permissões
@@ -235,8 +233,6 @@ const validateDatabaseConnection = async () => {
       database: {
         host: config.postgresConfig.host,
         port: config.postgresConfig.port,
-        database: config.postgresConfig.database,
-        user: config.postgresConfig.user,
         version: result.rows[0].version.split(' ')[0] + ' ' + result.rows[0].version.split(' ')[1],
         tables: tableValidation.tables,
         activeUsers: tableValidation.activeUsers

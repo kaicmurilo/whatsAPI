@@ -3,6 +3,7 @@ const routes = express.Router()
 const swaggerUi = require('swagger-ui-express')
 const { enableLocalCallbackExample, enableSwaggerEndpoint } = require('./config')
 const { getSwaggerConfig, getAvailableLanguages, isLanguageAvailable } = require('../swagger-config')
+const rateLimiting = require('express-rate-limit')
 
 const middleware = require('./middleware')
 const healthController = require('./controllers/healthController')
@@ -18,12 +19,21 @@ const authRoutes = require('./routes/authRoutes')
 // Importar rotas administrativas
 const adminRoutes = require('./routes/adminRoutes')
 
+// Rate limiting mais rigoroso para rotas de autenticação
+const authRateLimiter = rateLimiting({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 5, // máximo 5 tentativas
+  message: 'Muitas tentativas de autenticação. Tente novamente em 15 minutos.',
+  standardHeaders: true,
+  legacyHeaders: false,
+})
+
 /**
  * ================
  * AUTH ENDPOINTS
  * ================
  */
-routes.use('/auth', authRoutes)
+routes.use('/auth', authRateLimiter, authRoutes)
 
 /**
  * ================

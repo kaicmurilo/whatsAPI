@@ -37,11 +37,21 @@ class AuthController {
     try {
       const { user_name, description, user_documento_identificacao } = req.body
 
-      if (!user_name) {
-        return sendErrorResponse(res, 400, 'Nome do usuário é obrigatório')
+      // Validações de segurança
+      if (!user_name || user_name.trim().length < 3) {
+        return sendErrorResponse(res, 400, 'Nome do usuário deve ter pelo menos 3 caracteres')
       }
 
-      const user = await AuthService.createUser(user_name, description, user_documento_identificacao)
+      if (user_name.length > 100) {
+        return sendErrorResponse(res, 400, 'Nome do usuário muito longo (máximo 100 caracteres)')
+      }
+
+      // Sanitizar entrada
+      const sanitizedName = user_name.trim().replace(/[<>]/g, '')
+      const sanitizedDescription = description ? description.trim().replace(/[<>]/g, '').substring(0, 500) : ''
+      const sanitizedDocument = user_documento_identificacao ? user_documento_identificacao.trim().replace(/[<>]/g, '') : null
+
+      const user = await AuthService.createUser(sanitizedName, sanitizedDescription, sanitizedDocument)
 
       return sendSuccessResponse(res, 201, 'Usuário criado com sucesso', {
         id: user.id,
@@ -51,7 +61,7 @@ class AuthController {
         description: user.description,
         is_active: user.is_active,
         created_at: user.created_at,
-        user_secret: user.user_secret // Retorna apenas uma vez
+        temporary_secret: user.temporary_secret // Retorna apenas uma vez
       })
     } catch (error) {
       console.error('Erro ao criar usuário:', error)

@@ -106,18 +106,28 @@ const sessionNameValidation = async (req, res, next) => {
       example: 'f8377d8d-a589-4242-9ba6-9486a04ef80c'
     }
   */
-  if ((!/^[\w-]+$/.test(req.params.sessionId))) {
-    /* #swagger.responses[422] = {
-        description: "Unprocessable Entity.",
-        content: {
-          "application/json": {
-            schema: { "$ref": "#/definitions/ErrorResponse" }
-          }
-        }
-      }
-    */
-    return sendErrorResponse(res, 422, 'Session should be alphanumerical or -')
+  
+  const sessionId = req.params.sessionId
+  
+  // Validações de segurança mais rigorosas
+  if (!sessionId) {
+    return sendErrorResponse(res, 422, 'Session ID é obrigatório')
   }
+  
+  if (sessionId.length < 10 || sessionId.length > 100) {
+    return sendErrorResponse(res, 422, 'Session ID deve ter entre 10 e 100 caracteres')
+  }
+  
+  // Permitir apenas caracteres alfanuméricos, hífens e underscores
+  if (!/^[a-zA-Z0-9_-]+$/.test(sessionId)) {
+    return sendErrorResponse(res, 422, 'Session ID deve conter apenas letras, números, hífens e underscores')
+  }
+  
+  // Prevenir ataques de path traversal
+  if (sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    return sendErrorResponse(res, 422, 'Session ID inválido')
+  }
+  
   next()
 }
 
