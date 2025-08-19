@@ -180,6 +180,27 @@
             background: linear-gradient(135deg, rgba(73, 144, 226, 0.05) 0%, rgba(46, 91, 186, 0.05) 100%);
         }
 
+        .language-card.clients {
+            border: 2px solid var(--accent-color);
+            background: linear-gradient(135deg, rgba(255, 107, 53, 0.02) 0%, rgba(255, 107, 53, 0.05) 100%);
+        }
+
+        .language-card.clients:hover {
+            border-color: var(--accent-color);
+            background: linear-gradient(135deg, rgba(255, 107, 53, 0.05) 0%, rgba(255, 107, 53, 0.1) 100%);
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-heavy);
+        }
+
+        .language-card.clients .arrow-icon {
+            color: var(--accent-color);
+        }
+
+        .language-card.clients:hover .arrow-icon {
+            color: var(--accent-color);
+            transform: scale(1.1);
+        }
+
         .flag-icon {
             font-size: 2.5rem;
             flex-shrink: 0;
@@ -432,6 +453,17 @@
                         </div>
                         <i class="fas fa-arrow-right arrow-icon"></i>
                     </a>
+                    
+
+                    
+                    <a href="/api-docs/admin" class="language-card admin">
+                        <div class="flag-icon">⚙️</div>
+                        <div class="language-info">
+                            <div class="language-name">Administração</div>
+                            <div class="language-desc">Rotas administrativas com autenticação por API Key</div>
+                        </div>
+                        <i class="fas fa-shield-alt arrow-icon"></i>
+                    </a>
                 </div>
             </div>
             
@@ -499,8 +531,8 @@
                     <span class="stat-label">Endpoints</span>
                 </div>
                 <div class="stat-item">
-                    <span class="stat-number">2</span>
-                    <span class="stat-label">Idiomas</span>
+                    <span class="stat-number">3</span>
+                    <span class="stat-label">Documentações</span>
                 </div>
                 <div class="stat-item">
                     <span class="stat-number">100%</span>

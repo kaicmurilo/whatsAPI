@@ -185,7 +185,7 @@ npm run db:init           # Inicializar banco
 npm run db:reset          # Reset completo do banco
 
 # Acessar interfaces web
-# pgAdmin: http://localhost:8082 (admin@whatsapp.com / admin123)
+# PostgreSQL: localhost:5432 (whatsapp_user / your_postgres_password_here)
 # Redis Commander: http://localhost:8081
 ```
 

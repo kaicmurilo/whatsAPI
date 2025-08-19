@@ -26,12 +26,6 @@ const authenticateToken = async (req, res, next) => {
         }
       }
   */
-  
-  // Se já é admin master (verificado por API key), pular verificação de token
-  if (req.isMasterAdmin) {
-    next()
-    return
-  }
 
   try {
     const authHeader = req.headers['authorization']
@@ -41,14 +35,14 @@ const authenticateToken = async (req, res, next) => {
       return sendErrorResponse(res, 401, 'Token de acesso não fornecido')
     }
 
-    const result = await AuthService.verifyAccessToken(token)
+    const result = await AuthService.validateToken(token)
     
-    if (!result.success) {
-      return sendErrorResponse(res, 401, result.message)
+    if (!result) {
+      return sendErrorResponse(res, 401, 'Token inválido ou expirado')
     }
 
-    // Adicionar informações do cliente e token ao request
-    req.client = result.client
+    // Adicionar informações do usuário e token ao request
+    req.user = result.user
     req.token = result.token
     
     next()
@@ -58,16 +52,10 @@ const authenticateToken = async (req, res, next) => {
   }
 }
 
-// Middleware para verificar se o cliente está ativo
-const requireActiveClient = async (req, res, next) => {
-  // Admin master sempre está ativo
-  if (req.isMasterAdmin) {
-    next()
-    return
-  }
-
-  if (!req.client || !req.client.is_active) {
-    return sendErrorResponse(res, 403, 'Cliente inativo')
+// Middleware para verificar se o usuário está ativo
+const requireActiveUser = async (req, res, next) => {
+  if (!req.user || !req.user.is_active) {
+    return sendErrorResponse(res, 403, 'Usuário inativo')
   }
   next()
 }
@@ -75,12 +63,6 @@ const requireActiveClient = async (req, res, next) => {
 // Middleware para verificar escopo específico
 const requireScope = (requiredScope) => {
   return (req, res, next) => {
-    // Admin master tem todos os escopos
-    if (req.isMasterAdmin) {
-      next()
-      return
-    }
-
     if (!req.token || !req.token.scope) {
       return sendErrorResponse(res, 403, 'Escopo não definido')
     }
@@ -97,12 +79,6 @@ const requireScope = (requiredScope) => {
 // Middleware para verificar múltiplos escopos (qualquer um)
 const requireAnyScope = (requiredScopes) => {
   return (req, res, next) => {
-    // Admin master tem todos os escopos
-    if (req.isMasterAdmin) {
-      next()
-      return
-    }
-
     if (!req.token || !req.token.scope) {
       return sendErrorResponse(res, 403, 'Escopo não definido')
     }
@@ -121,12 +97,6 @@ const requireAnyScope = (requiredScopes) => {
 // Middleware para verificar múltiplos escopos (todos)
 const requireAllScopes = (requiredScopes) => {
   return (req, res, next) => {
-    // Admin master tem todos os escopos
-    if (req.isMasterAdmin) {
-      next()
-      return
-    }
-
     if (!req.token || !req.token.scope) {
       return sendErrorResponse(res, 403, 'Escopo não definido')
     }
@@ -142,50 +112,23 @@ const requireAllScopes = (requiredScopes) => {
   }
 }
 
-// Middleware para verificar se o cliente é o proprietário da sessão
+// Middleware para verificar se o usuário é o proprietário da sessão
 const requireSessionOwnership = async (req, res, next) => {
   const { sessionId } = req.params
   
-  if (!req.client) {
-    return sendErrorResponse(res, 401, 'Cliente não autenticado')
-  }
-
-  // Admin master pode acessar qualquer sessão
-  if (req.isMasterAdmin) {
-    try {
-      const { query } = require('../database')
-      const result = await query(
-        'SELECT * FROM whatsapp_sessions WHERE session_id = $1',
-        [sessionId]
-      )
-
-      if (result.rows.length === 0) {
-        // Sessão não existe no banco, mas admin master pode acessar
-        req.session = {
-          session_id: sessionId,
-          client_id: 'admin_master',
-          status: 'admin_access'
-        }
-      } else {
-        req.session = result.rows[0]
-      }
-      next()
-      return
-    } catch (error) {
-      console.error('Erro ao verificar sessão para admin master:', error)
-      return sendErrorResponse(res, 500, 'Erro interno do servidor')
-    }
+  if (!req.user) {
+    return sendErrorResponse(res, 401, 'Usuário não autenticado')
   }
 
   try {
     const { query } = require('../database')
     const result = await query(
-      'SELECT * FROM whatsapp_sessions WHERE session_id = $1 AND client_id = $2',
-      [sessionId, req.client.client_id]
+      'SELECT * FROM whatsapp_sessions WHERE session_id = $1 AND user_id = $2',
+      [sessionId, req.user.user_id]
     )
 
     if (result.rows.length === 0) {
-      return sendErrorResponse(res, 403, 'Acesso negado: sessão não pertence ao cliente')
+      return sendErrorResponse(res, 403, 'Acesso negado: sessão não pertence ao usuário')
     }
 
     req.session = result.rows[0]
@@ -196,72 +139,45 @@ const requireSessionOwnership = async (req, res, next) => {
   }
 }
 
-// Middleware para verificar se a sessão existe e pertence ao cliente (cria se não existir)
+// Middleware para verificar se a sessão existe e pertence ao usuário (cria se não existir)
 const requireSessionOwnershipOrCreate = async (req, res, next) => {
   const { sessionId } = req.params
   
-  if (!req.client) {
-    return sendErrorResponse(res, 401, 'Cliente não autenticado')
-  }
-
-  // Admin master pode acessar qualquer sessão sem criar associação
-  if (req.isMasterAdmin) {
-    try {
-      const { query } = require('../database')
-      const result = await query(
-        'SELECT * FROM whatsapp_sessions WHERE session_id = $1',
-        [sessionId]
-      )
-
-      if (result.rows.length === 0) {
-        // Sessão não existe no banco, mas admin master pode acessar
-        req.session = {
-          session_id: sessionId,
-          client_id: 'admin_master',
-          status: 'admin_access'
-        }
-      } else {
-        req.session = result.rows[0]
-      }
-      next()
-      return
-    } catch (error) {
-      console.error('Erro ao verificar sessão para admin master:', error)
-      return sendErrorResponse(res, 500, 'Erro interno do servidor')
-    }
+  if (!req.user) {
+    return sendErrorResponse(res, 401, 'Usuário não autenticado')
   }
 
   try {
     const { query } = require('../database')
     
-    // Verificar se a sessão já existe para este cliente
+    // Verificar se a sessão já existe para este usuário
     let result = await query(
-      'SELECT * FROM whatsapp_sessions WHERE session_id = $1 AND client_id = $2',
-      [sessionId, req.client.client_id]
+      'SELECT * FROM whatsapp_sessions WHERE session_id = $1 AND user_id = $2',
+      [sessionId, req.user.user_id]
     )
 
     if (result.rows.length > 0) {
-      // Sessão já existe e pertence ao cliente
+      // Sessão já existe e pertence ao usuário
       req.session = result.rows[0]
       next()
       return
     }
 
-    // Verificar se a sessão existe para outro cliente
+    // Verificar se a sessão existe para outro usuário
     result = await query(
       'SELECT * FROM whatsapp_sessions WHERE session_id = $1',
       [sessionId]
     )
 
     if (result.rows.length > 0) {
-      // Sessão existe mas pertence a outro cliente
-      return sendErrorResponse(res, 403, 'Acesso negado: sessão pertence a outro cliente')
+      // Sessão existe mas pertence a outro usuário
+      return sendErrorResponse(res, 403, 'Acesso negado: sessão pertence a outro usuário')
     }
 
     // Sessão não existe, criar nova associação
     result = await query(
-      'INSERT INTO whatsapp_sessions (session_id, client_id, status) VALUES ($1, $2, $3) RETURNING *',
-      [sessionId, req.client.client_id, 'creating']
+      'INSERT INTO whatsapp_sessions (session_id, user_id, status) VALUES ($1, $2, $3) RETURNING *',
+      [sessionId, req.user.user_id, 'creating']
     )
 
     req.session = result.rows[0]
@@ -274,32 +190,13 @@ const requireSessionOwnershipOrCreate = async (req, res, next) => {
 
 // Middleware para verificar se a autenticação está habilitada
 const checkAuthEnabled = (req, res, next) => {
-  const { enableAuth, globalApiKey } = require('../config')
-  
-  // Verificar se a API key master foi fornecida
-  if (globalApiKey) {
-    const apiKey = req.headers['x-api-key']
-    if (apiKey && apiKey === globalApiKey) {
-      // API key master válida - criar cliente admin master
-      req.client = {
-        client_id: 'admin_master',
-        client_name: 'Administrador Master',
-        is_active: true
-      }
-      req.token = {
-        scope: 'read write admin'
-      }
-      req.isMasterAdmin = true
-      next()
-      return
-    }
-  }
+  const { enableAuth } = require('../config')
   
   if (!enableAuth) {
-    // Se a autenticação estiver desabilitada, criar um cliente mock
-    req.client = {
-      client_id: 'default_client',
-      client_name: 'Cliente Padrão',
+    // Se a autenticação estiver desabilitada, criar um usuário mock
+    req.user = {
+      user_id: 'default_user',
+      user_name: 'Usuário Padrão',
       is_active: true
     }
     req.token = {
@@ -320,7 +217,7 @@ const authSwagger = async (req, res, next) => {
 
 module.exports = {
   authenticateToken,
-  requireActiveClient,
+  requireActiveUser,
   requireScope,
   requireAnyScope,
   requireAllScopes,

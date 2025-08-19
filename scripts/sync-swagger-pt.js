@@ -11,6 +11,7 @@ const path = require('path');
 // Função para traduzir tags
 function translateTags(tags) {
   const tagTranslations = {
+    'Auth': 'Autenticação',
     'Session': 'Sessão',
     'Client': 'Cliente', 
     'Message': 'Mensagem',
@@ -126,7 +127,18 @@ function translateSummary(summary) {
     'Check API status': 'Verificar Status da API',
     'Local callback example': 'Exemplo de Webhook Local',
     'Cache status': 'Status do Cache',
-    'Clear cache': 'Limpar Cache'
+    'Clear cache': 'Limpar Cache',
+    'Criar novo usuário': 'Criar Novo Usuário',
+    'Autenticar usuário': 'Autenticar Usuário',
+    'Renovar token de acesso': 'Renovar Token de Acesso',
+    'Revogar token de acesso': 'Revogar Token de Acesso',
+    'Verificar token de acesso': 'Verificar Token de Acesso',
+    'Listar todos os usuários': 'Listar Todos os Usuários',
+    'Obter usuário específico': 'Obter Usuário Específico',
+    'Atualizar usuário': 'Atualizar Usuário',
+    'Deletar usuário': 'Deletar Usuário',
+    'Listar tokens do usuário': 'Listar Tokens do Usuário',
+    'Listar sessões do usuário': 'Listar Sessões do Usuário'
   };
 
   return translations[summary] || summary;
@@ -189,15 +201,16 @@ function syncSwaggerPT() {
           // Traduzir tags
           if (endpoint.tags) {
             endpoint.tags = endpoint.tags.map(tag => {
-              const tagTranslations = {
-                'Session': 'Sessão',
-                'Client': 'Cliente',
-                'Message': 'Mensagem',
-                'Chat': 'Chat',
-                'Group Chat': 'Grupo',
-                'Contact': 'Contato',
-                'Various': 'Diversos'
-              };
+                          const tagTranslations = {
+              'Auth': 'Autenticação',
+              'Session': 'Sessão',
+              'Client': 'Cliente',
+              'Message': 'Mensagem',
+              'Chat': 'Chat',
+              'Group Chat': 'Grupo',
+              'Contact': 'Contato',
+              'Various': 'Diversos'
+            };
               return tagTranslations[tag] || tag;
             });
           }

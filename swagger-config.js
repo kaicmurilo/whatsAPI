@@ -13,6 +13,11 @@ const SWAGGER_CONFIGS = {
     file: 'swagger-pt.json',
     title: 'WhatsApp API',
     description: 'API Wrapper para WhatsAppWebJS - Interface REST para interagir com o WhatsApp Web'
+  },
+  'admin': {
+    file: 'swagger-admin.json',
+    title: 'WhatsApp API - Administração',
+    description: 'API para gerenciamento administrativo de usuários'
   }
 };
 
@@ -37,8 +42,9 @@ function getSwaggerConfig(language = 'en') {
 function getAvailableLanguages() {
   return Object.keys(SWAGGER_CONFIGS).map(lang => ({
     code: lang,
-    name: lang === 'en' ? 'English' : 'Português',
-    file: SWAGGER_CONFIGS[lang].file
+    name: lang === 'en' ? 'English' : lang === 'pt' ? 'Português' : 'Administração',
+    file: SWAGGER_CONFIGS[lang].file,
+    description: SWAGGER_CONFIGS[lang].description
   }));
 }
 

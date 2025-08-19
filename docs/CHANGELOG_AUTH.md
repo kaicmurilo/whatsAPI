@@ -7,7 +7,7 @@
 ### 🚀 O que foi implementado
 
 #### 1. Banco de Dados PostgreSQL
-- **Docker Compose** para PostgreSQL com pgAdmin
+- **Docker Compose** para PostgreSQL
 - **3 Tabelas principais**:
   - `clients`: Gerenciamento de clientes
   - `tokens`: Armazenamento de tokens JWT
@@ -45,7 +45,7 @@
 #### Novos Arquivos
 ```
 docker-postgres/
-├── docker-compose.yml          # Configuração PostgreSQL + pgAdmin
+├── docker-compose.yml          # Configuração PostgreSQL
 ├── Dockerfile                  # Imagem PostgreSQL customizada
 ├── postgresql.conf             # Configurações do PostgreSQL
 ├── init.sql                    # Script de inicialização do banco
@@ -204,7 +204,7 @@ curl http://localhost:3000/ping
 
 ### 📊 Interfaces Web
 
-- **pgAdmin**: http://localhost:8082
+- **PostgreSQL**: localhost:5432
   - Email: admin@whatsapp.com
   - Senha: admin123
 

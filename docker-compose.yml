@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   api_zdg:
-    image: chrishubert/whatsapp-web-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     networks:
       - comunidadezdg
     volumes:

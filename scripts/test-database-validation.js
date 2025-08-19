@@ -32,7 +32,7 @@ async function testDatabaseValidation() {
       console.log(`   🗄️  Banco: ${dbValidation.database}`)
       console.log(`   📋 Versão: ${dbValidation.version}`)
       console.log(`   📊 Tabelas: ${dbValidation.tables.join(', ')}`)
-      console.log(`   👥 Clientes ativos: ${dbValidation.activeClients}`)
+      console.log(`   👥 Usuários ativos: ${dbValidation.activeUsers}`)
     } else {
       console.log('❌ Teste 1 FALHOU')
       console.log(`   Erro: ${dbValidation.error}`)
@@ -69,7 +69,7 @@ async function testDatabaseValidation() {
         console.log(`   📋 Versão: ${response.data.database.version}`)
         console.log(`   🔐 Permissões: ${response.data.database.permissions ? 'OK' : 'FALHOU'}`)
         console.log(`   📊 Tabelas: ${response.data.database.tables ? response.data.database.tables.join(', ') : 'N/A'}`)
-        console.log(`   👥 Clientes ativos: ${response.data.database.activeClients || 'N/A'}`)
+        console.log(`   👥 Usuários ativos: ${response.data.database.activeUsers || 'N/A'}`)
       } else {
         console.log('❌ Teste 2 FALHOU')
         console.log(`   Status: ${response.status}`)
@@ -96,7 +96,7 @@ async function testDatabaseValidation() {
       console.log('   O banco de dados está funcionando corretamente')
       console.log('   Credenciais e permissões estão válidas')
       console.log(`   Todas as ${dbValidation.tables.length} tabelas necessárias estão presentes`)
-      console.log(`   ${dbValidation.activeClients} cliente(s) ativo(s) encontrado(s)`)
+              console.log(`   ${dbValidation.activeUsers} usuário(s) ativo(s) encontrado(s)`)
     } else {
       console.log('❌ Validação do banco de dados: FALHA')
       console.log('   Verifique as configurações do banco de dados')
@@ -111,7 +111,7 @@ async function testDatabaseValidation() {
         console.log('\n💡 SUGESTÕES:')
         console.log('   1. Execute: npm run db:reset (recreará as tabelas)')
         console.log('   2. Verifique se o script init.sql está atualizado')
-      } else if (dbValidation.code === 'NO_ACTIVE_CLIENTS') {
+      } else if (dbValidation.code === 'NO_ACTIVE_USERS') {
         console.log('\n💡 SUGESTÕES:')
         console.log('   1. Execute: npm run db:init (criará cliente padrão)')
         console.log('   2. Ou crie um cliente via API de autenticação')

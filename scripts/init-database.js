@@ -16,20 +16,20 @@ async function initializeDatabase() {
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
-      AND table_name IN ('clients', 'tokens', 'whatsapp_sessions')
+      AND table_name IN ('users', 'tokens', 'whatsapp_sessions')
     `)
     
     console.log('📋 Tabelas encontradas:', tablesResult.rows.map(row => row.table_name))
     
-    // Verificar se existe cliente padrão
-    const defaultClient = await AuthService.getClientById('default_client')
+    // Verificar se existe usuário padrão
+    const defaultUser = await AuthService.getUserById('default_user')
     
-    if (!defaultClient) {
-      console.log('👤 Criando cliente padrão...')
-      const newClient = await AuthService.createClient('Cliente Padrão', 'Cliente padrão para testes')
-      console.log('✅ Cliente padrão criado:', newClient.client_id)
+    if (!defaultUser) {
+      console.log('👤 Criando usuário padrão...')
+      const newUser = await AuthService.createUser('Usuário Padrão', 'Usuário padrão para testes')
+      console.log('✅ Usuário padrão criado:', newUser.user_id)
     } else {
-      console.log('✅ Cliente padrão já existe')
+      console.log('✅ Usuário padrão já existe')
     }
     
     // Limpar tokens expirados

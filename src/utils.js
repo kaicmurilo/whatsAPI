@@ -12,6 +12,15 @@ const sendErrorResponse = (res, status, message) => {
   res.status(status).json({ success: false, error: message })
 }
 
+// Function to send a response with success status and data
+const sendSuccessResponse = (res, status, message, data = null) => {
+  const response = { success: true, message }
+  if (data !== null) {
+    response.data = data
+  }
+  res.status(status).json(response)
+}
+
 // Function to wait for a specific item not to be null
 const waitForNestedObject = (rootObj, nestedPath, maxWaitTime = 10000, interval = 100) => {
   const start = Date.now()
@@ -41,6 +50,7 @@ const checkIfEventisEnabled = (event) => {
 module.exports = {
   triggerWebhook,
   sendErrorResponse,
+  sendSuccessResponse,
   waitForNestedObject,
   checkIfEventisEnabled
 }

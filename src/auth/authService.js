@@ -1,8 +1,8 @@
-const bcrypt = require('bcryptjs')
+const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const { v4: uuidv4 } = require('uuid')
 const { query } = require('../database')
-const { jwtSecret, jwtExpiresIn, jwtRefreshExpiresIn } = require('../config')
+const config = require('../config')
 
 class AuthService {
   // Gerar hash da senha
@@ -16,235 +16,229 @@ class AuthService {
     return await bcrypt.compare(password, hash)
   }
 
-  // Gerar tokens
-  static generateTokens(clientId) {
-    const accessToken = jwt.sign(
-      { clientId, type: 'access' },
-      jwtSecret,
-      { expiresIn: jwtExpiresIn }
-    )
-
-    const refreshToken = jwt.sign(
-      { clientId, type: 'refresh' },
-      jwtSecret,
-      { expiresIn: jwtRefreshExpiresIn }
-    )
-
-    return { accessToken, refreshToken }
+  // Gerar token JWT
+  static generateToken(payload, expiresIn = config.jwtExpiresIn) {
+    return jwt.sign(payload, config.jwtSecret, { expiresIn })
   }
 
-  // Verificar token
+  // Verificar token JWT
   static verifyToken(token) {
     try {
-      return jwt.verify(token, jwtSecret)
+      return jwt.verify(token, config.jwtSecret)
     } catch (error) {
       return null
     }
   }
 
-  // Criar cliente
-  static async createClient(clientName, description = '') {
-    const clientId = uuidv4()
-    const clientSecret = uuidv4()
-    const hashedSecret = await this.hashPassword(clientSecret)
+  // Criar usuário
+  static async createUser(userName, description = '', userDocumentoIdentificacao = null) {
+    const userId = uuidv4()
+    const userSecret = uuidv4()
+    const hashedSecret = await this.hashPassword(userSecret)
 
     const result = await query(
-      'INSERT INTO clients (client_id, client_name, client_secret, description) VALUES ($1, $2, $3, $4) RETURNING *',
-      [clientId, clientName, hashedSecret, description]
+      'INSERT INTO users (user_id, user_name, user_secret, user_documento_identificacao, description) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [userId, userName, hashedSecret, userDocumentoIdentificacao, description]
     )
 
     return {
       ...result.rows[0],
-      client_secret: clientSecret // Retorna a senha não criptografada apenas uma vez
+      user_secret: userSecret // Retorna a senha não criptografada apenas uma vez
     }
   }
 
-  // Buscar cliente por ID
-  static async getClientById(clientId) {
+  // Buscar usuário por ID
+  static async getUserById(userId) {
     const result = await query(
-      'SELECT * FROM clients WHERE client_id = $1 AND is_active = true',
-      [clientId]
+      'SELECT * FROM users WHERE user_id = $1 AND is_active = true',
+      [userId]
     )
-    return result.rows[0] || null
+    return result.rows[0]
   }
 
-  // Autenticar cliente
-  static async authenticateClient(clientId, clientSecret) {
-    const client = await this.getClientById(clientId)
-    if (!client) {
-      return { success: false, message: 'Cliente não encontrado' }
-    }
+  // Autenticar usuário
+  static async authenticateUser(userId, userSecret) {
+    const user = await this.getUserById(userId)
+    if (!user) return null
 
-    const isValidSecret = await this.verifyPassword(clientSecret, client.client_secret)
-    if (!isValidSecret) {
-      return { success: false, message: 'Credenciais inválidas' }
-    }
+    const isValidSecret = await this.verifyPassword(userSecret, user.user_secret)
+    if (!isValidSecret) return null
 
-    return { success: true, client }
+    return user
   }
 
-  // Criar token de acesso
-  static async createAccessToken(clientId, scope = '') {
-    const { accessToken, refreshToken } = this.generateTokens(clientId)
-    const expiresAt = new Date(Date.now() + this.getExpirationTime(jwtExpiresIn))
+  // Gerar tokens de acesso
+  static async generateAccessTokens(user) {
+    const accessToken = this.generateToken({
+      userId: user.user_id,
+      userName: user.user_name,
+      scope: 'read write'
+    }, config.jwtExpiresIn)
 
+    const refreshToken = this.generateToken({
+      userId: user.user_id,
+      type: 'refresh'
+    }, config.jwtRefreshExpiresIn)
+
+    // Salvar tokens no banco
     await query(
-      'INSERT INTO tokens (client_id, access_token, refresh_token, expires_at, scope) VALUES ($1, $2, $3, $4, $5)',
-      [clientId, accessToken, refreshToken, expiresAt, scope]
+      'INSERT INTO tokens (user_id, access_token, refresh_token, expires_at, scope) VALUES ($1, $2, $3, $4, $5)',
+      [user.user_id, accessToken, refreshToken, this.getExpirationTime(config.jwtExpiresIn), 'read write']
     )
 
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
       token_type: 'Bearer',
-      expires_in: this.getExpirationTime(jwtExpiresIn) / 1000,
-      scope
+      expires_in: config.jwtExpiresIn,
+      scope: 'read write'
     }
   }
 
   // Renovar token
   static async refreshToken(refreshToken) {
     const decoded = this.verifyToken(refreshToken)
-    if (!decoded || decoded.type !== 'refresh') {
-      return { success: false, message: 'Token de renovação inválido' }
-    }
+    if (!decoded || decoded.type !== 'refresh') return null
 
-    // Verificar se o token existe e não foi revogado
-    const result = await query(
+    const user = await this.getUserById(decoded.userId)
+    if (!user) return null
+
+    // Verificar se o refresh token existe no banco
+    const tokenResult = await query(
       'SELECT * FROM tokens WHERE refresh_token = $1 AND is_revoked = false',
       [refreshToken]
     )
 
-    if (result.rows.length === 0) {
-      return { success: false, message: 'Token de renovação não encontrado ou revogado' }
-    }
+    if (tokenResult.rows.length === 0) return null
 
-    const tokenRecord = result.rows[0]
-    const newTokens = this.generateTokens(tokenRecord.client_id)
-    const expiresAt = new Date(Date.now() + this.getExpirationTime(jwtExpiresIn))
-
-    // Revogar token antigo e criar novo
+    // Revogar tokens antigos
     await query(
-      'UPDATE tokens SET is_revoked = true WHERE refresh_token = $1',
-      [refreshToken]
+      'UPDATE tokens SET is_revoked = true WHERE user_id = $1',
+      [user.user_id]
     )
 
-    await query(
-      'INSERT INTO tokens (client_id, access_token, refresh_token, expires_at, scope) VALUES ($1, $2, $3, $4, $5)',
-      [tokenRecord.client_id, newTokens.accessToken, newTokens.refreshToken, expiresAt, tokenRecord.scope]
-    )
-
-    return {
-      success: true,
-      access_token: newTokens.accessToken,
-      refresh_token: newTokens.refreshToken,
-      token_type: 'Bearer',
-      expires_in: this.getExpirationTime(jwtExpiresIn) / 1000,
-      scope: tokenRecord.scope
-    }
+    // Gerar novos tokens
+    return await this.generateAccessTokens(user)
   }
 
   // Revogar token
   static async revokeToken(accessToken) {
-    const result = await query(
-      'UPDATE tokens SET is_revoked = true WHERE access_token = $1 RETURNING *',
+    await query(
+      'UPDATE tokens SET is_revoked = true WHERE access_token = $1',
       [accessToken]
     )
-    return result.rows.length > 0
+    return true
   }
 
-  // Verificar token de acesso
-  static async verifyAccessToken(accessToken) {
+  // Verificar token válido
+  static async validateToken(accessToken) {
     const decoded = this.verifyToken(accessToken)
-    if (!decoded || decoded.type !== 'access') {
-      return { success: false, message: 'Token inválido' }
-    }
+    if (!decoded) return null
 
-    const result = await query(
+    const tokenResult = await query(
       'SELECT * FROM tokens WHERE access_token = $1 AND is_revoked = false AND expires_at > NOW()',
       [accessToken]
     )
 
-    if (result.rows.length === 0) {
-      return { success: false, message: 'Token não encontrado, revogado ou expirado' }
+    if (tokenResult.rows.length === 0) return null
+
+    const user = await this.getUserById(decoded.userId)
+    if (!user) return null
+
+    return {
+      user,
+      token: tokenResult.rows[0],
+      decoded
     }
-
-    const client = await this.getClientById(decoded.clientId)
-    if (!client) {
-      return { success: false, message: 'Cliente não encontrado' }
-    }
-
-    return { success: true, client, token: result.rows[0] }
-  }
-
-  // Listar tokens de um cliente
-  static async getClientTokens(clientId) {
-    const result = await query(
-      'SELECT id, access_token, refresh_token, token_type, expires_at, scope, is_revoked, created_at FROM tokens WHERE client_id = $1 ORDER BY created_at DESC',
-      [clientId]
-    )
-    return result.rows
   }
 
   // Limpar tokens expirados
   static async cleanupExpiredTokens() {
     const result = await query(
-      'DELETE FROM tokens WHERE expires_at < NOW() AND is_revoked = true'
+      'DELETE FROM tokens WHERE expires_at < NOW() OR is_revoked = true'
     )
     return result.rowCount
   }
 
-  // Obter tempo de expiração em milissegundos
+  // Obter tempo de expiração
   static getExpirationTime(timeString) {
-    const units = {
-      's': 1000,
-      'm': 60 * 1000,
-      'h': 60 * 60 * 1000,
-      'd': 24 * 60 * 60 * 1000
+    const now = new Date()
+    const unit = timeString.slice(-1)
+    const value = parseInt(timeString.slice(0, -1))
+
+    switch (unit) {
+      case 's':
+        return new Date(now.getTime() + value * 1000)
+      case 'm':
+        return new Date(now.getTime() + value * 60 * 1000)
+      case 'h':
+        return new Date(now.getTime() + value * 60 * 60 * 1000)
+      case 'd':
+        return new Date(now.getTime() + value * 24 * 60 * 60 * 1000)
+      default:
+        return new Date(now.getTime() + 24 * 60 * 60 * 1000) // 24h padrão
     }
-    
-    const match = timeString.match(/^(\d+)([smhd])$/)
-    if (!match) return 24 * 60 * 60 * 1000 // 24h padrão
-    
-    const [, value, unit] = match
-    return parseInt(value) * units[unit]
   }
 
-  // Listar todos os clientes
-  static async getAllClients() {
+  // Listar todos os usuários
+  static async getAllUsers() {
     const result = await query(
-      'SELECT id, client_id, client_name, description, is_active, created_at, updated_at FROM clients ORDER BY created_at DESC'
+      'SELECT id, user_id, user_name, user_documento_identificacao, description, is_active, created_at, updated_at FROM users ORDER BY created_at DESC'
     )
     return result.rows
   }
 
-  // Atualizar cliente
-  static async updateClient(clientId, updates) {
-    const allowedFields = ['client_name', 'description', 'is_active']
-    const fields = Object.keys(updates).filter(key => allowedFields.includes(key))
+  // Atualizar usuário
+  static async updateUser(userId, updates) {
+    const allowedFields = ['user_name', 'user_documento_identificacao', 'description', 'is_active']
+    const validUpdates = {}
     
-    if (fields.length === 0) {
-      return null
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        validUpdates[field] = updates[field]
+      }
     }
 
-    const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ')
-    const values = [clientId, ...fields.map(field => updates[field])]
+    if (Object.keys(validUpdates).length === 0) {
+      throw new Error('Nenhum campo válido para atualização')
+    }
+
+    const setClause = Object.keys(validUpdates).map((key, index) => `${key} = $${index + 2}`).join(', ')
+    const values = [userId, ...Object.values(validUpdates)]
 
     const result = await query(
-      `UPDATE clients SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE client_id = $1 RETURNING *`,
+      `UPDATE users SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1 RETURNING *`,
       values
     )
 
-    return result.rows[0] || null
+    return result.rows[0]
   }
 
-  // Deletar cliente
-  static async deleteClient(clientId) {
+  // Deletar usuário
+  static async deleteUser(userId) {
     const result = await query(
-      'DELETE FROM clients WHERE client_id = $1 RETURNING *',
-      [clientId]
+      'DELETE FROM users WHERE user_id = $1 RETURNING *',
+      [userId]
     )
-    return result.rows[0] || null
+    return result.rows[0]
+  }
+
+  // Listar tokens de um usuário
+  static async getUserTokens(userId) {
+    const result = await query(
+      'SELECT id, access_token, refresh_token, token_type, expires_at, scope, is_revoked, created_at FROM tokens WHERE user_id = $1 ORDER BY created_at DESC',
+      [userId]
+    )
+    return result.rows
+  }
+
+  // Listar sessões de um usuário
+  static async getUserSessions(userId) {
+    const result = await query(
+      'SELECT id, session_id, status, created_at, updated_at FROM whatsapp_sessions WHERE user_id = $1 ORDER BY created_at DESC',
+      [userId]
+    )
+    return result.rows
   }
 }
 

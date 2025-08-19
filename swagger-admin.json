@@ -1,0 +1,470 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "WhatsApp API - Administração",
+    "description": "API Wrapper for WhatsAppWebJS - Rotas Administrativas (API Key)",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/admin",
+      "description": "Rotas administrativas"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Admin",
+      "description": "Rotas administrativas para gerenciamento de usuários"
+    }
+  ],
+  "paths": {
+    "/users": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Listar todos os usuários",
+        "description": "Lista todos os usuários cadastrados no sistema. Requer autenticação com escopo admin.",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "Forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/users/{userId}": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Obter usuário específico",
+        "description": "Obtém informações detalhadas de um usuário específico. Requer autenticação com escopo admin.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "Forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Atualizar usuário",
+        "description": "Atualiza informações de um usuário existente. Requer autenticação com escopo admin.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "Forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Deletar usuário",
+        "description": "Remove um usuário do sistema. Requer autenticação com escopo admin.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "Forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/users/{userId}/tokens": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Listar tokens do usuário",
+        "description": "Lista todos os tokens ativos de um usuário específico. Requer autenticação com escopo admin.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "Forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    },
+    "/users/{userId}/sessions": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Listar sessões do usuário",
+        "description": "Lista todas as sessões WhatsApp de um usuário específico. Requer autenticação com escopo admin.",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "description": "Forbidden.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "apiKeyAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "UserResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "number",
+                "example": 1
+              },
+              "user_id": {
+                "type": "string",
+                "example": "550e8400-e29b-41d4-a716-446655440000"
+              },
+              "user_name": {
+                "type": "string",
+                "example": "Admin User"
+              },
+              "user_documento_identificacao": {
+                "type": "string",
+                "example": "123.456.789-00"
+              },
+              "description": {
+                "type": "string",
+                "example": "Usuário administrativo"
+              },
+              "is_active": {
+                "type": "boolean",
+                "example": true
+              },
+              "created_at": {
+                "type": "string",
+                "example": "2024-01-01T00:00:00.000Z"
+              }
+            }
+          }
+        }
+      },
+      "UsersListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "number",
+                  "example": 1
+                },
+                "user_id": {
+                  "type": "string",
+                  "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "user_name": {
+                  "type": "string",
+                  "example": "Admin User"
+                },
+                "user_documento_identificacao": {
+                  "type": "string",
+                  "example": "123.456.789-00"
+                },
+                "description": {
+                  "type": "string",
+                  "example": "Usuário administrativo"
+                },
+                "is_active": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "created_at": {
+                  "type": "string",
+                  "example": "2024-01-01T00:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "number",
+                  "example": 1
+                },
+                "user_id": {
+                  "type": "string",
+                  "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "access_token": {
+                  "type": "string",
+                  "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                },
+                "refresh_token": {
+                  "type": "string",
+                  "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                },
+                "expires_at": {
+                  "type": "string",
+                  "example": "2024-01-01T00:00:00.000Z"
+                },
+                "scope": {
+                  "type": "string",
+                  "example": "read write"
+                }
+              }
+            }
+          }
+        }
+      },
+      "SessionResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "number",
+                  "example": 1
+                },
+                "session_id": {
+                  "type": "string",
+                  "example": "f8377d8d-a589-4242-9ba6-9486a04ef80c"
+                },
+                "user_id": {
+                  "type": "string",
+                  "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "status": {
+                  "type": "string",
+                  "example": "CONNECTED"
+                },
+                "created_at": {
+                  "type": "string",
+                  "example": "2024-01-01T00:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "example": "Some server error"
+          }
+        }
+      },
+      "ForbiddenResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "example": "Invalid API key"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key"
+      }
+    }
+  }
+}

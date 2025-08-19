@@ -1,23 +1,31 @@
 const swaggerAutogen = require('swagger-autogen')({ openapi: '3.0.0', autoBody: false })
 
 const outputFile = './swagger.json'
-const endpointsFiles = ['./src/routes.js']
+const endpointsFiles = ['./src/routes/userRoutes.js']
 
 const doc = {
   info: {
     title: 'WhatsApp API',
-    description: 'API Wrapper for WhatsAppWebJS'
+    description: 'API Wrapper for WhatsAppWebJS - Rotas de Usuário (Bearer Token)'
   },
   host: '',
   securityDefinitions: {
-    apiKeyAuth: {
-      type: 'apiKey',
-      in: 'header',
-      name: 'x-api-key'
+    bearerAuth: {
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT'
     }
   },
   produces: ['application/json'],
   tags: [
+    {
+      name: 'Health',
+      description: 'Health check and system status endpoints'
+    },
+    {
+      name: 'Auth',
+      description: 'Authentication and user management endpoints'
+    },
     {
       name: 'Session',
       description: 'Handling multiple sessions logic, creation and deletion'
@@ -29,6 +37,18 @@ const doc = {
     {
       name: 'Message',
       description: 'May fail if the message is too old (Only from the last 100 Messages of the given chat)'
+    },
+    {
+      name: 'Chat',
+      description: 'Chat management and operations'
+    },
+    {
+      name: 'Group Chat',
+      description: 'Group chat management and operations'
+    },
+    {
+      name: 'Contact',
+      description: 'Contact management and operations'
     }
   ],
   definitions: {
@@ -60,6 +80,10 @@ const doc = {
     ForbiddenResponse: {
       success: false,
       error: 'Invalid API key'
+    },
+    UnauthorizedResponse: {
+      success: false,
+      error: 'Unauthorized - Invalid or missing authentication token'
     }
   }
 }

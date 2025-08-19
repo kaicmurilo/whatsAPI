@@ -23,7 +23,7 @@ class AppInitializer {
         '1. Execute: npm run db:reset (recreará as tabelas)',
         '2. Verifique se o script init.sql está atualizado'
       ],
-      'NO_ACTIVE_CLIENTS': [
+      'NO_ACTIVE_USERS': [
         '1. Execute: npm run db:init (criará cliente padrão)',
         '2. Ou crie um cliente via API de autenticação'
       ]
@@ -79,11 +79,11 @@ class AppInitializer {
   showServicesStatus() {
     console.log('🚀 Aplicação inicializada com sucesso')
     console.log('📊 Status dos serviços:')
-    console.log(`   🗄️  Banco de dados: Conectado (${this.dbValidation.database})`)
-    console.log(`   👤 Usuário: ${this.dbValidation.user}`)
-    console.log(`   📋 PostgreSQL: ${this.dbValidation.version}`)
-    console.log(`   📊 Tabelas: ${this.dbValidation.tables.join(', ')}`)
-    console.log(`   👥 Clientes ativos: ${this.dbValidation.activeClients}`)
+    console.log(`   🗄️  Banco de dados: Conectado`)
+    console.log(`   👤 Usuário: ${this.dbValidation.database.user}`)
+    console.log(`   📋 PostgreSQL: ${this.dbValidation.database.version}`)
+    console.log(`   📊 Tabelas: ${this.dbValidation.database.tables.join(', ')}`)
+    console.log(`   👥 Usuários ativos: ${this.dbValidation.database.activeUsers}`)
     console.log('   🔴 Redis: Conectado')
     console.log('   💬 WhatsApp: Pronto para sessões')
   }

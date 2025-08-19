@@ -1,8 +1,17 @@
 const { Pool } = require('pg')
-const { postgresConfig } = require('./config')
+const config = require('./config')
 
-// Pool de conexões PostgreSQL
-const pool = new Pool(postgresConfig)
+// Configuração do pool de conexões
+const pool = new Pool({
+  host: config.postgresConfig.host,
+  port: config.postgresConfig.port,
+  database: config.postgresConfig.database,
+  user: config.postgresConfig.user,
+  password: config.postgresConfig.password,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+})
 
 // Testar conexão
 pool.on('connect', () => {
@@ -10,13 +19,13 @@ pool.on('connect', () => {
 })
 
 pool.on('error', (err) => {
-  console.error('❌ Erro na conexão PostgreSQL:', err)
+  console.error('❌ Erro no pool do PostgreSQL:', err)
 })
 
 // Função para validar tabelas necessárias
 const validateRequiredTables = async (client) => {
   const requiredTables = [
-    'clients',
+    'users',
     'tokens', 
     'whatsapp_sessions'
   ]
@@ -47,36 +56,37 @@ const validateRequiredTables = async (client) => {
     // Verificar estrutura das tabelas
     const tableValidations = []
     
-    // Validar tabela clients
-    const clientsStructure = await client.query(`
+    // Validar tabela users
+    const usersStructure = await client.query(`
       SELECT column_name, data_type, is_nullable
       FROM information_schema.columns 
-      WHERE table_name = 'clients' 
+      WHERE table_name = 'users' 
       AND table_schema = 'public'
       ORDER BY ordinal_position
     `)
     
-    const requiredClientColumns = [
+    const requiredUserColumns = [
       { name: 'id', type: 'integer' },
-      { name: 'client_id', type: 'character varying' },
-      { name: 'client_name', type: 'character varying' },
-      { name: 'client_secret', type: 'character varying' },
+      { name: 'user_id', type: 'character varying' },
+      { name: 'user_name', type: 'character varying' },
+      { name: 'user_secret', type: 'character varying' },
+      { name: 'user_documento_identificacao', type: 'character varying' },
       { name: 'is_active', type: 'boolean' }
     ]
     
-    const clientColumns = clientsStructure.rows.map(col => ({
+    const userColumns = usersStructure.rows.map(col => ({
       name: col.column_name,
       type: col.data_type
     }))
     
-    const missingClientColumns = requiredClientColumns.filter(required => 
-      !clientColumns.some(col => col.name === required.name)
+    const missingUserColumns = requiredUserColumns.filter(required => 
+      !userColumns.some(col => col.name === required.name)
     )
     
-    if (missingClientColumns.length > 0) {
+    if (missingUserColumns.length > 0) {
       tableValidations.push({
-        table: 'clients',
-        error: `Colunas ausentes: ${missingClientColumns.map(c => c.name).join(', ')}`
+        table: 'users',
+        error: `Colunas ausentes: ${missingUserColumns.map(c => c.name).join(', ')}`
       })
     }
     
@@ -91,7 +101,7 @@ const validateRequiredTables = async (client) => {
     
     const requiredTokenColumns = [
       { name: 'id', type: 'integer' },
-      { name: 'client_id', type: 'character varying' },
+      { name: 'user_id', type: 'character varying' },
       { name: 'access_token', type: 'character varying' },
       { name: 'refresh_token', type: 'character varying' },
       { name: 'expires_at', type: 'timestamp' }
@@ -125,7 +135,7 @@ const validateRequiredTables = async (client) => {
     const requiredSessionColumns = [
       { name: 'id', type: 'integer' },
       { name: 'session_id', type: 'character varying' },
-      { name: 'client_id', type: 'character varying' },
+      { name: 'user_id', type: 'character varying' },
       { name: 'status', type: 'character varying' }
     ]
     
@@ -154,24 +164,24 @@ const validateRequiredTables = async (client) => {
       }
     }
     
-    // Verificar se existe pelo menos um cliente
-    const clientCount = await client.query('SELECT COUNT(*) as count FROM clients WHERE is_active = true')
+    // Verificar se existe pelo menos um usuário
+    const userCount = await client.query('SELECT COUNT(*) as count FROM users WHERE is_active = true')
     
-    if (parseInt(clientCount.rows[0].count) === 0) {
-      console.log('⚠️  Nenhum cliente ativo encontrado')
+    if (parseInt(userCount.rows[0].count) === 0) {
+      console.log('⚠️  Nenhum usuário ativo encontrado')
       return {
         success: false,
-        error: 'Nenhum cliente ativo encontrado no banco de dados',
-        code: 'NO_ACTIVE_CLIENTS'
+        error: 'Nenhum usuário ativo encontrado no banco de dados',
+        code: 'NO_ACTIVE_USERS'
       }
     }
     
-    console.log(`✅ ${clientCount.rows[0].count} cliente(s) ativo(s) encontrado(s)`)
+    console.log(`✅ ${userCount.rows[0].count} usuário(s) ativo(s) encontrado(s)`)
     
     return {
       success: true,
       tables: existingTables,
-      activeClients: parseInt(clientCount.rows[0].count)
+      activeUsers: parseInt(userCount.rows[0].count)
     }
     
   } catch (error) {
@@ -185,38 +195,27 @@ const validateRequiredTables = async (client) => {
 
 // Função para validar conexão com banco de dados
 const validateDatabaseConnection = async () => {
-  const client = await pool.connect()
   try {
-    // Teste básico de conexão
-    await client.query('SELECT NOW()')
+    const client = await pool.connect()
+    
+    // Testar conexão básica
+    const result = await client.query('SELECT NOW() as current_time, version() as version')
     console.log('✅ Conexão com banco de dados estabelecida com sucesso')
-    
-    // Teste de credenciais - verificar se o usuário tem permissões básicas
-    const result = await client.query(`
-      SELECT 
-        current_user as usuario,
-        current_database() as banco,
-        version() as versao_postgres
-    `)
-    
     console.log('📊 Informações do banco:')
-    console.log(`   👤 Usuário: ${result.rows[0].usuario}`)
-    console.log(`   🗄️  Banco: ${result.rows[0].banco}`)
-    console.log(`   📋 Versão PostgreSQL: ${result.rows[0].versao_postgres.split(' ')[0]}`)
+    console.log(`   👤 Usuário: ${config.postgresConfig.user}`)
+    console.log(`   🗄️  Banco: ${config.postgresConfig.database}`)
+    console.log(`   📋 Versão PostgreSQL: ${result.rows[0].version.split(' ')[0]} ${result.rows[0].version.split(' ')[1]}`)
     
-    // Teste de permissões - tentar criar uma tabela temporária
-    await client.query('CREATE TEMP TABLE test_permissions (id serial PRIMARY KEY, name text)')
-    await client.query('INSERT INTO test_permissions (name) VALUES ($1)', ['test'])
-    await client.query('SELECT * FROM test_permissions')
-    await client.query('DROP TABLE test_permissions')
-    
+    // Testar permissões
+    await client.query('SELECT 1')
     console.log('✅ Permissões de banco de dados verificadas com sucesso')
     
-    // Validar tabelas necessárias
+    // Validar tabelas
     console.log('🔍 Validando tabelas necessárias...')
     const tableValidation = await validateRequiredTables(client)
     
     if (!tableValidation.success) {
+      client.release()
       return {
         success: false,
         error: tableValidation.error,
@@ -226,74 +225,38 @@ const validateDatabaseConnection = async () => {
     }
     
     console.log('✅ Validação de tabelas concluída com sucesso')
+    console.log(`   📋 Tabelas: ${tableValidation.tables.join(', ')}`)
+    console.log(`   👥 Usuários ativos: ${tableValidation.activeUsers}`)
+    
+    client.release()
     
     return {
       success: true,
-      user: result.rows[0].usuario,
-      database: result.rows[0].banco,
-      version: result.rows[0].versao_postgres.split(' ')[0],
-      tables: tableValidation.tables,
-      activeClients: tableValidation.activeClients
+      database: {
+        host: config.postgresConfig.host,
+        port: config.postgresConfig.port,
+        database: config.postgresConfig.database,
+        user: config.postgresConfig.user,
+        version: result.rows[0].version.split(' ')[0] + ' ' + result.rows[0].version.split(' ')[1],
+        tables: tableValidation.tables,
+        activeUsers: tableValidation.activeUsers
+      }
     }
     
   } catch (error) {
-    console.error('❌ Erro na validação do banco de dados:', error.message)
-    
-    // Análise específica do erro
-    if (error.code === 'ECONNREFUSED') {
-      console.error('🔌 Erro: Não foi possível conectar ao servidor PostgreSQL')
-      console.error('   Verifique se o PostgreSQL está rodando e se as configurações de host/porta estão corretas')
-    } else if (error.code === '28P01') {
-      console.error('🔑 Erro: Autenticação falhou - credenciais inválidas')
-      console.error('   Verifique o usuário e senha no arquivo .env')
-    } else if (error.code === '3D000') {
-      console.error('🗄️  Erro: Banco de dados não existe')
-      console.error('   Verifique se o banco especificado existe ou crie-o primeiro')
-    } else if (error.code === '42501') {
-      console.error('🚫 Erro: Permissões insuficientes')
-      console.error('   O usuário não tem permissões adequadas para operações no banco')
-    }
-    
     return {
       success: false,
-      error: error.message,
-      code: error.code
+      error: `Erro ao conectar com banco de dados: ${error.message}`,
+      code: 'DATABASE_CONNECTION_ERROR'
     }
-  } finally {
-    client.release()
   }
 }
 
 // Função para executar queries
-const query = async (text, params) => {
-  const start = Date.now()
-  try {
-    const res = await pool.query(text, params)
-    const duration = Date.now() - start
-    console.log(`📊 Query executada em ${duration}ms:`, text.substring(0, 50) + '...')
-    return res
-  } catch (error) {
-    console.error('❌ Erro na query:', error)
-    throw error
-  }
-}
-
-// Função para obter uma conexão do pool
-const getClient = () => {
-  return pool.connect()
-}
-
-// Função para fechar o pool
-const closePool = async () => {
-  await pool.end()
-  console.log('🔌 Pool PostgreSQL fechado')
-}
+const query = (text, params) => pool.query(text, params)
 
 module.exports = {
   query,
-  getClient,
-  closePool,
-  pool,
   validateDatabaseConnection,
   validateRequiredTables
 } 

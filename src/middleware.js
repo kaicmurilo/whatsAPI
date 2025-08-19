@@ -6,7 +6,7 @@ const rateLimiting = require('express-rate-limit')
 // Importar middleware de autenticação
 const { 
   authenticateToken, 
-  requireActiveClient, 
+  requireActiveUser, 
   requireScope,
   requireAnyScope,
   requireAllScopes,
@@ -15,6 +15,7 @@ const {
   checkAuthEnabled 
 } = require('./middleware/authMiddleware')
 
+// Middleware para rotas que aceitam apenas API Key (administrativas)
 const apikey = async (req, res, next) => {
   /*
     #swagger.security = [{
@@ -30,12 +31,68 @@ const apikey = async (req, res, next) => {
         }
       }
   */
+  
   if (globalApiKey) {
     const apiKey = req.headers['x-api-key']
     if (!apiKey || apiKey !== globalApiKey) {
       return sendErrorResponse(res, 403, 'Invalid API key')
     }
   }
+  next()
+}
+
+// Middleware para rotas que aceitam apenas JWT (rotas de usuário)
+const userAuth = async (req, res, next) => {
+  /*
+    #swagger.security = [{
+          "bearerAuth": []
+    }]
+  */
+  /* #swagger.responses[401] = {
+        description: "Unauthorized.",
+        content: {
+          "application/json": {
+            schema: { "$ref": "#/definitions/UnauthorizedResponse" }
+          }
+        }
+      }
+  */
+  /* #swagger.responses[403] = {
+        description: "Forbidden.",
+        content: {
+          "application/json": {
+            schema: { "$ref": "#/definitions/ForbiddenResponse" }
+          }
+        }
+      }
+  */
+  
+  // Se a autenticação JWT estiver habilitada, verificar token JWT
+  if (enableAuth) {
+    // Verificar se há um token JWT válido
+    const authHeader = req.headers['authorization']
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7)
+      try {
+        const AuthService = require('./auth/authService')
+        const result = await AuthService.validateToken(token)
+        if (result && result.user) {
+          // Token JWT válido encontrado, permitir continuar
+          req.user = result.user
+          req.token = result.token
+          return next()
+        }
+      } catch (error) {
+        // Token JWT inválido
+        return sendErrorResponse(res, 401, 'Token inválido ou expirado')
+      }
+    }
+    
+    // Se não há token JWT válido e a autenticação está habilitada
+    return sendErrorResponse(res, 401, 'Token de acesso não fornecido')
+  }
+  
+  // Se a autenticação estiver desabilitada, permitir acesso
   next()
 }
 
@@ -189,6 +246,7 @@ const groupChatSwagger = async (req, res, next) => {
 module.exports = {
   sessionValidation,
   apikey,
+  userAuth,
   sessionNameValidation,
   sessionSwagger,
   clientSwagger,
@@ -199,7 +257,7 @@ module.exports = {
   rateLimiter,
   // Middleware de autenticação
   authenticateToken,
-  requireActiveClient,
+  requireActiveUser,
   requireScope,
   requireAnyScope,
   requireAllScopes,

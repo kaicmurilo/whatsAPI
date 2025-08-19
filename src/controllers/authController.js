@@ -2,143 +2,108 @@ const AuthService = require('../auth/authService')
 const { sendErrorResponse, sendSuccessResponse } = require('../utils')
 
 class AuthController {
-  // Criar novo cliente
-  static async createClient(req, res) {
-    /*
-      #swagger.tags = ['Auth']
-      #swagger.summary = 'Criar novo cliente'
-      #swagger.description = 'Cria um novo cliente com credenciais únicas'
-      #swagger.requestBody = {
-        required: true,
-        schema: {
-          type: 'object',
-          properties: {
-            client_name: {
-              type: 'string',
-              description: 'Nome do cliente',
-              example: 'Meu App WhatsApp'
-            },
-            description: {
-              type: 'string',
-              description: 'Descrição do cliente',
-              example: 'Aplicação para integração com WhatsApp'
-            }
-          },
-          required: ['client_name']
-        }
-      }
-      #swagger.responses[201] = {
-        description: 'Cliente criado com sucesso',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                success: { type: 'boolean' },
-                data: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'integer' },
-                    client_id: { type: 'string' },
-                    client_name: { type: 'string' },
-                    client_secret: { type: 'string' },
-                    description: { type: 'string' },
-                    is_active: { type: 'boolean' },
-                    created_at: { type: 'string' }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    */
+  // Criar usuário
+  static async createUser(req, res) {
+    // #swagger.summary = 'Criar novo usuário'
+    // #swagger.description = 'Cria um novo usuário no sistema com credenciais únicas. Esta rota é pública e não requer autenticação.'
+    // #swagger.requestBody = {
+    //   required: true,
+    //   content: {
+    //     "application/json": {
+    //       schema: {
+    //         type: "object",
+    //         required: ["user_name"],
+    //         properties: {
+    //           user_name: {
+    //             type: "string",
+    //             description: "Nome do usuário",
+    //             example: "Meu App WhatsApp"
+    //           },
+    //           user_documento_identificacao: {
+    //             type: "string",
+    //             description: "Documento de identificação (CPF, CNPJ, etc.)",
+    //             example: "123.456.789-00"
+    //           },
+    //           description: {
+    //             type: "string",
+    //             description: "Descrição opcional do usuário",
+    //             example: "Aplicação para integração com WhatsApp"
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
     try {
-      const { client_name, description = '' } = req.body
+      const { user_name, description, user_documento_identificacao } = req.body
 
-      if (!client_name) {
-        return sendErrorResponse(res, 400, 'Nome do cliente é obrigatório')
+      if (!user_name) {
+        return sendErrorResponse(res, 400, 'Nome do usuário é obrigatório')
       }
 
-      const client = await AuthService.createClient(client_name, description)
-      
-      return sendSuccessResponse(res, 201, 'Cliente criado com sucesso', client)
+      const user = await AuthService.createUser(user_name, description, user_documento_identificacao)
+
+      return sendSuccessResponse(res, 201, 'Usuário criado com sucesso', {
+        id: user.id,
+        user_id: user.user_id,
+        user_name: user.user_name,
+        user_documento_identificacao: user.user_documento_identificacao,
+        description: user.description,
+        is_active: user.is_active,
+        created_at: user.created_at,
+        user_secret: user.user_secret // Retorna apenas uma vez
+      })
     } catch (error) {
-      console.error('Erro ao criar cliente:', error)
+      console.error('Erro ao criar usuário:', error)
+      if (error.code === '23505') { // Unique violation
+        return sendErrorResponse(res, 409, 'Usuário já existe')
+      }
       return sendErrorResponse(res, 500, 'Erro interno do servidor')
     }
   }
 
-  // Autenticar cliente e gerar token
-  static async authenticate(req, res) {
-    /*
-      #swagger.tags = ['Auth']
-      #swagger.summary = 'Autenticar cliente'
-      #swagger.description = 'Autentica um cliente e retorna tokens de acesso'
-      #swagger.requestBody = {
-        required: true,
-        schema: {
-          type: 'object',
-          properties: {
-            client_id: {
-              type: 'string',
-              description: 'ID do cliente',
-              example: '550e8400-e29b-41d4-a716-446655440000'
-            },
-            client_secret: {
-              type: 'string',
-              description: 'Chave secreta do cliente',
-              example: '550e8400-e29b-41d4-a716-446655440001'
-            },
-            scope: {
-              type: 'string',
-              description: 'Escopo do token (opcional)',
-              example: 'read write'
-            }
-          },
-          required: ['client_id', 'client_secret']
-        }
-      }
-      #swagger.responses[200] = {
-        description: 'Autenticação bem-sucedida',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                success: { type: 'boolean' },
-                data: {
-                  type: 'object',
-                  properties: {
-                    access_token: { type: 'string' },
-                    refresh_token: { type: 'string' },
-                    token_type: { type: 'string' },
-                    expires_in: { type: 'integer' },
-                    scope: { type: 'string' }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    */
+  // Autenticar usuário
+  static async authenticateUser(req, res) {
+    // #swagger.summary = 'Autenticar usuário'
+    // #swagger.description = 'Autentica um usuário com suas credenciais e retorna tokens de acesso.'
+    // #swagger.requestBody = {
+    //   required: true,
+    //   content: {
+    //     "application/json": {
+    //       schema: {
+    //         type: "object",
+    //         required: ["user_id", "user_secret"],
+    //         properties: {
+    //           user_id: {
+    //             type: "string",
+    //             description: "ID único do usuário (UUID)",
+    //             example: "550e8400-e29b-41d4-a716-446655440000"
+    //           },
+    //           user_secret: {
+    //             type: "string",
+    //             description: "Senha do usuário",
+    //             example: "minha_senha_secreta_123"
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
     try {
-      const { client_id, client_secret, scope = '' } = req.body
+      const { user_id, user_secret } = req.body
 
-      if (!client_id || !client_secret) {
-        return sendErrorResponse(res, 400, 'client_id e client_secret são obrigatórios')
+      if (!user_id || !user_secret) {
+        return sendErrorResponse(res, 400, 'ID do usuário e senha são obrigatórios')
       }
 
-      const authResult = await AuthService.authenticateClient(client_id, client_secret)
-      
-      if (!authResult.success) {
-        return sendErrorResponse(res, 401, authResult.message)
+      const user = await AuthService.authenticateUser(user_id, user_secret)
+      if (!user) {
+        return sendErrorResponse(res, 401, 'Credenciais inválidas')
       }
 
-      const tokens = await AuthService.createAccessToken(client_id, scope)
-      
-      return sendSuccessResponse(res, 200, 'Autenticação bem-sucedida', tokens)
+      const tokens = await AuthService.generateAccessTokens(user)
+
+      return sendSuccessResponse(res, 200, 'Autenticação realizada com sucesso', tokens)
     } catch (error) {
       console.error('Erro na autenticação:', error)
       return sendErrorResponse(res, 500, 'Erro interno do servidor')
@@ -147,62 +112,39 @@ class AuthController {
 
   // Renovar token
   static async refreshToken(req, res) {
-    /*
-      #swagger.tags = ['Auth']
-      #swagger.summary = 'Renovar token'
-      #swagger.description = 'Renova um token de acesso usando refresh token'
-      #swagger.requestBody = {
-        required: true,
-        schema: {
-          type: 'object',
-          properties: {
-            refresh_token: {
-              type: 'string',
-              description: 'Token de renovação',
-              example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
-            }
-          },
-          required: ['refresh_token']
-        }
-      }
-      #swagger.responses[200] = {
-        description: 'Token renovado com sucesso',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                success: { type: 'boolean' },
-                data: {
-                  type: 'object',
-                  properties: {
-                    access_token: { type: 'string' },
-                    refresh_token: { type: 'string' },
-                    token_type: { type: 'string' },
-                    expires_in: { type: 'integer' },
-                    scope: { type: 'string' }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    */
+    // #swagger.summary = 'Renovar token de acesso'
+    // #swagger.description = 'Renova o token de acesso usando um refresh token válido.'
+    // #swagger.requestBody = {
+    //   required: true,
+    //   content: {
+    //     "application/json": {
+    //       schema: {
+    //         type: "object",
+    //         required: ["refresh_token"],
+    //         properties: {
+    //           refresh_token: {
+    //             type: "string",
+    //             description: "Refresh token para renovar o acesso",
+    //             example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJ0eXBlIjoicmVmcmVzaCIsImlhdCI6MTYzNDU2Nzg5MCwiZXhwIjoxNjM1MTczNjkwfQ.example_signature"
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
     try {
       const { refresh_token } = req.body
 
       if (!refresh_token) {
-        return sendErrorResponse(res, 400, 'refresh_token é obrigatório')
+        return sendErrorResponse(res, 400, 'Refresh token é obrigatório')
       }
 
-      const result = await AuthService.refreshToken(refresh_token)
-      
-      if (!result.success) {
-        return sendErrorResponse(res, 401, result.message)
+      const tokens = await AuthService.refreshToken(refresh_token)
+      if (!tokens) {
+        return sendErrorResponse(res, 401, 'Refresh token inválido ou expirado')
       }
 
-      return sendSuccessResponse(res, 200, 'Token renovado com sucesso', result)
+      return sendSuccessResponse(res, 200, 'Token renovado com sucesso', tokens)
     } catch (error) {
       console.error('Erro ao renovar token:', error)
       return sendErrorResponse(res, 500, 'Erro interno do servidor')
@@ -211,51 +153,34 @@ class AuthController {
 
   // Revogar token
   static async revokeToken(req, res) {
-    /*
-      #swagger.tags = ['Auth']
-      #swagger.summary = 'Revogar token'
-      #swagger.description = 'Revoga um token de acesso'
-      #swagger.requestBody = {
-        required: true,
-        schema: {
-          type: 'object',
-          properties: {
-            access_token: {
-              type: 'string',
-              description: 'Token de acesso a ser revogado',
-              example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
-            }
-          },
-          required: ['access_token']
-        }
-      }
-      #swagger.responses[200] = {
-        description: 'Token revogado com sucesso',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                success: { type: 'boolean' },
-                message: { type: 'string' }
-              }
-            }
-          }
-        }
-      }
-    */
+    // #swagger.summary = 'Revogar token de acesso'
+    // #swagger.description = 'Revoga um token de acesso, invalidando-o permanentemente.'
+    // #swagger.requestBody = {
+    //   required: true,
+    //   content: {
+    //     "application/json": {
+    //       schema: {
+    //         type: "object",
+    //         required: ["access_token"],
+    //         properties: {
+    //           access_token: {
+    //             type: "string",
+    //             description: "Token de acesso a ser revogado",
+    //             example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJ1c2VyTmFtZSI6Ik1ldSBBcHAiLCJzY29wZSI6InJlYWQgd3JpdGUiLCJpYXQiOjE2MzQ1Njc4OTAsImV4cCI6MTYzNDY1NDI5MH0.example_signature"
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
     try {
       const { access_token } = req.body
 
       if (!access_token) {
-        return sendErrorResponse(res, 400, 'access_token é obrigatório')
+        return sendErrorResponse(res, 400, 'Access token é obrigatório')
       }
 
-      const revoked = await AuthService.revokeToken(access_token)
-      
-      if (!revoked) {
-        return sendErrorResponse(res, 404, 'Token não encontrado')
-      }
+      await AuthService.revokeToken(access_token)
 
       return sendSuccessResponse(res, 200, 'Token revogado com sucesso')
     } catch (error) {
@@ -264,272 +189,157 @@ class AuthController {
     }
   }
 
-  // Listar clientes
-  static async listClients(req, res) {
-    /*
-      #swagger.tags = ['Auth']
-      #swagger.summary = 'Listar clientes'
-      #swagger.description = 'Lista todos os clientes cadastrados'
-      #swagger.responses[200] = {
-        description: 'Lista de clientes',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                success: { type: 'boolean' },
-                data: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      id: { type: 'integer' },
-                      client_id: { type: 'string' },
-                      client_name: { type: 'string' },
-                      description: { type: 'string' },
-                      is_active: { type: 'boolean' },
-                      created_at: { type: 'string' },
-                      updated_at: { type: 'string' }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    */
+  // Verificar token
+  static async verifyToken(req, res) {
+    // #swagger.summary = 'Verificar token de acesso'
+    // #swagger.description = 'Verifica se um token de acesso é válido e retorna informações do usuário.'
+    // #swagger.requestBody = {
+    //   required: true,
+    //   content: {
+    //     "application/json": {
+    //       schema: {
+    //         type: "object",
+    //         required: ["access_token"],
+    //         properties: {
+    //           access_token: {
+    //             type: "string",
+    //             description: "Token de acesso a ser verificado",
+    //             example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJ1c2VyTmFtZSI6Ik1ldSBBcHAiLCJzY29wZSI6InJlYWQgd3JpdGUiLCJpYXQiOjE2MzQ1Njc4OTAsImV4cCI6MTYzNDY1NDI5MH0.example_signature"
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
     try {
-      const clients = await AuthService.getAllClients()
-      return sendSuccessResponse(res, 200, 'Clientes listados com sucesso', clients)
+      const { access_token } = req.body
+
+      if (!access_token) {
+        return sendErrorResponse(res, 400, 'Access token é obrigatório')
+      }
+
+      const validation = await AuthService.validateToken(access_token)
+      if (!validation) {
+        return sendErrorResponse(res, 401, 'Token inválido ou expirado')
+      }
+
+      return sendSuccessResponse(res, 200, 'Token válido', {
+        user: {
+          user_id: validation.user.user_id,
+          user_name: validation.user.user_name,
+          user_documento_identificacao: validation.user.user_documento_identificacao,
+          is_active: validation.user.is_active
+        },
+        token: {
+          scope: validation.token.scope,
+          expires_at: validation.token.expires_at
+        }
+      })
     } catch (error) {
-      console.error('Erro ao listar clientes:', error)
+      console.error('Erro ao verificar token:', error)
       return sendErrorResponse(res, 500, 'Erro interno do servidor')
     }
   }
 
-  // Obter cliente por ID
-  static async getClient(req, res) {
-    /*
-      #swagger.tags = ['Auth']
-      #swagger.summary = 'Obter cliente'
-      #swagger.description = 'Obtém informações de um cliente específico'
-      #swagger.parameters['clientId'] = {
-        in: 'path',
-        description: 'ID do cliente',
-        required: true,
-        type: 'string',
-        example: '550e8400-e29b-41d4-a716-446655440000'
-      }
-      #swagger.responses[200] = {
-        description: 'Informações do cliente',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                success: { type: 'boolean' },
-                data: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'integer' },
-                    client_id: { type: 'string' },
-                    client_name: { type: 'string' },
-                    description: { type: 'string' },
-                    is_active: { type: 'boolean' },
-                    created_at: { type: 'string' },
-                    updated_at: { type: 'string' }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    */
+  // Listar usuários (requer admin)
+  static async listUsers(req, res) {
+    // #swagger.summary = 'Listar todos os usuários'
+    // #swagger.description = 'Lista todos os usuários cadastrados no sistema. Requer autenticação com escopo admin.'
     try {
-      const { clientId } = req.params
-      const client = await AuthService.getClientById(clientId)
-      
-      if (!client) {
-        return sendErrorResponse(res, 404, 'Cliente não encontrado')
-      }
+      const users = await AuthService.getAllUsers()
 
-      return sendSuccessResponse(res, 200, 'Cliente encontrado', client)
+      return sendSuccessResponse(res, 200, 'Usuários listados com sucesso', users)
     } catch (error) {
-      console.error('Erro ao obter cliente:', error)
+      console.error('Erro ao listar usuários:', error)
       return sendErrorResponse(res, 500, 'Erro interno do servidor')
     }
   }
 
-  // Atualizar cliente
-  static async updateClient(req, res) {
-    /*
-      #swagger.tags = ['Auth']
-      #swagger.summary = 'Atualizar cliente'
-      #swagger.description = 'Atualiza informações de um cliente'
-      #swagger.parameters['clientId'] = {
-        in: 'path',
-        description: 'ID do cliente',
-        required: true,
-        type: 'string',
-        example: '550e8400-e29b-41d4-a716-446655440000'
-      }
-      #swagger.requestBody = {
-        required: true,
-        schema: {
-          type: 'object',
-          properties: {
-            client_name: {
-              type: 'string',
-              description: 'Nome do cliente',
-              example: 'Meu App WhatsApp Atualizado'
-            },
-            description: {
-              type: 'string',
-              description: 'Descrição do cliente',
-              example: 'Aplicação atualizada para integração com WhatsApp'
-            },
-            is_active: {
-              type: 'boolean',
-              description: 'Status ativo/inativo',
-              example: true
-            }
-          }
-        }
-      }
-      #swagger.responses[200] = {
-        description: 'Cliente atualizado com sucesso',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                success: { type: 'boolean' },
-                data: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'integer' },
-                    client_id: { type: 'string' },
-                    client_name: { type: 'string' },
-                    description: { type: 'string' },
-                    is_active: { type: 'boolean' },
-                    created_at: { type: 'string' },
-                    updated_at: { type: 'string' }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    */
+  // Obter usuário específico (requer admin)
+  static async getUser(req, res) {
+    // #swagger.summary = 'Obter usuário específico'
+    // #swagger.description = 'Obtém informações detalhadas de um usuário específico. Requer autenticação com escopo admin.'
     try {
-      const { clientId } = req.params
+      const { userId } = req.params
+
+      const user = await AuthService.getUserById(userId)
+      if (!user) {
+        return sendErrorResponse(res, 404, 'Usuário não encontrado')
+      }
+
+      return sendSuccessResponse(res, 200, 'Usuário encontrado', {
+        id: user.id,
+        user_id: user.user_id,
+        user_name: user.user_name,
+        user_documento_identificacao: user.user_documento_identificacao,
+        description: user.description,
+        is_active: user.is_active,
+        created_at: user.created_at,
+        updated_at: user.updated_at
+      })
+    } catch (error) {
+      console.error('Erro ao obter usuário:', error)
+      return sendErrorResponse(res, 500, 'Erro interno do servidor')
+    }
+  }
+
+  // Atualizar usuário (requer admin)
+  static async updateUser(req, res) {
+    // #swagger.summary = 'Atualizar usuário'
+    // #swagger.description = 'Atualiza informações de um usuário existente. Requer autenticação com escopo admin.'
+    try {
+      const { userId } = req.params
       const updates = req.body
 
-      const client = await AuthService.updateClient(clientId, updates)
-      
-      if (!client) {
-        return sendErrorResponse(res, 404, 'Cliente não encontrado')
-      }
+      const user = await AuthService.updateUser(userId, updates)
 
-      return sendSuccessResponse(res, 200, 'Cliente atualizado com sucesso', client)
+      return sendSuccessResponse(res, 200, 'Usuário atualizado com sucesso', {
+        id: user.id,
+        user_id: user.user_id,
+        user_name: user.user_name,
+        user_documento_identificacao: user.user_documento_identificacao,
+        description: user.description,
+        is_active: user.is_active,
+        created_at: user.created_at,
+        updated_at: user.updated_at
+      })
     } catch (error) {
-      console.error('Erro ao atualizar cliente:', error)
+      console.error('Erro ao atualizar usuário:', error)
+      if (error.message === 'Nenhum campo válido para atualização') {
+        return sendErrorResponse(res, 400, error.message)
+      }
       return sendErrorResponse(res, 500, 'Erro interno do servidor')
     }
   }
 
-  // Deletar cliente
-  static async deleteClient(req, res) {
-    /*
-      #swagger.tags = ['Auth']
-      #swagger.summary = 'Deletar cliente'
-      #swagger.description = 'Remove um cliente e todos os seus tokens'
-      #swagger.parameters['clientId'] = {
-        in: 'path',
-        description: 'ID do cliente',
-        required: true,
-        type: 'string',
-        example: '550e8400-e29b-41d4-a716-446655440000'
-      }
-      #swagger.responses[200] = {
-        description: 'Cliente deletado com sucesso',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                success: { type: 'boolean' },
-                message: { type: 'string' }
-              }
-            }
-          }
-        }
-      }
-    */
+  // Deletar usuário (requer admin)
+  static async deleteUser(req, res) {
+    // #swagger.summary = 'Deletar usuário'
+    // #swagger.description = 'Remove um usuário do sistema. Requer autenticação com escopo admin.'
     try {
-      const { clientId } = req.params
-      const client = await AuthService.deleteClient(clientId)
-      
-      if (!client) {
-        return sendErrorResponse(res, 404, 'Cliente não encontrado')
+      const { userId } = req.params
+
+      const user = await AuthService.deleteUser(userId)
+      if (!user) {
+        return sendErrorResponse(res, 404, 'Usuário não encontrado')
       }
 
-      return sendSuccessResponse(res, 200, 'Cliente deletado com sucesso')
+      return sendSuccessResponse(res, 200, 'Usuário deletado com sucesso')
     } catch (error) {
-      console.error('Erro ao deletar cliente:', error)
+      console.error('Erro ao deletar usuário:', error)
       return sendErrorResponse(res, 500, 'Erro interno do servidor')
     }
   }
 
-  // Listar tokens de um cliente
-  static async listClientTokens(req, res) {
-    /*
-      #swagger.tags = ['Auth']
-      #swagger.summary = 'Listar tokens do cliente'
-      #swagger.description = 'Lista todos os tokens de um cliente específico'
-      #swagger.parameters['clientId'] = {
-        in: 'path',
-        description: 'ID do cliente',
-        required: true,
-        type: 'string',
-        example: '550e8400-e29b-41d4-a716-446655440000'
-      }
-      #swagger.responses[200] = {
-        description: 'Lista de tokens',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                success: { type: 'boolean' },
-                data: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      id: { type: 'integer' },
-                      access_token: { type: 'string' },
-                      refresh_token: { type: 'string' },
-                      token_type: { type: 'string' },
-                      expires_at: { type: 'string' },
-                      scope: { type: 'string' },
-                      is_revoked: { type: 'boolean' },
-                      created_at: { type: 'string' }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    */
+  // Listar tokens de um usuário (requer admin)
+  static async listUserTokens(req, res) {
+    // #swagger.summary = 'Listar tokens do usuário'
+    // #swagger.description = 'Lista todos os tokens ativos de um usuário específico. Requer autenticação com escopo admin.'
     try {
-      const { clientId } = req.params
-      const tokens = await AuthService.getClientTokens(clientId)
+      const { userId } = req.params
+
+      const tokens = await AuthService.getUserTokens(userId)
+
       return sendSuccessResponse(res, 200, 'Tokens listados com sucesso', tokens)
     } catch (error) {
       console.error('Erro ao listar tokens:', error)
@@ -537,140 +347,18 @@ class AuthController {
     }
   }
 
-  // Listar sessões de um cliente
-  static async listClientSessions(req, res) {
-    /*
-      #swagger.tags = ['Auth']
-      #swagger.summary = 'Listar sessões do cliente'
-      #swagger.description = 'Lista todas as sessões WhatsApp de um cliente específico'
-      #swagger.parameters['clientId'] = {
-        in: 'path',
-        description: 'ID do cliente',
-        required: true,
-        type: 'string',
-        example: '550e8400-e29b-41d4-a716-446655440000'
-      }
-      #swagger.responses[200] = {
-        description: 'Lista de sessões',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                success: { type: 'boolean' },
-                data: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      id: { type: 'integer' },
-                      session_id: { type: 'string' },
-                      client_id: { type: 'string' },
-                      status: { type: 'string' },
-                      created_at: { type: 'string' },
-                      updated_at: { type: 'string' }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    */
+  // Listar sessões de um usuário (requer admin)
+  static async listUserSessions(req, res) {
+    // #swagger.summary = 'Listar sessões do usuário'
+    // #swagger.description = 'Lista todas as sessões WhatsApp de um usuário específico. Requer autenticação com escopo admin.'
     try {
-      const { clientId } = req.params
-      const { query } = require('../database')
-      
-      const result = await query(
-        'SELECT * FROM whatsapp_sessions WHERE client_id = $1 ORDER BY created_at DESC',
-        [clientId]
-      )
-      
-      return sendSuccessResponse(res, 200, 'Sessões listadas com sucesso', result.rows)
+      const { userId } = req.params
+
+      const sessions = await AuthService.getUserSessions(userId)
+
+      return sendSuccessResponse(res, 200, 'Sessões listadas com sucesso', sessions)
     } catch (error) {
       console.error('Erro ao listar sessões:', error)
-      return sendErrorResponse(res, 500, 'Erro interno do servidor')
-    }
-  }
-
-  // Verificar token
-  static async verifyToken(req, res) {
-    /*
-      #swagger.tags = ['Auth']
-      #swagger.summary = 'Verificar token'
-      #swagger.description = 'Verifica se um token é válido'
-      #swagger.requestBody = {
-        required: true,
-        schema: {
-          type: 'object',
-          properties: {
-            access_token: {
-              type: 'string',
-              description: 'Token de acesso a ser verificado',
-              example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
-            }
-          },
-          required: ['access_token']
-        }
-      }
-      #swagger.responses[200] = {
-        description: 'Token válido',
-        content: {
-          'application/json': {
-            schema: {
-              type: 'object',
-              properties: {
-                success: { type: 'boolean' },
-                data: {
-                  type: 'object',
-                  properties: {
-                    client: {
-                      type: 'object',
-                      properties: {
-                        id: { type: 'integer' },
-                        client_id: { type: 'string' },
-                        client_name: { type: 'string' },
-                        description: { type: 'string' },
-                        is_active: { type: 'boolean' }
-                      }
-                    },
-                    token: {
-                      type: 'object',
-                      properties: {
-                        id: { type: 'integer' },
-                        access_token: { type: 'string' },
-                        expires_at: { type: 'string' },
-                        scope: { type: 'string' }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    */
-    try {
-      const { access_token } = req.body
-
-      if (!access_token) {
-        return sendErrorResponse(res, 400, 'access_token é obrigatório')
-      }
-
-      const result = await AuthService.verifyAccessToken(access_token)
-      
-      if (!result.success) {
-        return sendErrorResponse(res, 401, result.message)
-      }
-
-      return sendSuccessResponse(res, 200, 'Token válido', {
-        client: result.client,
-        token: result.token
-      })
-    } catch (error) {
-      console.error('Erro ao verificar token:', error)
       return sendErrorResponse(res, 500, 'Erro interno do servidor')
     }
   }

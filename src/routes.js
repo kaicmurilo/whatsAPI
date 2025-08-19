@@ -15,6 +15,8 @@ const contactController = require('./controllers/contactController')
 
 // Importar rotas de autenticação
 const authRoutes = require('./routes/authRoutes')
+// Importar rotas administrativas
+const adminRoutes = require('./routes/adminRoutes')
 
 /**
  * ================
@@ -22,6 +24,13 @@ const authRoutes = require('./routes/authRoutes')
  * ================
  */
 routes.use('/auth', authRoutes)
+
+/**
+ * ================
+ * ADMIN ENDPOINTS
+ * ================
+ */
+routes.use('/admin', adminRoutes)
 
 /**
  * ================
@@ -38,8 +47,7 @@ routes.get('/test-qr', healthController.testQr)
 // Test QR endpoint with authentication
 routes.get('/test-qr-auth', 
   middleware.checkAuthEnabled,
-  middleware.authenticateToken, 
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   healthController.testQrWithAuth
 )
 
@@ -61,15 +69,14 @@ if (enableLocalCallbackExample) {
  * ================
  */
 const sessionRouter = express.Router()
-sessionRouter.use(middleware.apikey)
+sessionRouter.use(middleware.userAuth)
 sessionRouter.use(middleware.sessionSwagger)
 routes.use('/session', sessionRouter)
 
 // Rotas que requerem autenticação e verificação de propriedade da sessão
 sessionRouter.get('/start/:sessionId', 
   middleware.checkAuthEnabled,
-  middleware.authenticateToken, 
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   middleware.requireSessionOwnershipOrCreate,
   middleware.sessionNameValidation, 
   sessionController.startSession
@@ -77,8 +84,7 @@ sessionRouter.get('/start/:sessionId',
 
 sessionRouter.get('/status/:sessionId', 
   middleware.checkAuthEnabled,
-  middleware.authenticateToken, 
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   middleware.requireSessionOwnership,
   middleware.sessionNameValidation, 
   sessionController.statusSession
@@ -86,8 +92,7 @@ sessionRouter.get('/status/:sessionId',
 
 sessionRouter.get('/qr/:sessionId', 
   middleware.checkAuthEnabled,
-  middleware.authenticateToken, 
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   middleware.requireSessionOwnership,
   middleware.sessionNameValidation, 
   sessionController.sessionQrCode
@@ -95,8 +100,7 @@ sessionRouter.get('/qr/:sessionId',
 
 sessionRouter.get('/qr/:sessionId/image', 
   middleware.checkAuthEnabled,
-  middleware.authenticateToken, 
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   middleware.requireSessionOwnership,
   middleware.sessionNameValidation, 
   sessionController.sessionQrCodeImage
@@ -104,8 +108,7 @@ sessionRouter.get('/qr/:sessionId/image',
 
 sessionRouter.get('/terminate/:sessionId', 
   middleware.checkAuthEnabled,
-  middleware.authenticateToken, 
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   middleware.requireSessionOwnership,
   middleware.sessionNameValidation, 
   sessionController.terminateSession
@@ -114,16 +117,14 @@ sessionRouter.get('/terminate/:sessionId',
 // Rotas administrativas (requerem escopo admin)
 sessionRouter.get('/terminateInactive', 
   middleware.checkAuthEnabled,
-  middleware.authenticateToken, 
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   middleware.requireScope('admin'),
   sessionController.terminateInactiveSessions
 )
 
 sessionRouter.get('/terminateAll', 
   middleware.checkAuthEnabled,
-  middleware.authenticateToken, 
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   middleware.requireScope('admin'),
   sessionController.terminateAllSessions
 )
@@ -135,15 +136,14 @@ sessionRouter.get('/terminateAll',
  */
 
 const clientRouter = express.Router()
-clientRouter.use(middleware.apikey)
+clientRouter.use(middleware.userAuth)
 clientRouter.use(middleware.clientSwagger)
 routes.use('/client', clientRouter)
 
 // Função para criar middleware de autenticação e verificação de sessão
 const createClientMiddleware = (controllerMethod) => [
   middleware.checkAuthEnabled,
-  middleware.authenticateToken,
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   middleware.requireSessionOwnership,
   middleware.sessionNameValidation,
   middleware.sessionValidation,
@@ -170,8 +170,7 @@ clientRouter.post('/isRegisteredUser/:sessionId', createClientMiddleware(clientC
 clientRouter.post('/getProfilePicUrl/:sessionId', createClientMiddleware(clientController.getProfilePictureUrl))
 clientRouter.get('/getState/:sessionId', [
   middleware.checkAuthEnabled,
-  middleware.authenticateToken,
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   middleware.requireSessionOwnership,
   middleware.sessionNameValidation
 ], clientController.getState)
@@ -197,15 +196,14 @@ clientRouter.get('/getWWebVersion/:sessionId', createClientMiddleware(clientCont
  * ================
  */
 const chatRouter = express.Router()
-chatRouter.use(middleware.apikey)
+chatRouter.use(middleware.userAuth)
 chatRouter.use(middleware.chatSwagger)
 routes.use('/chat', chatRouter)
 
 // Função para criar middleware de autenticação e verificação de sessão
 const createChatMiddleware = (controllerMethod) => [
   middleware.checkAuthEnabled,
-  middleware.authenticateToken,
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   middleware.requireSessionOwnership,
   middleware.sessionNameValidation,
   middleware.sessionValidation,
@@ -227,15 +225,14 @@ chatRouter.post('/sendStateTyping/:sessionId', createChatMiddleware(chatControll
  * ================
  */
 const groupChatRouter = express.Router()
-groupChatRouter.use(middleware.apikey)
+groupChatRouter.use(middleware.userAuth)
 groupChatRouter.use(middleware.groupChatSwagger)
 routes.use('/groupChat', groupChatRouter)
 
 // Função para criar middleware de autenticação e verificação de sessão
 const createGroupChatMiddleware = (controllerMethod) => [
   middleware.checkAuthEnabled,
-  middleware.authenticateToken,
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   middleware.requireSessionOwnership,
   middleware.sessionNameValidation,
   middleware.sessionValidation,
@@ -261,15 +258,14 @@ groupChatRouter.post('/setSubject/:sessionId', createGroupChatMiddleware(groupCh
  * ================
  */
 const messageRouter = express.Router()
-messageRouter.use(middleware.apikey)
+messageRouter.use(middleware.userAuth)
 messageRouter.use(middleware.messageSwagger)
 routes.use('/message', messageRouter)
 
 // Função para criar middleware de autenticação e verificação de sessão
 const createMessageMiddleware = (controllerMethod) => [
   middleware.checkAuthEnabled,
-  middleware.authenticateToken,
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   middleware.requireSessionOwnership,
   middleware.sessionNameValidation,
   middleware.sessionValidation,
@@ -296,15 +292,14 @@ messageRouter.post('/unstar/:sessionId', createMessageMiddleware(messageControll
  * ================
  */
 const contactRouter = express.Router()
-contactRouter.use(middleware.apikey)
+contactRouter.use(middleware.userAuth)
 contactRouter.use(middleware.contactSwagger)
 routes.use('/contact', contactRouter)
 
 // Função para criar middleware de autenticação e verificação de sessão
 const createContactMiddleware = (controllerMethod) => [
   middleware.checkAuthEnabled,
-  middleware.authenticateToken,
-  middleware.requireActiveClient,
+  middleware.requireActiveUser,
   middleware.requireSessionOwnership,
   middleware.sessionNameValidation,
   middleware.sessionValidation,
@@ -370,6 +365,23 @@ if (enableSwaggerEndpoint) {
     } else {
       // Fallback para interface padrão
       const swaggerDocument = getSwaggerConfig('pt')
+      res.send(swaggerUi.generateHTML(swaggerDocument))
+    }
+  })
+  
+
+  
+  // Rota do Swagger para administração - usando interface customizada
+  routes.get('/api-docs/admin', (req, res) => {
+    const fs = require('fs')
+    const path = require('path')
+    const htmlPath = path.join(__dirname, '..', 'swagger-ui-custom.html')
+    
+    if (fs.existsSync(htmlPath)) {
+      res.sendFile(htmlPath)
+    } else {
+      // Fallback para interface padrão
+      const swaggerDocument = getSwaggerConfig('admin')
       res.send(swaggerUi.generateHTML(swaggerDocument))
     }
   })

@@ -128,6 +128,9 @@
                 if (path.includes('/api-docs/pt')) {
                     language = 'pt';
                     loadingText = 'Carregando documentação...';
+                } else if (path.includes('/api-docs/admin')) {
+                    language = 'admin';
+                    loadingText = 'Carregando documentação administrativa...';
                 }
                 
                 console.log(`Carregando documentação para idioma: ${language}`);

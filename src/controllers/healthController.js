@@ -223,7 +223,7 @@ const databaseStatus = async (req, res) => {
                       type: "array",
                       items: { type: "string" }
                     },
-                    activeClients: { type: "number" }
+                    activeUsers: { type: "number" }
                   }
                 },
                 timestamp: { type: "string" }
@@ -242,7 +242,7 @@ const databaseStatus = async (req, res) => {
           version: dbValidation.version,
           permissions: true,
           tables: dbValidation.tables,
-          activeClients: dbValidation.activeClients
+          activeUsers: dbValidation.activeUsers
         },
         timestamp: new Date().toISOString()
       })
