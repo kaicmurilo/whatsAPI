@@ -14,25 +14,27 @@ Este projeto está em desenvolvimento: dê uma estrela, crie issues, funcionalid
 
 [1. Funcionalidades](#funcionalidades)
 
-[2. Sistema de Autenticação](#sistema-de-autenticação)
+[2. Painel Web](#painel-web)
 
-[3. Executar Localmente](#executar-localmente)
+[3. Sistema de Autenticação](#sistema-de-autenticação)
 
-[4. Sistema de Cache](#sistema-de-cache)
+[4. Executar Localmente](#executar-localmente)
 
-[5. Testes](#testes)
+[5. Sistema de Cache](#sistema-de-cache)
 
-[6. Documentação](#documentação)
+[6. Testes](#testes)
 
-[7. Webhooks](#webhooks)
+[7. Documentação](#documentação)
 
-[8. Deploy em Produção](#deploy-em-produção)
+[8. Webhooks](#webhooks)
 
-[9. Contribuindo](#contribuindo)
+[9. Deploy em Produção](#deploy-em-produção)
 
-[10. Licença](#licença)
+[10. Contribuindo](#contribuindo)
 
-[11. Histórico de Estrelas](#histórico-de-estrelas)
+[11. Licença](#licença)
+
+[12. Histórico de Estrelas](#histórico-de-estrelas)
 
 ## Funcionalidades
 
@@ -80,6 +82,60 @@ Este projeto está em desenvolvimento: dê uma estrela, crie issues, funcionalid
 7. **Sistema de Cache Inteligente** - Cache Redis para melhorar performance e reduzir requests ao WhatsApp
 
 8. **Sistema de Autenticação Completo** - Gerenciamento de clientes, tokens JWT e controle de acesso
+
+9. **Painel Web** - Instâncias, conversas, agenda, arquivos, listas de transmissão e relatórios ([detalhes](#painel-web))
+
+## Painel Web
+
+Interface web (React + Vite) servida pela própria API em `/app`. Login com o `user_id` + `user_secret` de um usuário criado em `POST /auth/users`.
+
+| Tela | O que faz |
+|------|-----------|
+| **Instâncias** | Lista os números conectados com status ao vivo, cria instância nova e mostra o QR para parear |
+| **Conversas** | Histórico salvo no Postgres (recebidas + enviadas), busca, envio de texto e anexos em tempo real (SSE) |
+| **Contatos** | Agenda interna do painel (não altera a agenda do celular); o nome aparece nas conversas |
+| **Arquivos** | Biblioteca de arquivos reutilizáveis (até 50 MB); vídeo/imagem vão com play/preview até 64 MB |
+| **Transmissão** | Listas de contatos, disparo individual com intervalo aleatório configurável e ordem embaralhada, abortar, reprocessar |
+| **Relatório** | Por disparo: enviado, entregue, lido e reproduzido por contato (tiques do WhatsApp) + exportação CSV para Excel |
+
+### Rodar com Docker (recomendado)
+
+```bash
+cp env.example .env              # preencha os segredos (nunca commite o .env)
+npm run local:up                 # sobe Postgres + Redis + API/painel
+# Painel: http://localhost:47321/app
+npm run local:logs               # logs da API
+npm run local:down               # para tudo, mantendo dados e o login do WhatsApp
+```
+
+As portas são altas para não conflitar com outros projetos: painel/API em **47321** e Postgres em **47322** (sobrescreva com `WHATSAPI_LOCAL_PORT` / `WHATSAPI_LOCAL_DB_PORT`). Os containers não sobem sozinhos com o Docker; use `local:up`.
+
+### Desenvolvimento do front
+
+```bash
+npm run dev:web                  # Vite em http://localhost:47320/app, proxy para a API em 47321
+npm run build:web                # gera web/dist (o Dockerfile já faz isso no build)
+```
+
+### Variáveis do painel
+
+| Variável | Padrão | Descrição |
+|----------|--------|-----------|
+| `PANEL_MAX_FILE_SIZE` | `50000000` | Limite de upload da biblioteca, em bytes. Separado do `MAX_ATTACHMENT_SIZE` (webhook) |
+| `REPORT_TIMEZONE` | `America/Sao_Paulo` | Fuso dos horários no CSV do relatório |
+
+### Transmissão: como o envio funciona
+
+- Cada contato recebe uma mensagem **individual** (o WhatsApp Web não permite criar listas de transmissão nativas).
+- Um contato por vez, esperando um tempo **sorteado** na faixa escolhida (padrão 20–45 s) e em **ordem aleatória**. Máximo de 256 contatos por lista.
+- **Abortar** para antes do próximo contato; quem não recebeu fica pendente e pode ser **reprocessado** depois (nunca reenvia para quem já recebeu).
+- Isso reduz, mas **não elimina**, o risco de bloqueio do número.
+
+### Notas técnicas
+
+- `patches/whatsapp-web.js+1.34.7.patch` corrige o envio de mídia quebrado desde o WhatsApp Web 2.3000.10477 ([PR upstream #201923](https://github.com/wwebjs/whatsapp-web.js/pull/201923)). É aplicado no `postinstall` e no build do Docker; remova quando sair versão oficial com a correção.
+- Chats identificados por `@lid` são convertidos para `telefone@c.us` quando o WhatsApp informa o número, para casar com a agenda.
+- Travas órfãs do Chromium são limpas ao abrir a sessão, e o desligamento fecha os navegadores — reiniciar o container não pede QR de novo.
 
 ## Sistema de Autenticação
 

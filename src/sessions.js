@@ -4,6 +4,10 @@ const sessions = new Map()
 const { baseWebhookURL, sessionFolderPath, maxAttachmentSize, setMessagesAsSeen, webVersion, webVersionCacheType, recoverSessions } = require('./config')
 const { triggerWebhook, waitForNestedObject, checkIfEventisEnabled } = require('./utils')
 const { cacheHelpers } = require('./utils/cache')
+const { attachSessionRecorder } = require('./panel/sessionRecorder')
+const { clearStaleProfileLocks } = require('./utils/browserProfileLocks')
+// getChat() quebra no WhatsApp Web atual (erro minificado "r"); o id do chat sai direto de from/to
+const { resolveChatId } = require('./panel/messageMapper')
 
 // Function to validate if the session is ready
 const validateSession = async (sessionId) => {
@@ -76,11 +80,50 @@ const restoreSessions = () => {
   }
 }
 
+// Evita que o auto-recover (RECOVER_SESSIONS) reabra o navegador que estamos fechando de propósito
+const detachRecoveryListeners = (client) => {
+  client.pupPage?.removeAllListeners('close')
+  client.pupPage?.removeAllListeners('error')
+}
+
+const SHUTDOWN_DESTROY_TIMEOUT_MS = 15000
+
+// Client que não inicializou sai do Map: senão o painel fica em "iniciando" para sempre e /session/start dá 422
+const discardFailedClient = (sessionId, client, error) => {
+  console.error(`[session] falha ao inicializar sessão=${sessionId}:`, error.message)
+  if (sessions.get(sessionId) !== client) return
+  sessions.delete(sessionId)
+  detachRecoveryListeners(client)
+  client.destroy().catch(() => {}) // navegador pode nem ter aberto
+}
+
+const destroyWithTimeout = (sessionId, client) => Promise.race([
+  client.destroy(),
+  new Promise((resolve, reject) => setTimeout(() => reject(new Error('timeout')), SHUTDOWN_DESTROY_TIMEOUT_MS))
+]).catch((error) => console.error(`[session] falha ao fechar navegador sessão=${sessionId}:`, error.message))
+
+/**
+ * Fecha todos os navegadores no desligamento do processo. Sem isso o Chromium morre por SIGKILL:
+ * o IndexedDB do WhatsApp (onde fica o pareamento) pode não ser gravado e as travas do perfil ficam.
+ */
+const closeAllSessions = async () => {
+  const openSessions = [...sessions.entries()]
+  openSessions.forEach(([, client]) => detachRecoveryListeners(client))
+  await Promise.all(openSessions.map(([sessionId, client]) => destroyWithTimeout(sessionId, client)))
+  sessions.clear()
+  console.log(`[session] ${openSessions.length} navegador(es) fechado(s) no desligamento`)
+}
+
 // Setup Session
 const setupSession = (sessionId) => {
   try {
     if (sessions.has(sessionId)) {
       return { success: false, message: `Session already exists for: ${sessionId}`, client: sessions.get(sessionId) }
+    }
+
+    const removedLocks = clearStaleProfileLocks(`${sessionFolderPath}/session-${sessionId}`)
+    if (removedLocks.length > 0) {
+      console.warn(`[session] travas órfãs do Chromium removidas sessão=${sessionId}: ${removedLocks.join(', ')}`)
     }
 
     // Disable the delete folder from the logout function (will be handled separately)
@@ -121,9 +164,10 @@ const setupSession = (sessionId) => {
 
     const client = new Client(clientOptions)
 
-    client.initialize().catch(err => console.log('Initialize error:', err.message))
+    client.initialize().catch(err => discardFailedClient(sessionId, client, err))
 
     initializeEvents(client, sessionId)
+    attachSessionRecorder(client, sessionId)
 
     // Save the session to the Map
     sessions.set(sessionId, client)
@@ -234,8 +278,7 @@ const initializeEvents = (client, sessionId) => {
         
         // Invalidar cache de mensagens quando nova mensagem chegar
         try {
-          const chat = await message.getChat()
-          await cacheHelpers.invalidateMessageCache(sessionId, chat.id._serialized)
+          await cacheHelpers.invalidateMessageCache(sessionId, resolveChatId(message))
         } catch (error) {
           console.log('Erro ao invalidar cache de mensagens:', error.message)
         }
@@ -251,8 +294,7 @@ const initializeEvents = (client, sessionId) => {
           })
         }
         if (setMessagesAsSeen) {
-          const chat = await message.getChat()
-          chat.sendSeen()
+          client.sendSeen(resolveChatId(message)).catch(error => console.warn(`[session] falha ao marcar como lida sessão=${sessionId}:`, error.message))
         }
       })
     })
@@ -262,8 +304,7 @@ const initializeEvents = (client, sessionId) => {
       client.on('message_ack', async (message, ack) => {
         triggerWebhook(sessionWebhook, sessionId, 'message_ack', { message, ack })
         if (setMessagesAsSeen) {
-          const chat = await message.getChat()
-          chat.sendSeen()
+          client.sendSeen(resolveChatId(message)).catch(error => console.warn(`[session] falha ao marcar como lida sessão=${sessionId}:`, error.message))
         }
       })
     })
@@ -275,15 +316,13 @@ const initializeEvents = (client, sessionId) => {
         
         // Invalidar cache de mensagens quando mensagem for criada
         try {
-          const chat = await message.getChat()
-          await cacheHelpers.invalidateMessageCache(sessionId, chat.id._serialized)
+          await cacheHelpers.invalidateMessageCache(sessionId, resolveChatId(message))
         } catch (error) {
           console.log('Erro ao invalidar cache de mensagens:', error.message)
         }
         
         if (setMessagesAsSeen) {
-          const chat = await message.getChat()
-          chat.sendSeen()
+          client.sendSeen(resolveChatId(message)).catch(error => console.warn(`[session] falha ao marcar como lida sessão=${sessionId}:`, error.message))
         }
       })
     })
@@ -420,5 +459,6 @@ module.exports = {
   restoreSessions,
   validateSession,
   deleteSession,
-  flushSessions
+  flushSessions,
+  closeAllSessions
 }

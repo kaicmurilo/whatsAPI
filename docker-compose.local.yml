@@ -1,0 +1,76 @@
+# Ambiente local completo (API + painel + Postgres + Redis) com dados persistentes.
+# Segredos e configs vêm do .env. Portas altas (evitam conflito com 3000/5432) e só em 127.0.0.1.
+#   Painel:  http://localhost:47321/app   (sobrescreva com WHATSAPI_LOCAL_PORT)
+#   Postgres: localhost:47322              (sobrescreva com WHATSAPI_LOCAL_DB_PORT)
+#   Subir:  npm run local:up
+#   Parar:  npm run local:down   (volumes e sessão do WhatsApp são mantidos)
+# restart on-failure: não sobe sozinho quando o Docker abre, só com local:up
+name: whatsapi-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: on-failure
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker-postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "127.0.0.1:${WHATSAPI_LOCAL_DB_PORT:-47322}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: on-failure
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  api:
+    build: .
+    restart: on-failure
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      SESSIONS_PATH: /usr/src/app/sessions
+      PANEL_FILES_PATH: /usr/src/app/panel_files
+    volumes:
+      # Sessões do WhatsApp: mantém o login do número entre reinícios
+      - whatsapp_sessions:/usr/src/app/sessions
+      # Biblioteca de arquivos do painel (anexos reutilizáveis)
+      - panel_files:/usr/src/app/panel_files
+    ports:
+      - "127.0.0.1:${WHATSAPI_LOCAL_PORT:-47321}:3000"
+    shm_size: 512mb
+    # init reaproveita processos zumbis do Chromium; o prazo dá tempo de fechar os navegadores
+    # e gravar o pareamento antes do SIGKILL (padrão do Docker seria 10s)
+    init: true
+    stop_grace_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  whatsapp_sessions:
+  panel_files:

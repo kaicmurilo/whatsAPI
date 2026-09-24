@@ -1,5 +1,7 @@
+const path = require('path')
+const express = require('express')
 const { routes } = require('./routes')
-const app = require('express')()
+const app = express()
 const bodyParser = require('body-parser')
 const { maxAttachmentSize } = require('./config')
 const cors = require('cors')
@@ -62,6 +64,11 @@ app.use(cors())
 // Middleware para parsing de JSON
 app.use(bodyParser.json({ limit: maxAttachmentSize + 1000000 }))
 app.use(bodyParser.urlencoded({ limit: maxAttachmentSize + 1000000, extended: true }))
+
+// Front do painel (build do Vite em web/dist); fallback SPA para as rotas do React Router
+const webDistPath = path.join(__dirname, '..', 'web', 'dist')
+app.use('/app', express.static(webDistPath))
+app.get('/app/*', (req, res) => res.sendFile(path.join(webDistPath, 'index.html')))
 
 // Rotas
 app.use('/', routes)

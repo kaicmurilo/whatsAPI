@@ -251,8 +251,28 @@ const validateDatabaseConnection = async () => {
 // Função para executar queries
 const query = (text, params) => pool.query(text, params)
 
+const closePool = () => pool.end()
+
+// Executa `work(client)` numa transação; rollback em qualquer erro
+const withTransaction = async (work) => {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const result = await work(client)
+    await client.query('COMMIT')
+    return result
+  } catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  } finally {
+    client.release()
+  }
+}
+
 module.exports = {
   query,
+  closePool,
+  withTransaction,
   validateDatabaseConnection,
   validateRequiredTables
 } 

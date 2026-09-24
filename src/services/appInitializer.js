@@ -1,6 +1,8 @@
 const { validateDatabaseConnection } = require('../database')
 const { initRedis } = require('../utils/cache')
 const { restoreSessions } = require('../sessions')
+const { ensurePanelSchema } = require('../panel/panelSchema')
+const { interruptRunningRuns } = require('../panel/broadcastRunRepository')
 
 class AppInitializer {
   constructor() {
@@ -94,6 +96,10 @@ class AppInitializer {
   async initialize() {
     try {
       await this.validateDatabase()
+      await ensurePanelSchema()
+      console.log('✅ Tabelas do painel prontas')
+      const interruptedRuns = await interruptRunningRuns()
+      if (interruptedRuns > 0) console.warn(`⚠️ ${interruptedRuns} disparo(s) em andamento marcado(s) como interrompido(s)`)
       await this.initializeRedis()
       this.restoreSessions()
       this.showServicesStatus()

@@ -1,0 +1,22 @@
+import type { ChatQuery, PageQuery } from './panelApi'
+
+export const queryKeys = {
+  sessions: ['sessions'] as const,
+  allChats: ['chats'] as const,
+  chatsOf: (sessionId: string) => ['chats', sessionId] as const,
+  chats: (sessionId: string, query: ChatQuery) => ['chats', sessionId, query] as const,
+  allMessages: ['messages'] as const,
+  messages: (sessionId: string, chatId: string) => ['messages', sessionId, chatId] as const,
+  qr: (sessionId: string) => ['qr', sessionId] as const,
+  allContacts: ['contacts'] as const,
+  contacts: (query: PageQuery, perPage: number) => ['contacts', query, perPage] as const,
+  allFiles: ['files'] as const,
+  files: (query: PageQuery, perPage: number) => ['files', query, perPage] as const,
+  allBroadcastLists: ['broadcast-lists'] as const,
+  broadcastLists: (query: PageQuery) => ['broadcast-lists', 'page', query] as const,
+  broadcastList: (listId: string) => ['broadcast-lists', 'detail', listId] as const,
+  allBroadcastRuns: ['broadcast-runs'] as const,
+  broadcastRuns: (page: number) => ['broadcast-runs', page] as const,
+  reportOf: (runId: string) => ['broadcast-report', runId] as const,
+  reportRecipients: (runId: string, page: number, situation: string) => ['broadcast-report', runId, 'recipients', page, situation] as const,
+}

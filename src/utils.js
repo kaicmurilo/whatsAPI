@@ -3,9 +3,10 @@ const { globalApiKey, disabledCallbacks } = require('./config')
 
 // Trigger webhook endpoint
 const triggerWebhook = (webhookURL, sessionId, dataType, data) => {
-  console.log('triggerWebhook', webhookURL, sessionId, dataType, data)
+  // Sem payload no log: ele carrega números e conteúdo das mensagens (PII)
+  console.log(`[webhook] ${dataType} sessão=${sessionId}`)
   axios.post(webhookURL, { dataType, data, sessionId }, { headers: { 'x-api-key': globalApiKey } })
-    .catch(error => console.error('Failed to send new message webhook:', sessionId, dataType, error.message, data))
+    .catch(error => console.error(`[webhook] falha ao enviar ${dataType} sessão=${sessionId}:`, error.message))
 }
 
 // Function to send a response with error status and message

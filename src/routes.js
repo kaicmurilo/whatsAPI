@@ -18,6 +18,7 @@ const contactController = require('./controllers/contactController')
 const authRoutes = require('./routes/authRoutes')
 // Importar rotas administrativas
 const adminRoutes = require('./routes/adminRoutes')
+const panelRoutes = require('./panel/panelRoutes')
 
 // Rate limiting mais rigoroso para rotas de autenticação
 const authRateLimiter = rateLimiting({
@@ -41,6 +42,13 @@ routes.use('/auth', authRateLimiter, authRoutes)
  * ================
  */
 routes.use('/admin', adminRoutes)
+
+/**
+ * ================
+ * PANEL ENDPOINTS (front web: instâncias, conversas, SSE)
+ * ================
+ */
+routes.use('/panel', panelRoutes)
 
 /**
  * ================
