@@ -123,7 +123,7 @@ export interface BroadcastListInput {
   contactIds: string[]
 }
 
-export type BroadcastRunStatus = 'running' | 'done' | 'failed' | 'interrupted' | 'canceled'
+export type BroadcastRunStatus = 'scheduled' | 'running' | 'done' | 'failed' | 'interrupted' | 'canceled'
 
 export interface BroadcastRun {
   id: string
@@ -144,6 +144,8 @@ export interface BroadcastRun {
   randomOrder: boolean
   // Disparo feito a partir de um modelo (nome guardado; o modelo pode ter mudado depois)
   templateName: string | null
+  // Envio programado: quando vai sair (status 'scheduled' até lá)
+  scheduledAt: string | null
   createdAt: string
   finishedAt: string | null
 }
@@ -158,9 +160,11 @@ export interface BroadcastPacing {
 }
 
 // Conteúdo do disparo: modelo salvo OU texto/arquivo avulso
-export type BroadcastInput =
-  | { listId: string; pacing: BroadcastPacing; templateId: string }
-  | { listId: string; pacing: BroadcastPacing; text: string; fileId: string | null }
+// Conteúdo do disparo: modelo salvo OU texto/arquivo avulso; scheduledAt (ISO) programa em vez de enviar agora
+export type BroadcastInput = { listId: string; pacing: BroadcastPacing; scheduledAt?: string } & (
+  | { templateId: string }
+  | { text: string; fileId: string | null }
+)
 
 export interface TemplateFile {
   id: string

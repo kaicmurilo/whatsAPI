@@ -3,6 +3,7 @@ const { initRedis } = require('../utils/cache')
 const { restoreSessions } = require('../sessions')
 const { ensurePanelSchema } = require('../panel/panelSchema')
 const { interruptRunningRuns } = require('../panel/broadcastRunRepository')
+const { startBroadcastScheduler } = require('../panel/broadcastScheduler')
 
 class AppInitializer {
   constructor() {
@@ -102,6 +103,7 @@ class AppInitializer {
       if (interruptedRuns > 0) console.warn(`⚠️ ${interruptedRuns} disparo(s) em andamento marcado(s) como interrompido(s)`)
       await this.initializeRedis()
       this.restoreSessions()
+      startBroadcastScheduler()
       this.showServicesStatus()
     } catch (error) {
       console.error('❌ Erro ao inicializar aplicação:', error.message)

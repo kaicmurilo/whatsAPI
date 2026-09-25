@@ -96,7 +96,7 @@ Interface web (React + Vite) servida pela própria API em `/app`. Login com o `u
 | **Contatos** | Agenda interna do painel (não altera a agenda do celular); o nome aparece nas conversas |
 | **Mensagens** | Modelos reutilizáveis: texto + até 10 anexos (áudio, vídeo, imagem, documento) em ordem; áudio como mensagem de voz |
 | **Arquivos** | Biblioteca de arquivos reutilizáveis (até 50 MB); vídeo/imagem vão com play/preview até 64 MB |
-| **Transmissão** | Listas de contatos (até 5.000), **importação de planilha .xlsx**, disparo com mensagem salva ou avulsa, intervalo aleatório configurável, ordem embaralhada, abortar, reprocessar |
+| **Transmissão** | Listas de contatos (até 5.000), **importação de planilha .xlsx**, disparo com mensagem salva ou avulsa, **envio agora ou programado**, intervalo aleatório configurável, ordem embaralhada, abortar, reprocessar |
 | **Relatório** | Por disparo: enviado, entregue, lido e reproduzido por contato (tiques do WhatsApp), "Atualizar tiques" + exportação CSV para Excel |
 
 ### Rodar com Docker (recomendado)
@@ -131,6 +131,14 @@ npm run build:web                # gera web/dist (o Dockerfile já faz isso no b
 - Um contato por vez, esperando um tempo **sorteado** na faixa escolhida (padrão 20–45 s) e em **ordem aleatória**.
 - **Abortar** para antes do próximo contato; quem não recebeu fica pendente e pode ser **reprocessado** depois (nunca reenvia para quem já recebeu).
 - Isso reduz, mas **não elimina**, o risco de bloqueio do número.
+
+### Envio programado
+
+- No formulário de disparo: **Enviar agora | Programar** (data e hora de 1 min a 90 dias à frente). O histórico mostra "Programado para…" com **Cancelar programação**.
+- No horário, usa a lista e a mensagem **como estiverem naquele momento**; lista, modelo ou arquivo apagados antes disso fazem o disparo falhar com o motivo.
+- O agendador roda dentro da API (verifica a cada 30 s) e os programados ficam no Postgres, então sobrevivem a reinícios. Nunca dispara duas vezes (reserva atômica).
+- Não precisa da instância conectada ao programar. No horário, se estiver desconectada, espera até **30 min**; depois disso falha em vez de enviar atrasado. Atrás de outro disparo da mesma instância, espera sem limite.
+- **Só dispara com a API rodando no horário** (`npm run local:up`; os containers não sobem sozinhos com o Docker).
 
 ### Mensagens (modelos)
 

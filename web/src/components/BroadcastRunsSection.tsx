@@ -1,6 +1,7 @@
 import { useBroadcastRuns } from '../hooks/useBroadcasts'
 import { formatDateTime } from '../lib/format'
 import { describePacing } from '../lib/pacing'
+import { formatSchedule } from '../lib/schedule'
 import { TABLE_PER_PAGE } from '../lib/panelApi'
 import type { BroadcastRun, BroadcastRunStatus } from '../types/api'
 import type { BroadcastRunsSectionProps, DataTableColumn } from '../types/components'
@@ -10,6 +11,7 @@ import { BroadcastRunActions } from './BroadcastRunActions'
 import { Pagination } from './Pagination'
 
 const STATUS_LABELS: Record<BroadcastRunStatus, string> = {
+  scheduled: 'Programado',
   running: 'Enviando',
   done: 'Concluído',
   failed: 'Falhou',
@@ -32,12 +34,14 @@ function RunStatus({ run }: { run: BroadcastRun }) {
   return (
     <span className="run-status" data-status={run.status}>
       {STATUS_LABELS[run.status]}
+      {run.status === 'scheduled' && run.scheduledAt ? <span className="run-status__reason">para {formatSchedule(run.scheduledAt)}</span> : null}
       {run.error ? <span className="run-status__reason">{run.error}</span> : null}
     </span>
   )
 }
 
 function RunProgress({ run }: { run: BroadcastRun }) {
+  if (run.status === 'scheduled') return <span className="run-progress__label">Aguardando horário</span>
   const done = run.sent + run.failed
   return (
     <div className="run-progress" title={`${run.sent} enviados, ${run.failed} falhas de ${run.total}`}>

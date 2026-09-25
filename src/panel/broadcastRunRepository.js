@@ -4,7 +4,7 @@ const { messageKeyFromId } = require('./messageMapper')
 const RUN_COLUMNS = `id, session_id AS "sessionId", list_id AS "listId", list_name AS "listName", text,
   file_id AS "fileId", file_name AS "fileName", status, total, sent, failed, error,
   delay_min_seconds AS "delayMinSeconds", delay_max_seconds AS "delayMaxSeconds", random_order AS "randomOrder",
-  template_id AS "templateId", template_name AS "templateName", parts,
+  template_id AS "templateId", template_name AS "templateName", parts, scheduled_at AS "scheduledAt", user_id AS "userId",
   created_at AS "createdAt", finished_at AS "finishedAt"`
 
 const MAX_ERROR_LENGTH = 255
@@ -121,4 +121,78 @@ const interruptRunningRuns = async () => {
   return result.rowCount
 }
 
-module.exports = { createRun, recordRecipientResult, finishRun, listRuns, findRun, reopenRunForRetry, interruptRunningRuns }
+/**
+ * Disparo programado: guarda só o que foi escolhido (lista, modelo ou texto/arquivo, ritmo, horário).
+ * Destinatários e partes são montados no horário, com a lista e a mensagem como estiverem.
+ */
+const createScheduledRun = async (userId, { sessionId, listId, listName, templateId, templateName, text, fileId, fileName, pacing, scheduledAt }) => {
+  const result = await query(
+    `INSERT INTO broadcast_runs (user_id, session_id, list_id, list_name, template_id, template_name, text, file_id, file_name,
+                                 total, status, scheduled_at, delay_min_seconds, delay_max_seconds, random_order)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 'scheduled', $10, $11, $12, $13)
+     RETURNING ${RUN_COLUMNS}`,
+    [userId, sessionId, listId, listName, templateId, templateName, text, fileId, fileName, scheduledAt,
+      pacing.minSeconds, pacing.maxSeconds, pacing.randomOrder]
+  )
+  return result.rows[0]
+}
+
+const listDueScheduledRuns = async (now) => {
+  const result = await query(
+    `SELECT ${RUN_COLUMNS} FROM broadcast_runs WHERE status = 'scheduled' AND scheduled_at <= $1 ORDER BY scheduled_at, id`,
+    [now]
+  )
+  return result.rows
+}
+
+// Reserva atômica: só um tick (ou processo) consegue passar o disparo de 'scheduled' para 'running'
+const claimScheduledRun = async (runId) => {
+  const result = await query(
+    `UPDATE broadcast_runs SET status = 'running' WHERE id = $1 AND status = 'scheduled' RETURNING ${RUN_COLUMNS}`,
+    [runId]
+  )
+  return result.rows[0] || null
+}
+
+// No horário: grava destinatários e a cópia das partes montados agora
+const populateScheduledRun = (runId, { listName, templateName, text, fileName, recipients, parts }) => withTransaction(async (client) => {
+  const runResult = await client.query(
+    `UPDATE broadcast_runs
+     SET total = $2, list_name = $3, template_name = $4, text = $5, file_name = $6, parts = $7::jsonb
+     WHERE id = $1
+     RETURNING ${RUN_COLUMNS}`,
+    [runId, recipients.length, listName, templateName, text, fileName, JSON.stringify(parts)]
+  )
+  await client.query(
+    `INSERT INTO broadcast_run_recipients (run_id, position, name, phone)
+     SELECT $1, ordinality - 1, name, phone
+     FROM unnest($2::text[], $3::text[]) WITH ORDINALITY AS r(name, phone, ordinality)`,
+    [runId, recipients.map((recipient) => recipient.name), recipients.map((recipient) => recipient.phone)]
+  )
+  return runResult.rows[0]
+})
+
+const cancelScheduledRun = async (runId) => {
+  const result = await query(
+    `UPDATE broadcast_runs SET status = 'canceled', error = 'Programação cancelada pelo usuário', finished_at = CURRENT_TIMESTAMP
+     WHERE id = $1 AND status = 'scheduled'
+     RETURNING ${RUN_COLUMNS}`,
+    [runId]
+  )
+  return result.rows[0] || null
+}
+
+module.exports = {
+  createScheduledRun,
+  listDueScheduledRuns,
+  claimScheduledRun,
+  populateScheduledRun,
+  cancelScheduledRun,
+  createRun,
+  recordRecipientResult,
+  finishRun,
+  listRuns,
+  findRun,
+  reopenRunForRetry,
+  interruptRunningRuns
+}

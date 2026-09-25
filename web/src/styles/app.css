@@ -150,6 +150,8 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 
 .panel {
   height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   display: grid;
   grid-template-columns: 16.5rem minmax(0, 1fr);
 }
@@ -167,7 +169,9 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 /* ─── Rail de instâncias ────────────────────────────────── */
 
 .rail {
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -244,6 +248,8 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 }
 
 .new-session {
+  flex: none;
+  min-width: 0;
   display: grid;
   gap: var(--space-2);
   padding: var(--space-3);
@@ -257,7 +263,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
   text-transform: uppercase;
   color: var(--color-rail-muted);
 }
-.new-session__row { display: flex; gap: var(--space-2); }
+.new-session__row { display: flex; gap: var(--space-2); min-width: 0; }
 .new-session__input {
   flex: 1;
   min-width: 0;
@@ -277,7 +283,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
   font-weight: 600;
   font-size: var(--text-sm);
 }
-.new-session__hint { margin: 0; font-size: var(--text-xs); color: var(--color-rail-muted); }
+.new-session__hint { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: var(--text-xs); color: var(--color-rail-muted); }
 .new-session__hint[role='alert'] { color: var(--color-alert); }
 
 /* ─── Lista de conversas ────────────────────────────────── */

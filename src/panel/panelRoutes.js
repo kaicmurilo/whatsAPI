@@ -47,7 +47,8 @@ panelRouter.get('/sessions/:sessionId/chats', sessionScoped, panelController.get
 panelRouter.get('/sessions/:sessionId/chats/:chatId/messages', sessionScoped, panelController.getMessages)
 panelRouter.post('/sessions/:sessionId/chats/:chatId/messages', connectedSession, sendRateLimiter, conversationController.sendMessage)
 panelRouter.get('/sessions/:sessionId/numbers/:phone', connectedSession, conversationController.resolveNumber)
-panelRouter.post('/sessions/:sessionId/broadcasts', connectedSession, broadcastRateLimiter, broadcastController.startBroadcast)
+// Sem exigir conexão aqui: programar para depois não precisa da instância online agora (envio imediato checa no service)
+panelRouter.post('/sessions/:sessionId/broadcasts', sessionScoped, broadcastRateLimiter, broadcastController.startBroadcast)
 panelRouter.get('/stream', panelController.streamEvents)
 
 panelRouter.get('/contacts', contactController.getContacts)

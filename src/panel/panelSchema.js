@@ -161,6 +161,9 @@ const ensureTemplateTables = async () => {
   await query('ALTER TABLE broadcast_runs ADD COLUMN IF NOT EXISTS template_id BIGINT REFERENCES message_templates(id) ON DELETE SET NULL')
   await query('ALTER TABLE broadcast_runs ADD COLUMN IF NOT EXISTS template_name VARCHAR(100)')
   await query('ALTER TABLE broadcast_runs ADD COLUMN IF NOT EXISTS parts JSONB')
+  // Envio programado (status 'scheduled' até o horário; lista e mensagem são lidas no momento do envio)
+  await query('ALTER TABLE broadcast_runs ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ')
+  await query("CREATE INDEX IF NOT EXISTS idx_broadcast_runs_scheduled ON broadcast_runs(scheduled_at) WHERE status = 'scheduled'")
 }
 
 // Idempotente: roda a cada boot porque o init.sql só executa em volume novo do Postgres

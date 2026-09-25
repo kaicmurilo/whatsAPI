@@ -27,3 +27,5 @@ panel_files
 .tasks
 /tasks
 /tests
+# Estado local do editor Cursor (não versionar)
+.cursor/hooks/state/

@@ -8,13 +8,23 @@ export function BroadcastRunActions({ run, isReportOpen, onOpenReport }: Broadca
   const cancel = useCancelBroadcast()
   const pending = run.total - run.sent
   const isRunning = run.status === 'running'
-  const canRetry = !isRunning && pending > 0
+  const isScheduled = run.status === 'scheduled'
+  const canRetry = !isRunning && !isScheduled && pending > 0
 
   return (
     <div className="run-actions">
-      <button type="button" className="row-actions__primary" aria-pressed={isReportOpen} onClick={() => onOpenReport(run.id)}>
-        Relatório
-      </button>
+      {isScheduled ? (
+        <ConfirmButton
+          label="Cancelar programação"
+          confirmLabel="Confirmar cancelamento"
+          isPending={cancel.isPending}
+          onConfirm={() => cancel.mutate(run.id)}
+        />
+      ) : (
+        <button type="button" className="row-actions__primary" aria-pressed={isReportOpen} onClick={() => onOpenReport(run.id)}>
+          Relatório
+        </button>
+      )}
       {isRunning ? (
         <ConfirmButton
           label="Abortar"

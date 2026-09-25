@@ -170,6 +170,7 @@
 .broadcast-send {
   position: sticky;
   top: 0;
+  min-width: 0;
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
@@ -177,6 +178,13 @@
   border-radius: var(--radius-md);
   background: var(--color-surface-raised);
   box-shadow: var(--shadow-card);
+}
+.broadcast-send .field { min-width: 0; }
+.broadcast-send select.field__input,
+.broadcast-send textarea.field__input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 .broadcast-send__text { resize: vertical; min-height: 5rem; font-family: var(--font-sans); }
 .broadcast-send__note { margin: 0; font-size: var(--text-xs); color: var(--color-muted); }
