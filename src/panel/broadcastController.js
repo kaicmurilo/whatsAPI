@@ -3,7 +3,9 @@ const { sendErrorResponse } = require('../utils')
 const { findBroadcastList } = require('./broadcastListRepository')
 const { createRun, recordRecipientResult, finishRun, listRuns, findRun, reopenRunForRetry } = require('./broadcastRunRepository')
 const { runBroadcast, CANCELED_REASON } = require('./broadcastRunner')
-const { loadOwnedMedia } = require('./mediaLoader')
+const { findTemplate } = require('./templateRepository')
+const { findOwnedFile } = require('./fileRepository')
+const { partsFromTemplate, partsFromAdHoc, partsOfRun, trackedPartIndex, loadRuntimeParts } = require('./messageParts')
 const { isSessionOwnedBy } = require('./messageRepository')
 const { publishPanelEvent } = require('./panelEvents')
 const { parsePacing, pacingOfRun } = require('./broadcastPacing')
@@ -18,17 +20,33 @@ const RUNS_DEFAULT_PER_PAGE = 5
 const busySessions = new Set()
 const activeRuns = new Map()
 
+const isPresent = (value) => value !== undefined && value !== null && value !== ''
+
+// Conteúdo: modelo salvo (templateId) OU avulso (texto e/ou 1 arquivo) — nunca os dois.
+// templateId enviado mas vazio é erro: nunca pode "cair" silenciosamente num envio avulso.
+const parseContent = (body) => {
+  if (body?.templateId !== undefined && body?.templateId !== null) {
+    const templateId = parseId(String(body.templateId))
+    if (templateId === null) return { error: 'Modelo inválido' }
+    if (isPresent(body?.text) || isPresent(body?.fileId)) return { error: 'Use o modelo ou escreva a mensagem, não os dois' }
+    return { content: { templateId } }
+  }
+  const fileId = isPresent(body?.fileId) ? parseId(String(body.fileId)) : null
+  const text = typeof body?.text === 'string' ? body.text.trim() : ''
+  if (isPresent(body?.fileId) && fileId === null) return { error: 'Arquivo inválido' }
+  if (text.length > MAX_TEXT_LENGTH) return { error: `Texto maior que ${MAX_TEXT_LENGTH} caracteres` }
+  if (!text && fileId === null) return { error: 'Escolha um modelo ou escreva a mensagem' }
+  return { content: { fileId, text: text || null } }
+}
+
 const parseBroadcastInput = (body) => {
   const listId = parseId(body?.listId === undefined ? undefined : String(body.listId))
-  const fileId = body?.fileId === undefined || body.fileId === null ? null : parseId(String(body.fileId))
-  const text = typeof body?.text === 'string' ? body.text.trim() : ''
   if (listId === null) return { error: 'Escolha uma lista de transmissão' }
-  if (body?.fileId !== undefined && body.fileId !== null && fileId === null) return { error: 'Arquivo inválido' }
-  if (text.length > MAX_TEXT_LENGTH) return { error: `Texto maior que ${MAX_TEXT_LENGTH} caracteres` }
-  if (!text && fileId === null) return { error: 'Escreva uma mensagem ou escolha um arquivo' }
+  const { content, error } = parseContent(body)
+  if (error) return { error }
   const { pacing, error: pacingError } = parsePacing(body?.pacing)
   if (pacingError) return { error: pacingError }
-  return { input: { listId, fileId, text: text || null, pacing } }
+  return { input: { listId, pacing, ...content } }
 }
 
 const publishProgress = (sessionId, run) => {
@@ -36,12 +54,12 @@ const publishProgress = (sessionId, run) => {
 }
 
 // Roda em segundo plano; o HTTP já respondeu 202. Tudo é logado — nada falha em silêncio.
-const executeInBackground = ({ sessionId, run, recipients, text, media, mediaOptions, pacing }) => {
+const executeInBackground = ({ sessionId, run, recipients, storedParts, runtimeParts, pacing }) => {
   const controller = new AbortController()
   busySessions.add(sessionId)
   activeRuns.set(String(run.id), controller)
   const startedAt = Date.now()
-  runBroadcast({ id: run.id, recipients, text, media, mediaOptions, pacing, signal: controller.signal }, {
+  runBroadcast({ id: run.id, recipients, parts: runtimeParts, trackedPart: trackedPartIndex(storedParts), pacing, signal: controller.signal }, {
     getClient: () => sessions.get(sessionId) || null,
     recordResult: recordRecipientResult,
     finish: finishRun,
@@ -60,10 +78,20 @@ const executeInBackground = ({ sessionId, run, recipients, text, media, mediaOpt
     })
 }
 
-const loadMediaForRun = async (userId, fileId) => {
-  if (fileId === null) return { media: null, mediaOptions: {}, fileName: null }
-  const loaded = await loadOwnedMedia(userId, fileId)
-  return loaded ? { media: loaded.media, mediaOptions: loaded.sendOptions, fileName: loaded.file.name } : null
+/**
+ * Monta o conteúdo do disparo: partes guardadas (cópia no histórico) + colunas de exibição.
+ * @returns {{ run?: object, error?: [number, string] }}
+ */
+const buildRunContent = async (userId, input) => {
+  if (input.templateId) {
+    const template = await findTemplate(userId, input.templateId)
+    if (!template) return { error: [404, 'Modelo não encontrado'] }
+    return { run: { storedParts: partsFromTemplate(template), templateId: template.id, templateName: template.name, text: template.text, fileId: null, fileName: null } }
+  }
+  const file = input.fileId === null ? null : await findOwnedFile(userId, input.fileId)
+  if (input.fileId !== null && !file) return { error: [404, 'Arquivo não encontrado'] }
+  const fileName = file?.name ?? null
+  return { run: { storedParts: partsFromAdHoc({ text: input.text, fileId: input.fileId, fileName }), templateId: null, templateName: null, text: input.text, fileId: input.fileId, fileName } }
 }
 
 const startBroadcast = async (req, res) => {
@@ -76,15 +104,18 @@ const startBroadcast = async (req, res) => {
     const list = await findBroadcastList(userId, input.listId)
     if (!list) return sendErrorResponse(res, 404, 'Lista não encontrada')
     if (list.members.length === 0) return sendErrorResponse(res, 422, 'A lista não tem contatos')
-    const loadedMedia = await loadMediaForRun(userId, input.fileId)
-    if (!loadedMedia) return sendErrorResponse(res, 404, 'Arquivo não encontrado')
+    const content = await buildRunContent(userId, input)
+    if (content.error) return sendErrorResponse(res, ...content.error)
+    const loaded = await loadRuntimeParts(userId, content.run.storedParts)
+    if (loaded.missingFile) return sendErrorResponse(res, 404, `Arquivo não encontrado: ${loaded.missingFile}`)
 
     const recipients = list.members.map((member, position) => ({ position, name: member.name, phone: member.phone }))
+    const { storedParts, ...display } = content.run
     const run = await createRun(userId, {
-      sessionId, listId: list.id, listName: list.name, text: input.text, fileId: input.fileId, fileName: loadedMedia.fileName, recipients, pacing: input.pacing
+      sessionId, listId: list.id, listName: list.name, recipients, pacing: input.pacing, parts: storedParts, ...display
     })
-    console.log(`[panel] disparo iniciado run=${run.id} sessão=${sessionId} lista=${list.id} total=${recipients.length} arquivo=${input.fileId ?? '-'} intervalo=${input.pacing.minSeconds}-${input.pacing.maxSeconds}s aleatório=${input.pacing.randomOrder} user=${userId}`)
-    executeInBackground({ sessionId, run, recipients, text: input.text, media: loadedMedia.media, mediaOptions: loadedMedia.mediaOptions, pacing: input.pacing })
+    console.log(`[panel] disparo iniciado run=${run.id} sessão=${sessionId} lista=${list.id} total=${recipients.length} partes=${storedParts.length} modelo=${display.templateId ?? '-'} intervalo=${input.pacing.minSeconds}-${input.pacing.maxSeconds}s aleatório=${input.pacing.randomOrder} user=${userId}`)
+    executeInBackground({ sessionId, run, recipients, storedParts, runtimeParts: loaded.parts, pacing: input.pacing })
     res.status(202).json({ success: true, data: run })
   } catch (startError) {
     console.error(`[panel] falha ao iniciar disparo sessão=${sessionId} user=${userId}:`, startError)
@@ -99,7 +130,6 @@ const findRetryBlocker = async (userId, run) => {
   if (!await isSessionOwnedBy(run.sessionId, userId)) return [403, 'A instância deste disparo não pertence a você']
   if (!(await validateSession(run.sessionId)).success) return [409, 'A instância deste disparo não está conectada']
   if (busySessions.has(run.sessionId)) return [409, 'Já existe um disparo em andamento nesta instância']
-  if (run.fileName && !run.fileId) return [404, 'O arquivo deste disparo foi excluído da biblioteca']
   return null
 }
 
@@ -113,8 +143,9 @@ const retryBroadcast = async (req, res) => {
     if (!run) return sendErrorResponse(res, 404, 'Disparo não encontrado')
     const blocker = await findRetryBlocker(userId, run)
     if (blocker) return sendErrorResponse(res, ...blocker)
-    const loadedMedia = await loadMediaForRun(userId, run.fileId === null ? null : Number(run.fileId))
-    if (!loadedMedia) return sendErrorResponse(res, 404, 'O arquivo deste disparo foi excluído da biblioteca')
+    const storedParts = partsOfRun(run)
+    const loaded = await loadRuntimeParts(userId, storedParts)
+    if (loaded.missingFile) return sendErrorResponse(res, 404, `O arquivo "${loaded.missingFile}" deste disparo foi excluído da biblioteca`)
 
     const reopened = await reopenRunForRetry(runId)
     if (!reopened) return sendErrorResponse(res, 409, 'Este disparo ainda está em andamento')
@@ -123,9 +154,8 @@ const retryBroadcast = async (req, res) => {
       sessionId: run.sessionId,
       run: reopened.run,
       recipients: reopened.recipients,
-      text: run.text,
-      media: loadedMedia.media,
-      mediaOptions: loadedMedia.mediaOptions,
+      storedParts,
+      runtimeParts: loaded.parts,
       pacing: pacingOfRun(run)
     })
     publishProgress(run.sessionId, reopened.run)

@@ -8,6 +8,7 @@ import { BroadcastListEditor, BroadcastListEditorLoader } from './BroadcastListE
 import { ConfirmButton } from './ConfirmButton'
 import { DataTable } from './DataTable'
 import { EmptyState } from './EmptyState'
+import { ListImportButton } from './ListImportButton'
 import { Pagination } from './Pagination'
 import { SearchInput } from './SearchInput'
 
@@ -43,7 +44,12 @@ export function BroadcastListsSection({ page, search, onPageChange, onSearchChan
     <section className="broadcasts__section" aria-labelledby="lists-title">
       <header className="broadcasts__section-header">
         <h2 id="lists-title" className="broadcasts__section-title">Listas</h2>
-        {editorTarget === null ? <button type="button" className="broadcasts__new" onClick={() => setEditorTarget('new')}>+ Nova lista</button> : null}
+        {editorTarget === null ? (
+          <div className="broadcasts__header-actions">
+            <button type="button" className="broadcasts__new" onClick={() => setEditorTarget('new')}>+ Nova lista</button>
+            <ListImportButton />
+          </div>
+        ) : null}
       </header>
 
       {editorTarget === 'new' ? <BroadcastListEditor listId={null} initialName="" initialMembers={[]} onDone={closeEditor} /> : null}

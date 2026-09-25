@@ -10,6 +10,7 @@ const fileController = require('./fileController')
 const broadcastListController = require('./broadcastListController')
 const broadcastController = require('./broadcastController')
 const broadcastReportController = require('./broadcastReportController')
+const templateController = require('./templateController')
 
 const ONE_MINUTE_MS = 60 * 1000
 
@@ -59,9 +60,16 @@ panelRouter.delete('/files/:fileId', fileController.removeFile)
 
 panelRouter.get('/broadcast-lists', broadcastListController.getLists)
 panelRouter.post('/broadcast-lists', broadcastListController.saveList)
+panelRouter.post('/broadcast-lists/import', uploadRateLimiter, broadcastListController.importList)
 panelRouter.get('/broadcast-lists/:listId', broadcastListController.getList)
 panelRouter.put('/broadcast-lists/:listId', broadcastListController.saveList)
 panelRouter.delete('/broadcast-lists/:listId', broadcastListController.removeList)
+
+panelRouter.get('/templates', templateController.getTemplates)
+panelRouter.post('/templates', templateController.saveTemplate)
+panelRouter.get('/templates/:templateId', templateController.getTemplate)
+panelRouter.put('/templates/:templateId', templateController.saveTemplate)
+panelRouter.delete('/templates/:templateId', templateController.removeTemplate)
 
 panelRouter.get('/broadcasts', broadcastController.getRuns)
 panelRouter.get('/broadcasts/:runId', broadcastController.getRun)
@@ -70,6 +78,7 @@ panelRouter.post('/broadcasts/:runId/cancel', broadcastController.cancelBroadcas
 panelRouter.get('/broadcasts/:runId/report', broadcastReportController.getReport)
 panelRouter.get('/broadcasts/:runId/report/recipients', broadcastReportController.getReportRecipients)
 panelRouter.get('/broadcasts/:runId/report.csv', broadcastReportController.downloadReportCsv)
+panelRouter.post('/broadcasts/:runId/report/refresh', broadcastRateLimiter, broadcastReportController.refreshReport)
 
 // Corpo acima do limite (upload) ou JSON malformado viram resposta clara em vez de 500 genérico
 // eslint-disable-next-line n/handle-callback-err

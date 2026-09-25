@@ -4,6 +4,7 @@ const { publishPanelEvent, setSessionStatus } = require('./panelEvents')
 const { backfillRecentHistory } = require('./historyBackfill')
 const { createChatIdResolver } = require('./chatIdResolver')
 const { attachDeliveryTracker } = require('./deliveryTracker')
+const { reconcileRecentRuns } = require('./deliveryReconciler')
 
 // getChat() falha para chats @lid no WhatsApp Web atual; o nome cai no último remetente conhecido (SQL)
 const fetchChatName = async (sessionId, message) => {
@@ -46,7 +47,9 @@ const attachSessionRecorder = (client, sessionId) => {
   client.on('authenticated', () => setSessionStatus(sessionId, 'authenticated'))
   client.on('ready', () => {
     setSessionStatus(sessionId, 'connected')
-    backfillRecentHistory(sessionId, client, resolveCanonicalChatId) // fire-and-forget; loga o próprio resultado
+    // fire-and-forget em sequência (mesmo navegador): conversas recentes, depois tiques perdidos das transmissões
+    backfillRecentHistory(sessionId, client, resolveCanonicalChatId)
+      .then(() => reconcileRecentRuns(sessionId, client))
   })
   client.on('auth_failure', () => setSessionStatus(sessionId, 'auth_failure'))
   client.on('disconnected', () => setSessionStatus(sessionId, 'disconnected'))

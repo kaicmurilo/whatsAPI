@@ -1,11 +1,15 @@
 const { sendErrorResponse } = require('../utils')
-const { listBroadcastLists, findBroadcastList, saveBroadcastList, deleteBroadcastList } = require('./broadcastListRepository')
+const { listBroadcastLists, findBroadcastList, saveBroadcastList, deleteBroadcastList, importBroadcastList } = require('./broadcastListRepository')
+const { buildImportPlan, listNameFromFile } = require('./listImport')
 const { parseId, parsePagination, isValidPagination } = require('./validators')
 
 const LISTS_DEFAULT_PER_PAGE = 5
 const MAX_LIST_NAME_LENGTH = 100
-// Mesmo teto das listas nativas do WhatsApp: acima disso o risco de bloqueio por spam sobe muito
-const MAX_LIST_MEMBERS = 256
+// Lista é do painel (não é lista nativa do WhatsApp): o envio é individual e com intervalo aleatório.
+// O teto só protege o banco e o navegador de listas absurdas.
+const MAX_LIST_MEMBERS = 5000
+const MAX_IMPORT_ROWS = 5000
+const MAX_CELL_LENGTH = 300
 const UNIQUE_VIOLATION = '23505'
 
 const parseListInput = (body) => {
@@ -80,4 +84,36 @@ const removeList = async (req, res) => {
   }
 }
 
-module.exports = { getLists, getList, saveList, removeList }
+// Linhas cruas vindas do navegador (a planilha é lida lá); aqui só texto é aceito
+const parseImportRows = (rows) => {
+  if (!Array.isArray(rows) || rows.length === 0) return null
+  if (rows.length > MAX_IMPORT_ROWS) return null
+  const isTextCell = (value) => value === undefined || value === null || (typeof value === 'string' && value.length <= MAX_CELL_LENGTH)
+  if (!rows.every((row) => row && isTextCell(row.name) && isTextCell(row.phoneText))) return null
+  return rows.map((row) => ({ name: row.name ?? '', phoneText: row.phoneText ?? '' }))
+}
+
+const importList = async (req, res) => {
+  const userId = req.user.user_id
+  const baseName = listNameFromFile(req.body?.fileName)
+  const rows = parseImportRows(req.body?.rows)
+  if (!baseName) return sendErrorResponse(res, 422, 'Nome do arquivo inválido')
+  if (!rows) return sendErrorResponse(res, 422, `Planilha vazia ou com mais de ${MAX_IMPORT_ROWS} linhas`)
+
+  const plan = buildImportPlan(rows)
+  if (plan.entries.length === 0) return sendErrorResponse(res, 422, 'Nenhum telefone válido encontrado na planilha')
+  if (plan.entries.length > MAX_LIST_MEMBERS) return sendErrorResponse(res, 422, `Máximo de ${MAX_LIST_MEMBERS} contatos por lista`)
+  try {
+    const result = await importBroadcastList(userId, { baseName, entries: plan.entries })
+    console.log(`[panel] lista importada user=${userId} id=${result.list.id} linhas=${rows.length} membros=${result.list.memberCount} novos=${result.createdContacts} reaproveitados=${result.reusedContacts} ignoradas=${plan.skipped.length} repetidos=${plan.duplicates}`)
+    res.status(201).json({
+      success: true,
+      data: { ...result, totalRows: rows.length, duplicates: plan.duplicates, skipped: plan.skipped }
+    })
+  } catch (importError) {
+    console.error(`[panel] falha ao importar lista user=${userId}:`, importError)
+    sendErrorResponse(res, 500, 'Erro ao importar a planilha')
+  }
+}
+
+module.exports = { getLists, getList, saveList, removeList, importList }

@@ -1,4 +1,4 @@
-import { useBroadcastReport, useDownloadReport, useReportRecipients } from '../hooks/useBroadcastReport'
+import { useBroadcastReport, useDownloadReport, useRefreshReport, useReportRecipients } from '../hooks/useBroadcastReport'
 import { formatDateTime, formatPhone } from '../lib/format'
 import { TABLE_PER_PAGE } from '../lib/panelApi'
 import type { RecipientSituation, ReportRecipient } from '../types/api'
@@ -45,7 +45,11 @@ export function BroadcastReport({ runId, page, situation, onClose, onPageChange,
   const summary = useBroadcastReport(runId)
   const recipients = useReportRecipients(runId, page, situation)
   const download = useDownloadReport()
+  const refresh = useRefreshReport(runId)
   const items = recipients.data?.items ?? []
+  const refreshMessage = refresh.isSuccess
+    ? `${refresh.data.checked} mensagem(ns) consultada(s), ${refresh.data.updated} atualizada(s).`
+    : null
 
   if (summary.isError) {
     return (
@@ -70,6 +74,9 @@ export function BroadcastReport({ runId, page, situation, onClose, onPageChange,
           </p>
         </div>
         <div className="report__actions">
+          <button type="button" className="report__refresh" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
+            {refresh.isPending ? 'Consultando…' : 'Atualizar tiques'}
+          </button>
           <button type="button" className="report__download" disabled={download.isPending} onClick={() => download.mutate(runId)}>
             {download.isPending ? 'Gerando…' : 'Baixar CSV'}
           </button>
@@ -77,11 +84,13 @@ export function BroadcastReport({ runId, page, situation, onClose, onPageChange,
         </div>
       </header>
       {download.isError ? <p className="broadcast-send__error" role="alert">{download.error.message}</p> : null}
+      {refresh.isError ? <p className="broadcast-send__error" role="alert">{refresh.error.message}</p> : null}
+      {refreshMessage ? <p className="broadcast-send__ok" role="status">{refreshMessage}</p> : null}
 
       <ReportSummaryCards summary={run} />
       <p className="report__note">
-        Entregue e lido chegam pelos tiques do WhatsApp enquanto a instância estiver conectada.
-        “Lido” só aparece para quem mantém a confirmação de leitura ligada.
+        Entregue, lido e reproduzido chegam pelos tiques do WhatsApp. Com a instância desligada, os tiques são
+        recuperados ao reconectar (ou em “Atualizar tiques”). “Lido” só aparece para quem mantém a confirmação de leitura ligada.
       </p>
 
       <ReportSituationFilter value={situation} onChange={onSituationChange} />

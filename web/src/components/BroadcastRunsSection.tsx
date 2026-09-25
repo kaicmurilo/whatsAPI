@@ -20,7 +20,9 @@ const STATUS_LABELS: Record<BroadcastRunStatus, string> = {
 const getRunKey = (run: BroadcastRun): string => run.id
 
 const describeContent = (run: BroadcastRun): string =>
-  [run.fileName ? `📎 ${run.fileName}` : null, run.text].filter(Boolean).join(' · ') || '—'
+  run.templateName
+    ? `✉ ${run.templateName}`
+    : [run.fileName ? `📎 ${run.fileName}` : null, run.text].filter(Boolean).join(' · ') || '—'
 
 const describeRunPacing = (run: BroadcastRun): string =>
   describePacing({ minSeconds: run.delayMinSeconds, maxSeconds: run.delayMaxSeconds, randomOrder: run.randomOrder })

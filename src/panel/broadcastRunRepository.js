@@ -1,21 +1,25 @@
 const { query, withTransaction } = require('../database')
+const { messageKeyFromId } = require('./messageMapper')
 
 const RUN_COLUMNS = `id, session_id AS "sessionId", list_id AS "listId", list_name AS "listName", text,
   file_id AS "fileId", file_name AS "fileName", status, total, sent, failed, error,
   delay_min_seconds AS "delayMinSeconds", delay_max_seconds AS "delayMaxSeconds", random_order AS "randomOrder",
+  template_id AS "templateId", template_name AS "templateName", parts,
   created_at AS "createdAt", finished_at AS "finishedAt"`
 
 const MAX_ERROR_LENGTH = 255
 const truncateError = (error) => (error ? String(error).slice(0, MAX_ERROR_LENGTH) : null)
 
-const createRun = (userId, { sessionId, listId, listName, text, fileId, fileName, recipients, pacing }) => withTransaction(async (client) => {
+const createRun = (userId, {
+  sessionId, listId, listName, text, fileId, fileName, recipients, pacing, templateId = null, templateName = null, parts = null
+}) => withTransaction(async (client) => {
   const runResult = await client.query(
     `INSERT INTO broadcast_runs (user_id, session_id, list_id, list_name, text, file_id, file_name, total,
-                                 delay_min_seconds, delay_max_seconds, random_order)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                                 delay_min_seconds, delay_max_seconds, random_order, template_id, template_name, parts)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)
      RETURNING ${RUN_COLUMNS}`,
     [userId, sessionId, listId, listName, text, fileId, fileName, recipients.length,
-      pacing.minSeconds, pacing.maxSeconds, pacing.randomOrder]
+      pacing.minSeconds, pacing.maxSeconds, pacing.randomOrder, templateId, templateName, parts ? JSON.stringify(parts) : null]
   )
   const run = runResult.rows[0]
   await client.query(
@@ -38,12 +42,13 @@ const recordRecipientResult = async (runId, position, { status, error = null, me
   const result = await query(
     `WITH recipient AS (
        UPDATE broadcast_run_recipients
-       SET status = $3, error = $4, sent_at = CASE WHEN $5::boolean THEN CURRENT_TIMESTAMP END, message_id = $6
+       SET status = $3, error = $4, sent_at = CASE WHEN $5::boolean THEN CURRENT_TIMESTAMP END,
+           message_id = $6, message_key = $7
        WHERE run_id = $1 AND position = $2
      )
      UPDATE broadcast_runs SET ${counter} = ${counter} + 1 WHERE id = $1
      RETURNING ${RUN_COLUMNS}`,
-    [runId, position, status, truncateError(error), isSent, messageId]
+    [runId, position, status, truncateError(error), isSent, messageId, messageKeyFromId(messageId)]
   )
   return result.rows[0]
 }
@@ -98,7 +103,7 @@ const reopenRunForRetry = (runId) => withTransaction(async (client) => {
   if (!run) return null
   const recipients = await client.query(
     `UPDATE broadcast_run_recipients
-     SET status = 'pending', error = NULL, sent_at = NULL, message_id = NULL, delivered_at = NULL, read_at = NULL, played_at = NULL
+     SET status = 'pending', error = NULL, sent_at = NULL, message_id = NULL, message_key = NULL, delivered_at = NULL, read_at = NULL, played_at = NULL
      WHERE run_id = $1 AND status <> 'sent'
      RETURNING position, name, phone`,
     [runId]

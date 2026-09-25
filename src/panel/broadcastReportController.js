@@ -1,4 +1,8 @@
 const { reportTimeZone } = require('../config')
+const { sessions, validateSession } = require('../sessions')
+const { reconcileRunDeliveries } = require('./deliveryReconciler')
+const { isSessionOwnedBy } = require('./messageRepository')
+const { publishPanelEvent } = require('./panelEvents')
 const { sendErrorResponse } = require('../utils')
 const { findReportSummary, listReportRecipients, listAllReportRecipients, isKnownSituation } = require('./broadcastReportRepository')
 const { buildReportCsv, reportFileName } = require('./reportCsv')
@@ -64,4 +68,22 @@ const downloadReportCsv = async (req, res) => {
   }
 }
 
-module.exports = { getReport, getReportRecipients, downloadReportCsv }
+// Botão "Atualizar tiques": consulta no WhatsApp o status atual das mensagens do disparo (só leitura)
+const refreshReport = async (req, res) => {
+  const userId = req.user.user_id
+  try {
+    const summary = await loadOwnedSummary(req, res)
+    if (!summary) return
+    if (!await isSessionOwnedBy(summary.sessionId, userId)) return sendErrorResponse(res, 403, 'A instância deste disparo não pertence a você')
+    if (!(await validateSession(summary.sessionId)).success) return sendErrorResponse(res, 409, 'Conecte a instância do disparo para consultar os tiques')
+    const result = await reconcileRunDeliveries(sessions.get(summary.sessionId), summary.id)
+    console.log(`[panel] tiques atualizados manualmente run=${summary.id} verificados=${result.checked} atualizados=${result.updated} falhas=${result.failed} user=${userId}`)
+    if (result.updated > 0) publishPanelEvent({ type: 'broadcast_delivery', sessionId: summary.sessionId, runId: summary.id })
+    res.json({ success: true, data: result })
+  } catch (error) {
+    console.error(`[panel] falha ao atualizar tiques user=${userId} run=${req.params.runId}:`, error)
+    sendErrorResponse(res, 500, 'Erro ao consultar tiques no WhatsApp')
+  }
+}
+
+module.exports = { getReport, getReportRecipients, downloadReportCsv, refreshReport }

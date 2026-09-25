@@ -7,6 +7,7 @@ import { EmptyState } from '../components/EmptyState'
 import { FilesPane } from '../components/FilesPane'
 import { QrCard } from '../components/QrCard'
 import { SessionRail } from '../components/SessionRail'
+import { TemplatesPane } from '../components/TemplatesPane'
 import { usePanelPage } from '../hooks/usePanelPage'
 
 export function PanelPage() {
@@ -38,6 +39,15 @@ export function PanelPage() {
             onPageChange={(page) => actions.setTablePage('contacts', page)}
             onSearchChange={(search) => actions.setTableSearch('contacts', search)}
             onOpenChat={actions.openChat}
+          />
+        ) : null}
+
+        {view === 'templates' ? (
+          <TemplatesPane
+            page={tables.templates.page}
+            search={tables.templates.search}
+            onPageChange={(page) => actions.setTablePage('templates', page)}
+            onSearchChange={(search) => actions.setTableSearch('templates', search)}
           />
         ) : null}
 

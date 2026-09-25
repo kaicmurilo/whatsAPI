@@ -1,6 +1,6 @@
-import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRequiredToken } from '../auth/useAuth'
-import { downloadReportCsv, fetchBroadcastReport, fetchReportRecipients } from '../lib/broadcastApi'
+import { downloadReportCsv, fetchBroadcastReport, fetchReportRecipients, refreshBroadcastReport } from '../lib/broadcastApi'
 import { queryKeys } from '../lib/queryKeys'
 import type { ReportSituation } from '../types/api'
 
@@ -35,5 +35,14 @@ export function useDownloadReport() {
   return useMutation({
     mutationFn: (runId: string) => downloadReportCsv(token, runId),
     onSuccess: ({ blob, fileName }) => saveBlob(blob, fileName),
+  })
+}
+
+export function useRefreshReport(runId: string) {
+  const token = useRequiredToken()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => refreshBroadcastReport(token, runId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.reportOf(runId) }),
   })
 }

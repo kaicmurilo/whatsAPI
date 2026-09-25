@@ -13,7 +13,8 @@
     "@tanstack/react-query": "^5.103.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "read-excel-file": "^9.3.10"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

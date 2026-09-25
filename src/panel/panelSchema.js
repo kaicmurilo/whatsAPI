@@ -125,8 +125,42 @@ const ensureBroadcastTables = async () => {
     await query(`ALTER TABLE broadcast_run_recipients ADD COLUMN IF NOT EXISTS ${column}`)
   }
   await query('CREATE INDEX IF NOT EXISTS idx_broadcast_recipients_message ON broadcast_run_recipients(message_id) WHERE message_id IS NOT NULL')
+  // Chave estável da mensagem (igual com remote LID ou telefone): é por ela que os tiques casam
+  await query('ALTER TABLE broadcast_run_recipients ADD COLUMN IF NOT EXISTS message_key VARCHAR(64)')
+  await query("UPDATE broadcast_run_recipients SET message_key = NULLIF(split_part(message_id, '_', 3), '') WHERE message_key IS NULL AND message_id IS NOT NULL")
+  await query('CREATE INDEX IF NOT EXISTS idx_broadcast_recipients_key ON broadcast_run_recipients(message_key) WHERE message_key IS NOT NULL')
   // Vínculo tardio do ack: destinatários enviados ainda sem id, por telefone
   await query("CREATE INDEX IF NOT EXISTS idx_broadcast_recipients_unlinked ON broadcast_run_recipients(phone, sent_at DESC) WHERE message_id IS NULL AND status = 'sent'")
+}
+
+// Modelos de mensagem: texto + anexos da biblioteca, reutilizados na transmissão.
+// Arquivo em uso não pode ser apagado (RESTRICT) — evita modelo quebrado em silêncio.
+const ensureTemplateTables = async () => {
+  await query(`
+    CREATE TABLE IF NOT EXISTS message_templates (
+      id BIGSERIAL PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      name VARCHAR(100) NOT NULL,
+      text TEXT,
+      audio_as_voice BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (user_id, name)
+    )
+  `)
+  await query(`
+    CREATE TABLE IF NOT EXISTS message_template_files (
+      template_id BIGINT NOT NULL REFERENCES message_templates(id) ON DELETE CASCADE,
+      position INTEGER NOT NULL,
+      file_id BIGINT NOT NULL REFERENCES panel_files(id) ON DELETE RESTRICT,
+      PRIMARY KEY (template_id, position)
+    )
+  `)
+  await query('CREATE INDEX IF NOT EXISTS idx_template_files_file ON message_template_files(file_id)')
+  // Disparo guarda cópia das partes: editar/excluir o modelo depois não muda histórico nem reprocessamento
+  await query('ALTER TABLE broadcast_runs ADD COLUMN IF NOT EXISTS template_id BIGINT REFERENCES message_templates(id) ON DELETE SET NULL')
+  await query('ALTER TABLE broadcast_runs ADD COLUMN IF NOT EXISTS template_name VARCHAR(100)')
+  await query('ALTER TABLE broadcast_runs ADD COLUMN IF NOT EXISTS parts JSONB')
 }
 
 // Idempotente: roda a cada boot porque o init.sql só executa em volume novo do Postgres
@@ -135,6 +169,7 @@ const ensurePanelSchema = async () => {
   await ensureContactsTable()
   await ensureFilesTable()
   await ensureBroadcastTables()
+  await ensureTemplateTables()
 }
 
 module.exports = { ensurePanelSchema }

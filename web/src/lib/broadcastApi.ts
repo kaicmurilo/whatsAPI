@@ -9,6 +9,8 @@ import type {
   BroadcastReportSummary,
   ReportRecipientPage,
   ReportSituation,
+  ImportRow,
+  ListImportResult,
 } from '../types/api'
 import { requestData, requestRaw } from './apiClient'
 import { pageParams, sessionPath, TABLE_PER_PAGE, type PageQuery } from './panelApi'
@@ -75,4 +77,20 @@ export async function downloadReportCsv(token: string, runId: string): Promise<R
 // Para antes do próximo contato; quem não recebeu fica pendente (pode reprocessar depois)
 export async function cancelBroadcast(token: string, runId: string): Promise<void> {
   await requestRaw(`/panel/broadcasts/${encodeURIComponent(runId)}/cancel`, { token, method: 'POST' })
+}
+
+export interface ReportRefreshResult {
+  checked: number
+  updated: number
+  failed: number
+}
+
+// Consulta no WhatsApp o status atual das mensagens do disparo (só leitura)
+export function refreshBroadcastReport(token: string, runId: string): Promise<ReportRefreshResult> {
+  return requestData<ReportRefreshResult>(`${reportPath(runId)}/refresh`, { token, method: 'POST' })
+}
+
+// Nome da lista = nome do arquivo; telefones normalizados e contatos reaproveitados no servidor
+export function importBroadcastList(token: string, fileName: string, rows: ImportRow[]): Promise<ListImportResult> {
+  return requestData<ListImportResult>('/panel/broadcast-lists/import', { token, method: 'POST', body: { fileName, rows } })
 }

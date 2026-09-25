@@ -1,4 +1,5 @@
 const { query, withTransaction } = require('../database')
+const { alternatePhone } = require('./phone')
 
 const listBroadcastLists = async (userId, { page, perPage, search }) => {
   const result = await query(
@@ -72,4 +73,74 @@ const deleteBroadcastList = async (userId, listId) => {
   return result.rowCount > 0
 }
 
-module.exports = { listBroadcastLists, findBroadcastList, saveBroadcastList, deleteBroadcastList }
+const MAX_LIST_NAME_LENGTH = 100
+
+// "INTERIOR" já existe → "INTERIOR (2)", "INTERIOR (3)"… Importação nunca sobrescreve uma lista.
+const pickAvailableListName = async (client, userId, baseName) => {
+  const result = await client.query(
+    'SELECT name FROM broadcast_lists WHERE user_id = $1 AND left(name, length($2::text)) = $2::text',
+    [userId, baseName]
+  )
+  const taken = new Set(result.rows.map((row) => row.name))
+  if (!taken.has(baseName)) return baseName
+  for (let suffix = 2; ; suffix++) {
+    const label = ` (${suffix})`
+    const candidate = baseName.slice(0, MAX_LIST_NAME_LENGTH - label.length) + label
+    if (!taken.has(candidate)) return candidate
+  }
+}
+
+// Contato já existente = mesmo telefone ou a variante do 9º dígito (phone_alt)
+const findExistingContactIds = async (client, userId, phones) => {
+  const result = await client.query(
+    `SELECT id, phone, phone_alt FROM panel_contacts
+     WHERE user_id = $1 AND (phone = ANY($2::text[]) OR phone_alt = ANY($2::text[]))`,
+    [userId, phones]
+  )
+  const idByPhone = new Map()
+  for (const row of result.rows) {
+    idByPhone.set(row.phone, row.id)
+    if (row.phone_alt && !idByPhone.has(row.phone_alt)) idByPhone.set(row.phone_alt, row.id)
+  }
+  return idByPhone
+}
+
+const insertContacts = async (client, userId, entries) => {
+  if (entries.length === 0) return new Map()
+  const result = await client.query(
+    `INSERT INTO panel_contacts (user_id, name, phone, phone_alt)
+     SELECT $1, name, phone, NULLIF(phone_alt, '')
+     FROM unnest($2::text[], $3::text[], $4::text[]) AS c(name, phone, phone_alt)
+     ON CONFLICT (user_id, phone) DO NOTHING
+     RETURNING id, phone`,
+    [userId, entries.map((entry) => entry.name), entries.map((entry) => entry.phone), entries.map((entry) => alternatePhone(entry.phone) || '')]
+  )
+  return new Map(result.rows.map((row) => [row.phone, row.id]))
+}
+
+/**
+ * Importa uma planilha já normalizada: reaproveita contatos existentes, cria os que faltam
+ * e monta a lista (nome único). Tudo numa transação: ou importa inteiro ou nada muda.
+ */
+const importBroadcastList = (userId, { baseName, entries }) => withTransaction(async (client) => {
+  const idByPhone = await findExistingContactIds(client, userId, entries.map((entry) => entry.phone))
+  const newEntries = entries.filter((entry) => !idByPhone.has(entry.phone))
+  const createdIds = await insertContacts(client, userId, newEntries)
+  createdIds.forEach((id, phone) => idByPhone.set(phone, id))
+
+  const contactIds = [...new Set(entries.map((entry) => idByPhone.get(entry.phone)).filter(Boolean))]
+  const listName = await pickAvailableListName(client, userId, baseName)
+  const listResult = await client.query('INSERT INTO broadcast_lists (user_id, name) VALUES ($1, $2) RETURNING id, name', [userId, listName])
+  const list = listResult.rows[0]
+  await client.query(
+    'INSERT INTO broadcast_list_members (list_id, contact_id) SELECT $1, unnest($2::bigint[]) ON CONFLICT DO NOTHING',
+    [list.id, contactIds]
+  )
+  return {
+    list: { ...list, memberCount: contactIds.length },
+    createdContacts: createdIds.size,
+    reusedContacts: contactIds.length - createdIds.size
+  }
+})
+
+module.exports = { listBroadcastLists, findBroadcastList, saveBroadcastList, deleteBroadcastList, importBroadcastList }

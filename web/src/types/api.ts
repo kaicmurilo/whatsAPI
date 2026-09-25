@@ -142,6 +142,8 @@ export interface BroadcastRun {
   delayMinSeconds: number
   delayMaxSeconds: number
   randomOrder: boolean
+  // Disparo feito a partir de um modelo (nome guardado; o modelo pode ter mudado depois)
+  templateName: string | null
   createdAt: string
   finishedAt: string | null
 }
@@ -155,11 +157,42 @@ export interface BroadcastPacing {
   randomOrder: boolean
 }
 
-export interface BroadcastInput {
-  listId: string
+// Conteúdo do disparo: modelo salvo OU texto/arquivo avulso
+export type BroadcastInput =
+  | { listId: string; pacing: BroadcastPacing; templateId: string }
+  | { listId: string; pacing: BroadcastPacing; text: string; fileId: string | null }
+
+export interface TemplateFile {
+  id: string
+  name: string
+  mimetype: string
+  sizeBytes: number
+}
+
+export interface MessageTemplateSummary {
+  id: string
+  name: string
+  text: string | null
+  audioAsVoice: boolean
+  attachmentCount: number
+  updatedAt: string
+}
+
+export type MessageTemplatePage = Paginated<MessageTemplateSummary>
+
+export interface MessageTemplateDetail {
+  id: string
+  name: string
+  text: string | null
+  audioAsVoice: boolean
+  files: TemplateFile[]
+}
+
+export interface TemplateInput {
+  name: string
   text: string
-  fileId: string | null
-  pacing: BroadcastPacing
+  audioAsVoice: boolean
+  fileIds: string[]
 }
 
 export interface OutgoingMessage {
@@ -208,3 +241,17 @@ export type PanelEvent =
   | { type: 'status'; sessionId: string; status: SessionStatus }
   | { type: 'message'; sessionId: string; message: StoredMessage }
   | { type: 'history_synced'; sessionId: string; inserted: number }
+
+export interface ImportRow {
+  name: string
+  phoneText: string
+}
+
+export interface ListImportResult {
+  list: { id: string; name: string; memberCount: number }
+  createdContacts: number
+  reusedContacts: number
+  totalRows: number
+  duplicates: number
+  skipped: { row: number; reason: string }[]
+}

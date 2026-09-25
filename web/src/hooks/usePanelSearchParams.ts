@@ -21,11 +21,12 @@ const TABLE_PARAMS = {
   lists: { page: 'lpage', search: 'lq' },
   files: { page: 'fpage', search: 'fq' },
   runs: { page: 'rpage', search: 'rq' },
+  templates: { page: 'tpage', search: 'tq' },
 } as const
 
 export type TableKey = keyof typeof TABLE_PARAMS
 
-const PANEL_VIEWS = ['chats', 'contacts', 'broadcasts', 'files'] as const
+const PANEL_VIEWS = ['chats', 'contacts', 'templates', 'broadcasts', 'files'] as const
 export type PanelView = (typeof PANEL_VIEWS)[number]
 
 export interface TableState {

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { BroadcastListMember, BroadcastListSummary, BroadcastPacing, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
+import type { BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
 import type { PanelView, ReportState, TableKey, TableState } from '../hooks/usePanelSearchParams'
 
 export interface StatusLampProps {
@@ -236,4 +236,28 @@ export interface PacingFieldsProps {
   value: BroadcastPacing
   onChange: (pacing: BroadcastPacing) => void
   isDisabled?: boolean
+}
+
+export interface TemplateAttachmentsProps {
+  files: TemplateFile[]
+  onChange: (files: TemplateFile[]) => void
+}
+
+export interface TemplateEditorProps {
+  templateId: string | null
+  initialName: string
+  initialText: string
+  initialAudioAsVoice: boolean
+  initialFiles: TemplateFile[]
+  onDone: () => void
+}
+
+export interface TemplateEditorLoaderProps {
+  templateId: string
+  onDone: () => void
+}
+
+export interface TemplateRowActionsProps {
+  template: MessageTemplateSummary
+  onEdit: (templateId: string) => void
 }

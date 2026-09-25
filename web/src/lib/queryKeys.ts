@@ -17,6 +17,9 @@ export const queryKeys = {
   broadcastList: (listId: string) => ['broadcast-lists', 'detail', listId] as const,
   allBroadcastRuns: ['broadcast-runs'] as const,
   broadcastRuns: (page: number) => ['broadcast-runs', page] as const,
+  allTemplates: ['templates'] as const,
+  templates: (query: PageQuery) => ['templates', 'page', query] as const,
+  template: (templateId: string) => ['templates', 'detail', templateId] as const,
   reportOf: (runId: string) => ['broadcast-report', runId] as const,
   reportRecipients: (runId: string, page: number, situation: string) => ['broadcast-report', runId, 'recipients', page, situation] as const,
 }

@@ -7,12 +7,13 @@ import {
   fetchBroadcastRuns,
   retryBroadcast,
   cancelBroadcast,
+  importBroadcastList,
   saveBroadcastList,
   startBroadcast,
 } from '../lib/broadcastApi'
 import type { PageQuery } from '../lib/panelApi'
 import { queryKeys } from '../lib/queryKeys'
-import type { BroadcastInput, BroadcastListInput } from '../types/api'
+import type { BroadcastInput, BroadcastListInput, ImportRow } from '../types/api'
 
 export function useBroadcastLists(query: PageQuery) {
   const token = useRequiredToken()
@@ -103,5 +104,24 @@ export function useCancelBroadcast() {
   return useMutation({
     mutationFn: (runId: string) => cancelBroadcast(token, runId),
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.allBroadcastRuns }),
+  })
+}
+
+interface ImportListInput {
+  fileName: string
+  rows: ImportRow[]
+}
+
+// Importação cria contatos novos também: agenda e listas precisam recarregar
+export function useImportBroadcastList() {
+  const token = useRequiredToken()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ fileName, rows }: ImportListInput) => importBroadcastList(token, fileName, rows),
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.allBroadcastLists }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.allContacts }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.allChats }),
+    ]),
   })
 }

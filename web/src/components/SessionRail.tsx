@@ -5,6 +5,7 @@ import { SessionRailItem } from './SessionRailItem'
 
 const RAIL_VIEWS: { view: PanelView; label: string }[] = [
   { view: 'contacts', label: 'Contatos' },
+  { view: 'templates', label: 'Mensagens' },
   { view: 'broadcasts', label: 'Transmissão' },
   { view: 'files', label: 'Arquivos' },
 ]

@@ -3,6 +3,7 @@ const { panelMaxFileSize } = require('../config')
 const { sendErrorResponse } = require('../utils')
 const { listFiles, createFile, deleteOwnedFile } = require('./fileRepository')
 const { writeFileBytes, removeFileBytes } = require('./fileStorage')
+const { listTemplateNamesUsingFile } = require('./templateRepository')
 const { parseBoundedInt, parsePagination, isValidPagination } = require('./validators')
 
 const FILES_DEFAULT_PER_PAGE = 5
@@ -62,6 +63,8 @@ const removeFile = async (req, res) => {
   const fileId = parseBoundedInt(req.params.fileId, { fallback: null, min: 1, max: Number.MAX_SAFE_INTEGER })
   if (fileId === null) return sendErrorResponse(res, 422, 'Id de arquivo inválido')
   try {
+    const usedBy = await listTemplateNamesUsingFile(req.user.user_id, fileId)
+    if (usedBy.length > 0) return sendErrorResponse(res, 409, `Arquivo usado nos modelos: ${usedBy.join(', ')}. Remova dos modelos antes de excluir.`)
     const storageKey = await deleteOwnedFile(req.user.user_id, fileId)
     if (!storageKey) return sendErrorResponse(res, 404, 'Arquivo não encontrado')
     await removeFileBytes(storageKey)

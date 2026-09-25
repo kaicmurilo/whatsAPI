@@ -94,9 +94,10 @@ Interface web (React + Vite) servida pela própria API em `/app`. Login com o `u
 | **Instâncias** | Lista os números conectados com status ao vivo, cria instância nova e mostra o QR para parear |
 | **Conversas** | Histórico salvo no Postgres (recebidas + enviadas), busca, envio de texto e anexos em tempo real (SSE) |
 | **Contatos** | Agenda interna do painel (não altera a agenda do celular); o nome aparece nas conversas |
+| **Mensagens** | Modelos reutilizáveis: texto + até 10 anexos (áudio, vídeo, imagem, documento) em ordem; áudio como mensagem de voz |
 | **Arquivos** | Biblioteca de arquivos reutilizáveis (até 50 MB); vídeo/imagem vão com play/preview até 64 MB |
-| **Transmissão** | Listas de contatos, disparo individual com intervalo aleatório configurável e ordem embaralhada, abortar, reprocessar |
-| **Relatório** | Por disparo: enviado, entregue, lido e reproduzido por contato (tiques do WhatsApp) + exportação CSV para Excel |
+| **Transmissão** | Listas de contatos (até 5.000), **importação de planilha .xlsx**, disparo com mensagem salva ou avulsa, intervalo aleatório configurável, ordem embaralhada, abortar, reprocessar |
+| **Relatório** | Por disparo: enviado, entregue, lido e reproduzido por contato (tiques do WhatsApp), "Atualizar tiques" + exportação CSV para Excel |
 
 ### Rodar com Docker (recomendado)
 
@@ -126,10 +127,31 @@ npm run build:web                # gera web/dist (o Dockerfile já faz isso no b
 
 ### Transmissão: como o envio funciona
 
-- Cada contato recebe uma mensagem **individual** (o WhatsApp Web não permite criar listas de transmissão nativas).
-- Um contato por vez, esperando um tempo **sorteado** na faixa escolhida (padrão 20–45 s) e em **ordem aleatória**. Máximo de 256 contatos por lista.
+- Cada contato recebe uma mensagem **individual** (o WhatsApp Web não permite criar listas de transmissão nativas). Até 5.000 contatos por lista.
+- Um contato por vez, esperando um tempo **sorteado** na faixa escolhida (padrão 20–45 s) e em **ordem aleatória**.
 - **Abortar** para antes do próximo contato; quem não recebeu fica pendente e pode ser **reprocessado** depois (nunca reenvia para quem já recebeu).
 - Isso reduz, mas **não elimina**, o risco de bloqueio do número.
+
+### Mensagens (modelos)
+
+- Um modelo tem nome, texto (opcional) e até 10 anexos da biblioteca, enviados na ordem definida.
+- O **texto vai como legenda do primeiro vídeo, imagem ou documento** (chega numa mensagem só). Áudio não aceita legenda no WhatsApp: modelo só com áudios envia o texto antes, separado.
+- Áudio pode ir como **mensagem de voz** (aparece como gravado na hora; `.ogg` funciona melhor).
+- Entre as partes de um mesmo contato há uma pausa curta (1,5–4 s); abortar nunca corta um contato no meio.
+- O disparo guarda uma cópia das partes: editar/excluir o modelo depois não muda o histórico nem o reprocessamento. Arquivo usado em modelo não pode ser excluído da biblioteca.
+
+### Importar lista de planilha (.xlsx)
+
+- Em **Transmissão → Importar planilha**. O nome do arquivo vira o nome da lista (`INTERIOR.xlsx` → **INTERIOR**; se já existir, "INTERIOR (2)").
+- As colunas são detectadas pelo conteúdo (nome e telefone, com ou sem cabeçalho). Telefones recebem o código **55**; célula com dois números separados por `/` gera dois contatos; número repetido no arquivo entra uma vez.
+- Contato que já está na agenda (inclusive com/sem o 9º dígito) é **reaproveitado**, sem alterar o nome. Linhas sem telefone válido aparecem no resumo com o motivo.
+- A planilha é lida no navegador; o servidor recebe só texto e faz a validação. Tudo numa transação.
+
+### Relatório: entregue, lido e reproduzido
+
+- Os tiques são casados pela chave estável da mensagem (o WhatsApp alterna entre id por telefone e por LID).
+- Tiques que chegam com a instância desligada são recuperados ao reconectar (disparos dos últimos 7 dias) ou no botão **Atualizar tiques**, que consulta os "Dados da mensagem" do WhatsApp com o horário real (só leitura).
+- "Lido" só aparece para quem mantém a confirmação de leitura ligada; "reproduzido" vem principalmente de áudio de voz.
 
 ### Notas técnicas
 

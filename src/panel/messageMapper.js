@@ -34,6 +34,21 @@ const serializeMessageId = (message) => {
 }
 
 /**
+ * Chave estável da mensagem (ex.: "3EB0DB4BD378834E54BE1F"). O WhatsApp Web serializa a mesma
+ * mensagem ora com o LID (`true_<lid>@lid_KEY`), ora com o telefone (`true_<tel>@c.us_KEY`);
+ * só a chave é igual nos dois — é por ela que os tiques (entregue/lido) são casados.
+ */
+const messageKeyOf = (message) => {
+  const id = message?.id || message?._data?.id
+  if (!id) return null
+  if (typeof id === 'string') return messageKeyFromId(id)
+  return id.id || messageKeyFromId(id._serialized)
+}
+
+// "true_5511...@c.us_3EB0..._participante" → "3EB0..."
+const messageKeyFromId = (serializedId) => (serializedId ? serializedId.split('_')[2] || null : null)
+
+/**
  * Converte uma Message do whatsapp-web.js no registro da tabela whatsapp_messages.
  * Mídia: guarda só metadados — o arquivo continua no WhatsApp.
  * `chatId` permite gravar o id canônico (telefone) no lugar do LID.
@@ -57,4 +72,14 @@ const toMessageRecord = (sessionId, message, { chatName = null, chatId = resolve
   }
 }
 
-module.exports = { toMessageRecord, isStatusBroadcast, isRecordableMessage, SYSTEM_MESSAGE_TYPES, resolveChatId, serializeMessageId, serializeWid }
+module.exports = {
+  toMessageRecord,
+  isStatusBroadcast,
+  isRecordableMessage,
+  SYSTEM_MESSAGE_TYPES,
+  resolveChatId,
+  serializeMessageId,
+  serializeWid,
+  messageKeyOf,
+  messageKeyFromId
+}

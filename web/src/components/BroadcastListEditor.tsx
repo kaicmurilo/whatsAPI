@@ -4,7 +4,7 @@ import type { BroadcastListMember } from '../types/api'
 import type { BroadcastListEditorLoaderProps, BroadcastListEditorProps } from '../types/components'
 import { ContactPicker } from './ContactPicker'
 
-const MAX_LIST_MEMBERS = 256
+const MAX_LIST_MEMBERS = 5000
 
 const toSelection = (members: BroadcastListMember[]) => new Map(members.map((member) => [member.id, member]))
 
