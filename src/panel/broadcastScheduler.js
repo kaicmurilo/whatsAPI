@@ -1,4 +1,5 @@
 const { validateSession } = require('../sessions')
+const { sessionsOf } = require('./broadcastSessions')
 const { listDueScheduledRuns } = require('./broadcastRunRepository')
 const { decideScheduledAction, LATE_GRACE_MS } = require('./broadcastSchedule')
 const broadcastService = require('./broadcastService')
@@ -9,11 +10,15 @@ const LATE_GRACE_MINUTES = LATE_GRACE_MS / 60000
 let isTicking = false
 
 const handleDueRun = async (run, now) => {
-  const isConnected = (await validateSession(run.sessionId)).success
-  const action = decideScheduledAction({ scheduledAt: run.scheduledAt, now, isConnected, isBusy: broadcastService.isSessionBusy(run.sessionId) })
+  const sessionIds = sessionsOf(run)
+  let allConnected = sessionIds.length > 0
+  for (const sessionId of sessionIds) {
+    if (!(await validateSession(sessionId)).success) allConnected = false
+  }
+  const action = decideScheduledAction({ scheduledAt: run.scheduledAt, now, isConnected: allConnected })
   if (action === 'start') return broadcastService.startScheduled(run)
   if (action === 'expire') {
-    return broadcastService.failScheduled(run, `Instância desconectada no horário programado (esperou ${LATE_GRACE_MINUTES} min)`)
+    return broadcastService.failScheduled(run, `Instâncias desconectadas no horário programado (esperou ${LATE_GRACE_MINUTES} min)`)
   }
 }
 

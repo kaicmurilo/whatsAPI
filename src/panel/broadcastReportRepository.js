@@ -4,14 +4,15 @@ const { query } = require('../database')
 const SITUATION_SQL = `CASE
   WHEN status = 'failed' THEN 'failed'
   WHEN status = 'pending' THEN 'pending'
+  WHEN status = 'awaiting_reply' THEN 'awaiting_reply'
   WHEN read_at IS NOT NULL THEN 'read'
   WHEN delivered_at IS NOT NULL THEN 'delivered'
   ELSE 'sent' END`
 
-// Filtros cumulativos: "entregues" inclui quem já leu
 const SITUATION_FILTERS = {
   all: 'TRUE',
   pending: "status = 'pending'",
+  awaiting_reply: "status = 'awaiting_reply'",
   sent: "status = 'sent'",
   delivered: 'delivered_at IS NOT NULL',
   read: 'read_at IS NOT NULL',
@@ -25,6 +26,7 @@ const findReportSummary = async (userId, runId) => {
   const result = await query(
     `SELECT r.id, r.session_id AS "sessionId", r.list_name AS "listName", r.text, r.file_name AS "fileName",
             r.status, r.total, r.sent, r.failed, r.error, r.created_at AS "createdAt", r.finished_at AS "finishedAt",
+            COUNT(*) FILTER (WHERE rr.status = 'awaiting_reply')::int AS awaiting,
             COUNT(*) FILTER (WHERE rr.delivered_at IS NOT NULL)::int AS delivered,
             COUNT(*) FILTER (WHERE rr.read_at IS NOT NULL)::int AS read,
             COUNT(*) FILTER (WHERE rr.played_at IS NOT NULL)::int AS played

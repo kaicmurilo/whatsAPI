@@ -23,9 +23,17 @@ src/
 ├── routes/            # Definição de rotas
 ├── auth/              # Sistema de autenticação
 ├── utils/             # Utilitários
+├── panel/             # API do painel (/panel): controllers finos, services, repositórios, disparos (docs/PANEL_API.md)
+├── sessions.js        # Ciclo de vida das sessões do WhatsApp (nova tentativa ao falhar a abertura)
 ├── app.js             # Configuração do Express (simplificado)
 ├── database.js        # Conexão e validação do banco
 └── config.js          # Configurações da aplicação
+
+web/                   # Painel React + Vite (build servido em /app)
+├── src/components/    # UI (ex.: BroadcastRunActions, RunPacingEditor)
+├── src/hooks/         # TanStack Query (useBroadcasts…)
+├── src/lib/           # Cliente da API e regras puras (pacing, schedule…)
+└── src/types/         # Tipos compartilhados
 ```
 
 ## 🔧 Serviços Implementados

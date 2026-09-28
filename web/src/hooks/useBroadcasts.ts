@@ -7,13 +7,16 @@ import {
   fetchBroadcastRuns,
   retryBroadcast,
   cancelBroadcast,
+  pauseBroadcast,
+  updateBroadcastPacing,
+  updateBroadcastSessions,
   importBroadcastList,
   saveBroadcastList,
   startBroadcast,
 } from '../lib/broadcastApi'
 import type { PageQuery } from '../lib/panelApi'
 import { queryKeys } from '../lib/queryKeys'
-import type { BroadcastInput, BroadcastListInput, ImportRow } from '../types/api'
+import type { BroadcastInput, BroadcastListInput, BroadcastPacing, ImportRow } from '../types/api'
 
 export function useBroadcastLists(query: PageQuery) {
   const token = useRequiredToken()
@@ -89,23 +92,19 @@ export function useBroadcastRuns(page: number) {
   })
 }
 
-export function useRetryBroadcast() {
+// Ações sobre um disparo do histórico: todas recarregam a lista de disparos ao terminar
+function useRunAction(action: (token: string, runId: string) => Promise<unknown>) {
   const token = useRequiredToken()
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (runId: string) => retryBroadcast(token, runId),
+    mutationFn: (runId: string) => action(token, runId),
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.allBroadcastRuns }),
   })
 }
 
-export function useCancelBroadcast() {
-  const token = useRequiredToken()
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: (runId: string) => cancelBroadcast(token, runId),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.allBroadcastRuns }),
-  })
-}
+export const useRetryBroadcast = () => useRunAction(retryBroadcast)
+export const useCancelBroadcast = () => useRunAction(cancelBroadcast)
+export const usePauseBroadcast = () => useRunAction(pauseBroadcast)
 
 interface ImportListInput {
   fileName: string
@@ -123,5 +122,23 @@ export function useImportBroadcastList() {
       queryClient.invalidateQueries({ queryKey: queryKeys.allContacts }),
       queryClient.invalidateQueries({ queryKey: queryKeys.allChats }),
     ]),
+  })
+}
+
+export function useUpdateRunPacing(runId: string) {
+  const token = useRequiredToken()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (pacing: BroadcastPacing) => updateBroadcastPacing(token, runId, pacing),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.allBroadcastRuns }),
+  })
+}
+
+export function useUpdateRunSessions(runId: string) {
+  const token = useRequiredToken()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (sessionIds: string[]) => updateBroadcastSessions(token, runId, sessionIds),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.allBroadcastRuns }),
   })
 }

@@ -1,18 +1,21 @@
 import { useBroadcastRuns } from '../hooks/useBroadcasts'
 import { formatDateTime } from '../lib/format'
-import { describePacing } from '../lib/pacing'
 import { formatSchedule } from '../lib/schedule'
 import { TABLE_PER_PAGE } from '../lib/panelApi'
-import type { BroadcastRun, BroadcastRunStatus } from '../types/api'
+import type { BroadcastRun, BroadcastRunStatus, WhatsAppSession } from '../types/api'
 import type { BroadcastRunsSectionProps, DataTableColumn } from '../types/components'
 import { DataTable } from './DataTable'
 import { EmptyState } from './EmptyState'
 import { BroadcastRunActions } from './BroadcastRunActions'
 import { Pagination } from './Pagination'
+import { RunInstancesEditor } from './RunInstancesEditor'
+import { RunPacingEditor } from './RunPacingEditor'
 
 const STATUS_LABELS: Record<BroadcastRunStatus, string> = {
   scheduled: 'Programado',
   running: 'Enviando',
+  paused: 'Pausado',
+  awaiting: 'Aguardando respostas',
   done: 'Concluído',
   failed: 'Falhou',
   interrupted: 'Interrompido',
@@ -25,9 +28,6 @@ const describeContent = (run: BroadcastRun): string =>
   run.templateName
     ? `✉ ${run.templateName}`
     : [run.fileName ? `📎 ${run.fileName}` : null, run.text].filter(Boolean).join(' · ') || '—'
-
-const describeRunPacing = (run: BroadcastRun): string =>
-  describePacing({ minSeconds: run.delayMinSeconds, maxSeconds: run.delayMaxSeconds, randomOrder: run.randomOrder })
 
 // Status + motivo real quando o disparo inteiro parou (antes aparecia sempre "instância caiu")
 function RunStatus({ run }: { run: BroadcastRun }) {
@@ -42,6 +42,13 @@ function RunStatus({ run }: { run: BroadcastRun }) {
 
 function RunProgress({ run }: { run: BroadcastRun }) {
   if (run.status === 'scheduled') return <span className="run-progress__label">Aguardando horário</span>
+  if (run.status === 'awaiting') {
+    return (
+      <span className="run-progress__label">
+        {run.sent}/{run.total} enviados · aguardando respostas
+      </span>
+    )
+  }
   const done = run.sent + run.failed
   return (
     <div className="run-progress" title={`${run.sent} enviados, ${run.failed} falhas de ${run.total}`}>
@@ -54,7 +61,11 @@ function RunProgress({ run }: { run: BroadcastRun }) {
   )
 }
 
-const buildRunColumns = (openReportId: string | null, onOpenReport: (runId: string) => void): DataTableColumn<BroadcastRun>[] => [
+const buildRunColumns = (
+  sessions: WhatsAppSession[],
+  openReportId: string | null,
+  onOpenReport: (runId: string) => void,
+): DataTableColumn<BroadcastRun>[] => [
   { key: 'created', header: 'Quando', render: (run) => <span className="broadcasts__mono">{formatDateTime(run.createdAt)}</span> },
   { key: 'list', header: 'Lista', render: (run) => <span className="broadcasts__strong">{run.listName}</span> },
   {
@@ -63,7 +74,8 @@ const buildRunColumns = (openReportId: string | null, onOpenReport: (runId: stri
     render: (run) => (
       <span className="run-content">
         <span className="broadcasts__content">{describeContent(run)}</span>
-        <span className="run-content__pacing">⏱ {describeRunPacing(run)}</span>
+        <RunInstancesEditor run={run} sessions={sessions} />
+        <RunPacingEditor run={run} />
       </span>
     ),
   },
@@ -77,10 +89,10 @@ const buildRunColumns = (openReportId: string | null, onOpenReport: (runId: stri
   },
 ]
 
-export function BroadcastRunsSection({ page, openReportId, onPageChange, onOpenReport }: BroadcastRunsSectionProps) {
+export function BroadcastRunsSection({ sessions, page, openReportId, onPageChange, onOpenReport }: BroadcastRunsSectionProps) {
   const runs = useBroadcastRuns(page)
   const items = runs.data?.items ?? []
-  const columns = buildRunColumns(openReportId, onOpenReport)
+  const columns = buildRunColumns(sessions, openReportId, onOpenReport)
 
   return (
     <section className="broadcasts__section" aria-labelledby="runs-title">

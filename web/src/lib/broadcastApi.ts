@@ -4,6 +4,7 @@ import type {
   BroadcastListInput,
   BroadcastListPage,
   BroadcastListSummary,
+  BroadcastPacing,
   BroadcastRun,
   BroadcastRunPage,
   BroadcastReportSummary,
@@ -49,6 +50,14 @@ export function retryBroadcast(token: string, runId: string): Promise<BroadcastR
   return requestData<BroadcastRun>(`/panel/broadcasts/${encodeURIComponent(runId)}/retry`, { token, method: 'POST' })
 }
 
+export function updateBroadcastPacing(token: string, runId: string, pacing: BroadcastPacing): Promise<BroadcastRun> {
+  return requestData<BroadcastRun>(`/panel/broadcasts/${encodeURIComponent(runId)}/pacing`, { token, method: 'PUT', body: { pacing } })
+}
+
+export function updateBroadcastSessions(token: string, runId: string, sessionIds: string[]): Promise<BroadcastRun> {
+  return requestData<BroadcastRun>(`/panel/broadcasts/${encodeURIComponent(runId)}/sessions`, { token, method: 'PUT', body: { sessionIds } })
+}
+
 const reportPath = (runId: string) => `/panel/broadcasts/${encodeURIComponent(runId)}/report`
 
 export function fetchBroadcastReport(token: string, runId: string): Promise<BroadcastReportSummary> {
@@ -74,10 +83,16 @@ export async function downloadReportCsv(token: string, runId: string): Promise<R
   return { blob: await response.blob(), fileName }
 }
 
-// Para antes do próximo contato; quem não recebeu fica pendente (pode reprocessar depois)
-export async function cancelBroadcast(token: string, runId: string): Promise<void> {
-  await requestRaw(`/panel/broadcasts/${encodeURIComponent(runId)}/cancel`, { token, method: 'POST' })
+const postRunAction = async (token: string, runId: string, action: 'cancel' | 'pause'): Promise<void> => {
+  await requestRaw(`/panel/broadcasts/${encodeURIComponent(runId)}/${action}`, { token, method: 'POST' })
 }
+
+// Para antes do próximo contato; quem não recebeu fica pendente (pode reprocessar depois)
+export const cancelBroadcast = (token: string, runId: string): Promise<void> => postRunAction(token, runId, 'cancel')
+
+// Para antes do próximo contato; quem não recebeu fica pendente para Retomar
+export const pauseBroadcast = (token: string, runId: string): Promise<void> => postRunAction(token, runId, 'pause')
+
 
 export interface ReportRefreshResult {
   checked: number

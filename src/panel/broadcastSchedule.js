@@ -19,13 +19,12 @@ const parseScheduledAt = (value, now = new Date()) => {
 
 /**
  * O que o agendador faz com um disparo programado vencido.
- * - start: instância conectada e livre
- * - wait: ainda dá tempo (ou está na fila atrás de outro disparo da mesma instância — isso não expira)
+ * - start: instância conectada (outro disparo na mesma instância não impede: os envios alternam)
+ * - wait: instância desconectada, ainda dentro da tolerância
  * - expire: passou da tolerância com a instância desconectada
  */
-const decideScheduledAction = ({ scheduledAt, now, isConnected, isBusy }) => {
-  if (isConnected && !isBusy) return 'start'
-  if (isConnected && isBusy) return 'wait'
+const decideScheduledAction = ({ scheduledAt, now, isConnected }) => {
+  if (isConnected) return 'start'
   return now.getTime() - new Date(scheduledAt).getTime() > LATE_GRACE_MS ? 'expire' : 'wait'
 }
 

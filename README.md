@@ -94,9 +94,9 @@ Interface web (React + Vite) servida pela própria API em `/app`. Login com o `u
 | **Instâncias** | Lista os números conectados com status ao vivo, cria instância nova e mostra o QR para parear |
 | **Conversas** | Histórico salvo no Postgres (recebidas + enviadas), busca, envio de texto e anexos em tempo real (SSE) |
 | **Contatos** | Agenda interna do painel (não altera a agenda do celular); o nome aparece nas conversas |
-| **Mensagens** | Modelos reutilizáveis: texto + até 10 anexos (áudio, vídeo, imagem, documento) em ordem; áudio como mensagem de voz |
+| **Mensagens** | Modelos reutilizáveis: texto, **variações ilimitadas**, até 10 anexos (áudio, vídeo, imagem, documento) em ordem; áudio como mensagem de voz |
 | **Arquivos** | Biblioteca de arquivos reutilizáveis (até 50 MB); vídeo/imagem vão com play/preview até 64 MB |
-| **Transmissão** | Listas de contatos (até 5.000), **importação de planilha .xlsx**, disparo com mensagem salva ou avulsa, **envio agora ou programado**, intervalo aleatório configurável, ordem embaralhada, abortar, reprocessar |
+| **Transmissão** | Listas de contatos (até 5.000), **importação de planilha .xlsx** (lista simples ou exportação de contatos), disparo com mensagem salva ou avulsa, **uma ou várias instâncias em rodízio**, **várias listas ao mesmo tempo** (a instância alterna os envios), **envio agora ou programado**, intervalo aleatório configurável (editável durante o envio), ordem embaralhada, **pausar/retomar**, pausa automática ao sinal de bloqueio, abortar, reprocessar |
 | **Relatório** | Por disparo: enviado, entregue, lido e reproduzido por contato (tiques do WhatsApp), "Atualizar tiques" + exportação CSV para Excel |
 
 ### Rodar com Docker (recomendado)
@@ -129,20 +129,39 @@ npm run build:web                # gera web/dist (o Dockerfile já faz isso no b
 
 - Cada contato recebe uma mensagem **individual** (o WhatsApp Web não permite criar listas de transmissão nativas). Até 5.000 contatos por lista.
 - Um contato por vez, esperando um tempo **sorteado** na faixa escolhida (padrão 20–45 s) e em **ordem aleatória**.
-- **Abortar** para antes do próximo contato; quem não recebeu fica pendente e pode ser **reprocessado** depois (nunca reenvia para quem já recebeu).
-- Isso reduz, mas **não elimina**, o risco de bloqueio do número.
+- Dá para marcar **uma, algumas ou todas** as instâncias. Cada contato sai pela próxima instância conectada. No histórico, **Editar instâncias** troca o rodízio do que ainda falta enviar.
+- **Várias listas podem disparar ao mesmo tempo** nas mesmas instâncias. Cada número manda um contato por vez e alterna a lista (um da primeira, espera o intervalo, um da segunda). O ritmo da instância não dobra.
+- Isso reduz, mas **não elimina**, o risco de bloqueio do número. O que mais pesa é quem recebe: contatos que não pediram a mensagem denunciam e bloqueiam.
+
+**Status e ações no histórico**
+
+| Status | Ações | O que acontece |
+|--------|-------|----------------|
+| **Programado** | Cancelar programação · Editar intervalo · Editar instâncias | Espera o horário. Só começa quando todas as instâncias marcadas estão conectadas |
+| **Enviando** | Pausar · Abortar · Editar intervalo · Editar instâncias | Pausar/Abortar param antes do próximo contato (um envio em curso termina). Intervalo e instâncias novos valem a partir do próximo contato |
+| **Pausado** | Retomar (N) · Cancelar · Editar intervalo · Editar instâncias | Mostra o motivo da pausa |
+| **Interrompido** | Retomar (N) · Editar intervalo · Editar instâncias | O servidor reiniciou durante o envio |
+| **Falhou / Cancelado / Concluído com falhas** | Reprocessar (N) · Editar intervalo · Editar instâncias | — |
+
+- **Retomar** e **Reprocessar** enviam só para quem **não recebeu** (falhas + pendentes), pela mesma instância, com a mesma mensagem e o intervalo atual. Quem já recebeu **nunca** recebe de novo (garantido no banco). N = total − enviados.
+- **Pausa automática** (em vez de insistir num número bloqueado):
+  - a instância desconecta no meio do envio;
+  - **3 falhas de envio seguidas** ("Número sem WhatsApp" não conta; um envio com sucesso zera a contagem).
+- **Editar intervalo**: link **Editar** ao lado de "⏱" no histórico (mesmos limites do formulário: 3–600 s). A ordem já sorteada de um envio em andamento não muda.
+- Retomar/Reprocessar exigem a instância conectada. Outra lista já em envio na mesma instância não bloqueia: os contatos alternam.
 
 ### Envio programado
 
 - No formulário de disparo: **Enviar agora | Programar** (data e hora de 1 min a 90 dias à frente). O histórico mostra "Programado para…" com **Cancelar programação**.
 - No horário, usa a lista e a mensagem **como estiverem naquele momento**; lista, modelo ou arquivo apagados antes disso fazem o disparo falhar com o motivo.
 - O agendador roda dentro da API (verifica a cada 30 s) e os programados ficam no Postgres, então sobrevivem a reinícios. Nunca dispara duas vezes (reserva atômica).
-- Não precisa da instância conectada ao programar. No horário, se estiver desconectada, espera até **30 min**; depois disso falha em vez de enviar atrasado. Atrás de outro disparo da mesma instância, espera sem limite.
+- Não precisa da instância conectada ao programar. No horário, se estiver desconectada, espera até **30 min**; depois disso falha em vez de enviar atrasado. Se outra lista já está enviando nessa instância, o programado começa e alterna os contatos com ela.
 - **Só dispara com a API rodando no horário** (`npm run local:up`; os containers não sobem sozinhos com o Docker).
 
 ### Mensagens (modelos)
 
-- Um modelo tem nome, texto (opcional) e até 10 anexos da biblioteca, enviados na ordem definida.
+- Um modelo tem nome, texto (opcional), **quantas variações de texto quiser** e até 10 anexos da biblioteca, enviados na ordem definida.
+- No disparo, cada contato da lista recebe uma versão em rodízio: o texto principal, depois a variação 1, a variação 2, e volta ao início. A posição na lista define a versão, então um retry manda o mesmo texto para o mesmo contato. Sem variações, todo mundo recebe o mesmo texto.
 - O **texto vai como legenda do primeiro vídeo, imagem ou documento** (chega numa mensagem só). Áudio não aceita legenda no WhatsApp: modelo só com áudios envia o texto antes, separado.
 - Áudio pode ir como **mensagem de voz** (aparece como gravado na hora; `.ogg` funciona melhor).
 - Entre as partes de um mesmo contato há uma pausa curta (1,5–4 s); abortar nunca corta um contato no meio.
@@ -151,7 +170,10 @@ npm run build:web                # gera web/dist (o Dockerfile já faz isso no b
 ### Importar lista de planilha (.xlsx)
 
 - Em **Transmissão → Importar planilha**. O nome do arquivo vira o nome da lista (`INTERIOR.xlsx` → **INTERIOR**; se já existir, "INTERIOR (2)").
-- As colunas são detectadas pelo conteúdo (nome e telefone, com ou sem cabeçalho). Telefones recebem o código **55**; célula com dois números separados por `/` gera dois contatos; número repetido no arquivo entra uma vez.
+- Dois formatos:
+  - **Lista simples:** colunas de nome e telefone detectadas pelo conteúdo, com ou sem cabeçalho. Telefone nacional recebe o código **55**. Célula com dois números separados por `/` gera dois contatos.
+  - **Exportação de contatos** (cabeçalho com `country_code`, `phone_number`, `saved_name`, `public_name`): o telefone já vem com DDI e é guardado assim. O nome é o salvo na agenda, ou o nome público do WhatsApp se o salvo estiver vazio. Sem nenhum dos dois, entra como **Sem nome**.
+- Número repetido no arquivo entra uma vez.
 - Contato que já está na agenda (inclusive com/sem o 9º dígito) é **reaproveitado**, sem alterar o nome. Linhas sem telefone válido aparecem no resumo com o motivo.
 - A planilha é lida no navegador; o servidor recebe só texto e faz a validação. Tudo numa transação.
 
@@ -166,6 +188,9 @@ npm run build:web                # gera web/dist (o Dockerfile já faz isso no b
 - `patches/whatsapp-web.js+1.34.7.patch` corrige o envio de mídia quebrado desde o WhatsApp Web 2.3000.10477 ([PR upstream #201923](https://github.com/wwebjs/whatsapp-web.js/pull/201923)). É aplicado no `postinstall` e no build do Docker; remova quando sair versão oficial com a correção.
 - Chats identificados por `@lid` são convertidos para `telefone@c.us` quando o WhatsApp informa o número, para casar com a agenda.
 - Travas órfãs do Chromium são limpas ao abrir a sessão, e o desligamento fecha os navegadores — reiniciar o container não pede QR de novo.
+- Erros assíncronos internos do whatsapp-web.js/puppeteer (comuns quando a página do WhatsApp Web recarrega: "Execution context was destroyed", "onQRChangedEvent already exists") são logados com `[process]` e **não derrubam mais o processo** — antes o Node 22 encerrava a API e todas as instâncias/disparos caíam juntos.
+- Sessão que falha ao abrir tenta de novo sozinha em 10 s, 30 s e 60 s (não recria sessão excluída). O motivo de cada desconexão vai para o log: `[session] desconectada sessão=… motivo=LOGOUT` (aparelho desvinculado pelo WhatsApp), `CONFLICT` etc.
+- Rotas internas do painel: [docs/PANEL_API.md](docs/PANEL_API.md).
 
 ## Sistema de Autenticação
 
@@ -383,6 +408,18 @@ Execute a suíte de testes com o seguinte comando:
 npm run test
 ```
 
+Testes de integração do painel rodam contra um **Postgres real e descartável** (criam e apagam dados):
+
+```bash
+docker run --rm -d --name wa-it-pg -p 55432:5432 -e POSTGRES_DB=whatsapp_auth -e POSTGRES_USER=whatsapp_user \
+  -e POSTGRES_PASSWORD=x -v "$PWD/docker-postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro" postgres:16-alpine
+PANEL_DB_TEST=1 POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=55432 POSTGRES_PASSWORD=x JWT_SECRET=x \
+  npx jest --testPathIgnorePatterns api.test
+docker rm -f wa-it-pg
+```
+
+`tests/api.test.js` abre sessões reais do WhatsApp e fica fora dessa execução. Nunca teste rotas de envio contra listas reais: use uma lista descartável só com um número impossível (ex.: `551100000000`).
+
 ### 🗄️ Validação de Banco de Dados
 
 A aplicação inclui validação automática do banco de dados PostgreSQL:
@@ -436,6 +473,11 @@ A documentação da API está disponível em **inglês** e **português**:
 ### 📖 Documentação Online
 - **Inglês**: [`swagger.json`](https://raw.githubusercontent.com/kaicmurilo/whatsAPI/master/swagger.json)
 - **Português**: [`swagger-pt.json`](https://raw.githubusercontent.com/kaicmurilo/whatsAPI/master/swagger-pt.json)
+
+### 🗂️ Painel e internos
+O Swagger cobre a API pública. O painel e o funcionamento interno estão em `docs/`:
+- [API do painel (`/panel`)](docs/PANEL_API.md) · [Disparos de transmissão](docs/BROADCAST_SEND.md)
+- [Sessões e recuperação](docs/SESSIONS.md) · [Arquitetura](docs/ARCHITECTURE.md) · [Estrutura de código](docs/CODE_STRUCTURE.md)
 
 ### 🔧 Visualizar Documentação
 - **Swagger Editor**: [Visualizar em inglês](https://editor.swagger.io/?url=https://raw.githubusercontent.com/kaicmurilo/whatsAPI/master/swagger.json)

@@ -1,14 +1,17 @@
 const { query, withTransaction } = require('../database')
 
 const TEMPLATE_COLUMNS = 't.id, t.name, t.text, t.audio_as_voice AS "audioAsVoice", t.updated_at AS "updatedAt"'
+const TEMPLATE_DETAIL_COLUMNS = `${TEMPLATE_COLUMNS}, t.text_variations AS variations`
 
 const listTemplates = async (userId, { page, perPage, search }) => {
   const result = await query(
     `SELECT ${TEMPLATE_COLUMNS},
             (SELECT COUNT(*) FROM message_template_files f WHERE f.template_id = t.id)::int AS "attachmentCount",
+            jsonb_array_length(t.text_variations)::int AS "variationCount",
             COUNT(*) OVER() AS total
      FROM message_templates t
-     WHERE t.user_id = $1 AND ($2::text IS NULL OR t.name ILIKE $2 OR t.text ILIKE $2)
+     WHERE t.user_id = $1 AND ($2::text IS NULL OR t.name ILIKE $2 OR t.text ILIKE $2
+       OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(t.text_variations) AS variation(value) WHERE variation.value ILIKE $2))
      ORDER BY t.name, t.id
      LIMIT $3 OFFSET $4`,
     [userId, search ? `%${search}%` : null, perPage, (page - 1) * perPage]
@@ -19,7 +22,7 @@ const listTemplates = async (userId, { page, perPage, search }) => {
 }
 
 const findTemplate = async (userId, templateId) => {
-  const templateResult = await query(`SELECT ${TEMPLATE_COLUMNS} FROM message_templates t WHERE t.user_id = $1 AND t.id = $2`, [userId, templateId])
+  const templateResult = await query(`SELECT ${TEMPLATE_DETAIL_COLUMNS} FROM message_templates t WHERE t.user_id = $1 AND t.id = $2`, [userId, templateId])
   const template = templateResult.rows[0]
   if (!template) return null
   const files = await query(
@@ -29,7 +32,7 @@ const findTemplate = async (userId, templateId) => {
      ORDER BY f.position`,
     [templateId]
   )
-  return { ...template, files: files.rows }
+  return { ...template, variations: Array.isArray(template.variations) ? template.variations : [], files: files.rows }
 }
 
 const countOwnedFiles = async (client, userId, fileIds) => {
@@ -41,17 +44,18 @@ const countOwnedFiles = async (client, userId, fileIds) => {
  * Cria (templateId null) ou substitui um modelo com seus anexos na ordem dada.
  * @returns {{ template?: object, error?: 'not_found' | 'foreign_files' }}
  */
-const saveTemplate = (userId, { templateId, name, text, audioAsVoice, fileIds }) => withTransaction(async (client) => {
+const saveTemplate = (userId, { templateId, name, text, variations, audioAsVoice, fileIds }) => withTransaction(async (client) => {
   if (await countOwnedFiles(client, userId, fileIds) !== fileIds.length) return { error: 'foreign_files' }
+  const variationJson = JSON.stringify(variations)
   const saved = templateId
     ? await client.query(
-      `UPDATE message_templates SET name = $3, text = $4, audio_as_voice = $5, updated_at = CURRENT_TIMESTAMP
+      `UPDATE message_templates SET name = $3, text = $4, audio_as_voice = $5, text_variations = $6::jsonb, updated_at = CURRENT_TIMESTAMP
        WHERE user_id = $1 AND id = $2 RETURNING id, name`,
-      [userId, templateId, name, text, audioAsVoice]
+      [userId, templateId, name, text, audioAsVoice, variationJson]
     )
     : await client.query(
-      'INSERT INTO message_templates (user_id, name, text, audio_as_voice) VALUES ($1, $2, $3, $4) RETURNING id, name',
-      [userId, name, text, audioAsVoice]
+      'INSERT INTO message_templates (user_id, name, text, audio_as_voice, text_variations) VALUES ($1, $2, $3, $4, $5::jsonb) RETURNING id, name',
+      [userId, name, text, audioAsVoice, variationJson]
     )
   const template = saved.rows[0]
   if (!template) return { error: 'not_found' }
@@ -61,7 +65,7 @@ const saveTemplate = (userId, { templateId, name, text, audioAsVoice, fileIds })
      SELECT $1, ordinality - 1, file_id FROM unnest($2::bigint[]) WITH ORDINALITY AS f(file_id, ordinality)`,
     [template.id, fileIds]
   )
-  return { template: { ...template, attachmentCount: fileIds.length } }
+  return { template: { ...template, attachmentCount: fileIds.length, variationCount: variations.length } }
 })
 
 const deleteTemplate = async (userId, templateId) => {

@@ -96,4 +96,29 @@ const isSessionOwnedBy = async (sessionId, userId) => {
   return result.rows.length > 0
 }
 
-module.exports = { saveMessage, listChats, listMessages, isSessionOwnedBy }
+// Já respondeu nesta instância → contato “quente” (campanha direta, sem saudação)
+const hasInboundFromPhone = async (sessionId, phone) => {
+  const digits = String(phone || '').replace(/\D/g, '')
+  if (!digits) return false
+  const result = await query(
+    `SELECT 1 FROM whatsapp_messages
+     WHERE session_id = $1 AND from_me = false
+       AND (
+         chat_id = $2 OR chat_id = $3
+         OR split_part(chat_id, '@', 1) = $4
+         OR split_part(chat_id, '@', 1) LIKE '%' || $4
+       )
+     LIMIT 1`,
+    [sessionId, `${digits}@c.us`, `${digits}@lid`, digits]
+  )
+  return result.rows.length > 0
+}
+
+const phoneFromChatId = (chatId) => {
+  if (typeof chatId !== 'string' || !chatId.includes('@')) return null
+  const local = chatId.split('@')[0]
+  const digits = local.replace(/\D/g, '')
+  return digits || null
+}
+
+module.exports = { saveMessage, listChats, listMessages, isSessionOwnedBy, hasInboundFromPhone, phoneFromChatId }

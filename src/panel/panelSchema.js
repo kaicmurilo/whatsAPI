@@ -131,10 +131,21 @@ const ensureBroadcastTables = async () => {
   await query('CREATE INDEX IF NOT EXISTS idx_broadcast_recipients_key ON broadcast_run_recipients(message_key) WHERE message_key IS NOT NULL')
   // Vínculo tardio do ack: destinatários enviados ainda sem id, por telefone
   await query("CREATE INDEX IF NOT EXISTS idx_broadcast_recipients_unlinked ON broadcast_run_recipients(phone, sent_at DESC) WHERE message_id IS NULL AND status = 'sent'")
+  // Instâncias do rodízio. session_id continua sendo a primeira (relatório e eventos).
+  await query('ALTER TABLE broadcast_runs ADD COLUMN IF NOT EXISTS session_ids TEXT[]')
+  await query(`UPDATE broadcast_runs SET session_ids = ARRAY[session_id] WHERE session_ids IS NULL OR session_ids = '{}'`)
+  await query(`ALTER TABLE broadcast_runs ALTER COLUMN session_ids SET DEFAULT ARRAY[]::TEXT[]`)
+  await query('ALTER TABLE broadcast_runs ALTER COLUMN session_ids SET NOT NULL')
+  // Saudação a frios: espera resposta (ou 24h) antes da campanha
+  await query('ALTER TABLE broadcast_run_recipients ADD COLUMN IF NOT EXISTS greeting_sent_at TIMESTAMPTZ')
+  await query('ALTER TABLE broadcast_run_recipients ADD COLUMN IF NOT EXISTS greeting_session_id VARCHAR(255)')
+  await query(`CREATE INDEX IF NOT EXISTS idx_broadcast_recipients_awaiting
+    ON broadcast_run_recipients(greeting_sent_at) WHERE status = 'awaiting_reply'`)
 }
 
 // Modelos de mensagem: texto + anexos da biblioteca, reutilizados na transmissão.
-// Arquivo em uso não pode ser apagado (RESTRICT) — evita modelo quebrado em silêncio.
+// Arquivo em uso não pode ser apagado — evita modelo quebrado em silêncio. A checagem é adiada para o fim da
+// transação: excluir o usuário apaga arquivos e modelos em cascata, e RESTRICT barraria antes do modelo sair.
 const ensureTemplateTables = async () => {
   await query(`
     CREATE TABLE IF NOT EXISTS message_templates (
@@ -152,11 +163,23 @@ const ensureTemplateTables = async () => {
     CREATE TABLE IF NOT EXISTS message_template_files (
       template_id BIGINT NOT NULL REFERENCES message_templates(id) ON DELETE CASCADE,
       position INTEGER NOT NULL,
-      file_id BIGINT NOT NULL REFERENCES panel_files(id) ON DELETE RESTRICT,
+      file_id BIGINT NOT NULL REFERENCES panel_files(id) ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED,
       PRIMARY KEY (template_id, position)
     )
   `)
+  // Bancos criados antes (RESTRICT): troca uma vez
+  await query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'message_template_files_file_id_fkey' AND NOT condeferrable) THEN
+        ALTER TABLE message_template_files DROP CONSTRAINT message_template_files_file_id_fkey,
+          ADD CONSTRAINT message_template_files_file_id_fkey FOREIGN KEY (file_id) REFERENCES panel_files(id)
+          ON DELETE NO ACTION DEFERRABLE INITIALLY DEFERRED;
+      END IF;
+    END $$
+  `)
   await query('CREATE INDEX IF NOT EXISTS idx_template_files_file ON message_template_files(file_id)')
+  // Versões alternativas do texto. No disparo, cada contato recebe uma (texto principal + estas), em rodízio.
+  await query(`ALTER TABLE message_templates ADD COLUMN IF NOT EXISTS text_variations JSONB NOT NULL DEFAULT '[]'::jsonb`)
   // Disparo guarda cópia das partes: editar/excluir o modelo depois não muda histórico nem reprocessamento
   await query('ALTER TABLE broadcast_runs ADD COLUMN IF NOT EXISTS template_id BIGINT REFERENCES message_templates(id) ON DELETE SET NULL')
   await query('ALTER TABLE broadcast_runs ADD COLUMN IF NOT EXISTS template_name VARCHAR(100)')

@@ -29,3 +29,9 @@ panel_files
 /tests
 # Estado local do editor Cursor (não versionar)
 .cursor/hooks/state/
+
+# Grafo local do graphify (gerado, não versionar)
+graphify-out/
+
+# Instruções locais de agente (não versionar)
+AGENTS.md

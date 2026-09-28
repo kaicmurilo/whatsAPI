@@ -6,6 +6,7 @@ const percentOf = (value: number, total: number): string => (total > 0 ? `${Math
 export function ReportSummaryCards({ summary }: ReportSummaryCardsProps) {
   const metrics = [
     { key: 'sent', label: 'Enviados', value: summary.sent, tone: 'ink' },
+    { key: 'awaiting', label: 'Aguardando', value: summary.awaiting, tone: 'pending' },
     { key: 'delivered', label: 'Entregues', value: summary.delivered, tone: 'live' },
     { key: 'read', label: 'Lidos', value: summary.read, tone: 'live' },
     { key: 'played', label: 'Reproduzidos', value: summary.played, tone: 'live' },

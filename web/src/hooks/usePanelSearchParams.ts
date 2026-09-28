@@ -13,7 +13,7 @@ const PARAM = {
   reportSituation: 'repsit',
 } as const
 
-const REPORT_SITUATIONS: ReportSituation[] = ['all', 'pending', 'sent', 'delivered', 'read', 'failed']
+const REPORT_SITUATIONS: ReportSituation[] = ['all', 'pending', 'awaiting_reply', 'sent', 'delivered', 'read', 'failed']
 
 // Cada tabela paginada tem página e busca próprias na URL
 const TABLE_PARAMS = {

@@ -52,7 +52,11 @@ const attachSessionRecorder = (client, sessionId) => {
       .then(() => reconcileRecentRuns(sessionId, client))
   })
   client.on('auth_failure', () => setSessionStatus(sessionId, 'auth_failure'))
-  client.on('disconnected', () => setSessionStatus(sessionId, 'disconnected'))
+  // Motivo vem do WhatsApp (ex.: LOGOUT = aparelho desvinculado/banido, CONFLICT = aberto em outro lugar)
+  client.on('disconnected', (reason) => {
+    console.warn(`[session] desconectada sessão=${sessionId} motivo=${reason}`)
+    setSessionStatus(sessionId, 'disconnected')
+  })
   // message_create cobre recebidas e enviadas (inclusive pelo celular)
   client.on('message_create', (message) => recordMessage(sessionId, message, resolveCanonicalChatId))
   // Tiques de entrega/leitura das transmissões (relatório)

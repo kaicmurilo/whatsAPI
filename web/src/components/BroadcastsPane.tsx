@@ -40,6 +40,7 @@ export function BroadcastsPane({
       ) : null}
 
       <BroadcastRunsSection
+        sessions={sessions}
         page={runs.page}
         openReportId={report.runId}
         onPageChange={(page) => onTablePage('runs', page)}

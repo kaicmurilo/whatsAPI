@@ -18,7 +18,8 @@ const getTemplateKey = (template: MessageTemplateSummary): string => template.id
 const PREVIEW_LENGTH = 70
 
 const describeTemplate = (template: MessageTemplateSummary): string => {
-  const text = template.text ? `“${template.text.slice(0, PREVIEW_LENGTH)}${template.text.length > PREVIEW_LENGTH ? '…' : ''}”` : 'Sem texto'
+  const preview = template.text ? `“${template.text.slice(0, PREVIEW_LENGTH)}${template.text.length > PREVIEW_LENGTH ? '…' : ''}”` : 'Sem texto'
+  const text = template.variationCount > 0 ? `${preview} · ${template.variationCount} variações` : preview
   return template.attachmentCount > 0 ? `${text} · 📎 ${template.attachmentCount}` : text
 }
 
@@ -53,6 +54,7 @@ export function TemplatesPane({ page, search, onPageChange, onSearchChange }: Ta
         <p className="library__note">
           Monte uma vez (texto + áudio, vídeo, imagem ou documento) e use em qualquer lista de transmissão.
           O texto vai como legenda do primeiro vídeo, imagem ou documento; áudios chegam como mensagens próprias.
+          Variações entram no rodízio: cada contato da lista recebe uma versão.
         </p>
       </header>
 
@@ -62,7 +64,7 @@ export function TemplatesPane({ page, search, onPageChange, onSearchChange }: Ta
       </div>
 
       {editorTarget === 'new' ? (
-        <TemplateEditor templateId={null} initialName="" initialText="" initialAudioAsVoice initialFiles={[]} onDone={closeEditor} />
+        <TemplateEditor templateId={null} initialName="" initialText="" initialVariations={[]} initialAudioAsVoice initialFiles={[]} onDone={closeEditor} />
       ) : null}
       {editorTarget !== null && editorTarget !== 'new' ? <TemplateEditorLoader key={editorTarget} templateId={editorTarget} onDone={closeEditor} /> : null}
 

@@ -8,9 +8,12 @@ const PHONE_SEPARATORS = /[/,;|]| ou /i
 const MAX_NAME_LENGTH = 100
 const FALLBACK_NAME = 'Sem nome'
 
-// "(67) 99999-9999" → "5567999999999"; null quando não dá para saber o número completo (ex.: sem DDD)
+// "(67) 99999-9999" → "5567999999999"; null quando não dá para saber o número completo (ex.: sem DDD).
+// "+" no começo significa que o DDI já está no número (exportação de contatos): não prefixa 55.
 const toInternationalPhone = (raw) => {
-  let digits = String(raw).replace(/\D/g, '')
+  const text = String(raw ?? '').trim()
+  if (text.startsWith('+')) return normalizePhone(text.replace(/\D/g, ''))
+  let digits = text.replace(/\D/g, '')
   if (digits.startsWith(TRUNK_PREFIX) && BR_NATIONAL_LENGTHS.includes(digits.length - 1)) digits = digits.slice(1)
   if (BR_NATIONAL_LENGTHS.includes(digits.length)) return normalizePhone(BRAZIL_COUNTRY_CODE + digits)
   if (digits.startsWith(BRAZIL_COUNTRY_CODE) && BR_INTERNATIONAL_LENGTHS.includes(digits.length)) return normalizePhone(digits)

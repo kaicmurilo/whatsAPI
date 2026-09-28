@@ -7,21 +7,45 @@ import { TemplateAttachments } from './TemplateAttachments'
 
 const MAX_TEXT_LENGTH = 4096
 
-export function TemplateEditor({ templateId, initialName, initialText, initialAudioAsVoice, initialFiles, onDone }: TemplateEditorProps) {
+interface VariationDraft {
+  id: string
+  text: string
+}
+
+const draftVariation = (text: string): VariationDraft => ({ id: crypto.randomUUID(), text })
+
+export function TemplateEditor({ templateId, initialName, initialText, initialVariations, initialAudioAsVoice, initialFiles, onDone }: TemplateEditorProps) {
   const [name, setName] = useState(initialName)
   const [text, setText] = useState(initialText)
+  const [variations, setVariations] = useState<VariationDraft[]>(() => initialVariations.map(draftVariation))
   const [audioAsVoice, setAudioAsVoice] = useState(initialAudioAsVoice)
   const [files, setFiles] = useState<TemplateFile[]>(initialFiles)
   const saveTemplate = useSaveTemplate()
-  const steps = describeDeliveryOrder(text, files, audioAsVoice)
+  const filledVariations = variations.map((item) => item.text.trim()).filter((item) => item.length > 0)
+  const previewText = text.trim() || filledVariations[0] || ''
+  const versionCount = (text.trim() ? 1 : 0) + filledVariations.length
+  const steps = describeDeliveryOrder(previewText, files, audioAsVoice)
   const hasAudio = files.some((file) => file.mimetype.startsWith('audio/'))
   const canSave = name.trim().length > 0 && steps.length > 0 && !saveTemplate.isPending
+
+  const updateVariation = (id: string, value: string) => {
+    setVariations((current) => current.map((item) => (item.id === id ? { ...item, text: value } : item)))
+  }
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!canSave) return
     saveTemplate.mutate(
-      { templateId, input: { name: name.trim(), text: text.trim(), audioAsVoice, fileIds: files.map((file) => file.id) } },
+      {
+        templateId,
+        input: {
+          name: name.trim(),
+          text: text.trim(),
+          variations: filledVariations,
+          audioAsVoice,
+          fileIds: files.map((file) => file.id),
+        },
+      },
       { onSuccess: onDone },
     )
   }
@@ -42,6 +66,34 @@ export function TemplateEditor({ templateId, initialName, initialText, initialAu
         <textarea className="field__input broadcast-send__text" value={text} onChange={(event) => setText(event.target.value)} maxLength={MAX_TEXT_LENGTH} rows={4} />
       </label>
 
+      <div className="template-variations">
+        <span className="field__label">Variações do texto</span>
+        <p className="template-variations__note">
+          Cada contato da lista recebe uma versão, em rodízio: o texto acima e estas variações, nesta ordem.
+        </p>
+        {variations.map((variation, index) => (
+          <div key={variation.id} className="template-variations__item">
+            <div className="template-variations__head">
+              <label className="field__label" htmlFor={`variation-${variation.id}`}>Variação {index + 1}</label>
+              <button type="button" className="template-variations__remove" onClick={() => setVariations((current) => current.filter((item) => item.id !== variation.id))}>
+                Remover
+              </button>
+            </div>
+            <textarea
+              id={`variation-${variation.id}`}
+              className="field__input broadcast-send__text"
+              value={variation.text}
+              onChange={(event) => updateVariation(variation.id, event.target.value)}
+              maxLength={MAX_TEXT_LENGTH}
+              rows={3}
+            />
+          </div>
+        ))}
+        <button type="button" className="template-variations__add" onClick={() => setVariations((current) => [...current, draftVariation('')])}>
+          Adicionar variação
+        </button>
+      </div>
+
       <TemplateAttachments files={files} onChange={setFiles} />
 
       {hasAudio ? (
@@ -55,7 +107,8 @@ export function TemplateEditor({ templateId, initialName, initialText, initialAu
         <span className="field__label">Cada contato recebe</span>
         {steps.length > 0 ? (
           <ol>{steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol>
-        ) : <p>Escreva um texto ou adicione ao menos um anexo.</p>}
+        ) : <p>Escreva um texto, uma variação ou adicione ao menos um anexo.</p>}
+        {versionCount > 1 ? <p>{versionCount} versões de texto, uma por contato.</p> : null}
       </div>
 
       {saveTemplate.isError ? <p className="list-editor__error" role="alert">{saveTemplate.error.message}</p> : null}
@@ -76,6 +129,7 @@ export function TemplateEditorLoader({ templateId, onDone }: TemplateEditorLoade
       templateId={templateId}
       initialName={template.data.name}
       initialText={template.data.text ?? ''}
+      initialVariations={template.data.variations}
       initialAudioAsVoice={template.data.audioAsVoice}
       initialFiles={template.data.files}
       onDone={onDone}

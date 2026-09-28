@@ -7,19 +7,26 @@ import type { BroadcastInput, BroadcastPacing, PanelFile, WhatsAppSession } from
 import type { BroadcastSendFormProps } from '../types/components'
 import { ConfirmButton } from './ConfirmButton'
 import { FilePicker } from './FilePicker'
+import { InstancePicker } from './InstancePicker'
 import { PacingFields } from './PacingFields'
 
 const MAX_TEXT_LENGTH = 4096
 
-// Começa na instância aberta no painel; senão, na primeira conectada
-const pickInitialSessionId = (sessions: WhatsAppSession[], defaultSessionId: string | null): string =>
-  defaultSessionId ?? sessions.find((session) => session.status === 'connected')?.sessionId ?? ''
+// Começa na instância aberta no painel, se estiver conectada; senão, na primeira conectada
+const pickInitialSessionIds = (sessions: WhatsAppSession[], defaultSessionId: string | null): string[] => {
+  const preferred = sessions.find((session) => session.sessionId === defaultSessionId)
+  if (preferred?.status === 'connected') return [preferred.sessionId]
+  const connected = sessions.find((session) => session.status === 'connected')
+  return connected ? [connected.sessionId] : []
+}
 
 type ContentMode = 'template' | 'custom'
 type WhenMode = 'now' | 'schedule'
 
 interface BlockerInput {
-  session: WhatsAppSession | null
+  sessionIds: string[]
+  sessions: WhatsAppSession[]
+  requireConnected: boolean
   hasList: boolean
   hasContent: boolean
   pacing: BroadcastPacing
@@ -27,10 +34,11 @@ interface BlockerInput {
   scheduleValue: string
 }
 
-function describeBlocker({ session, hasList, hasContent, pacing, whenMode, scheduleValue }: BlockerInput): string | null {
-  if (!session) return 'Escolha a instância que vai enviar.'
-  // Programado não exige conexão agora: o agendador espera a instância estar online no horário
-  if (whenMode === 'now' && session.status !== 'connected') return 'A instância selecionada não está conectada.'
+function describeBlocker({ sessionIds, sessions, requireConnected, hasList, hasContent, pacing, whenMode, scheduleValue }: BlockerInput): string | null {
+  if (sessionIds.length === 0) return 'Escolha ao menos uma instância.'
+  if (requireConnected && sessionIds.some((sessionId) => sessions.find((session) => session.sessionId === sessionId)?.status !== 'connected')) {
+    return 'Todas as instâncias selecionadas precisam estar conectadas.'
+  }
   if (!hasList) return 'Escolha a lista.'
   if (!hasContent) return 'Escolha uma mensagem salva ou escreva a mensagem.'
   if (!isValidPacing(pacing)) return 'Intervalo inválido: use segundos inteiros de 3 a 600, mínimo ≤ máximo.'
@@ -45,9 +53,8 @@ function submitLabel(memberCount: number | null, scheduleValue: string | null): 
 }
 
 export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendFormProps) {
-  // null = ainda não escolheu; segue a instância aberta (ou a primeira conectada) quando ela chega
-  const [chosenSessionId, setChosenSessionId] = useState<string | null>(null)
-  const sessionId = chosenSessionId ?? pickInitialSessionId(sessions, defaultSessionId)
+  const [chosenSessionIds, setChosenSessionIds] = useState<string[] | null>(null)
+  const sessionIds = chosenSessionIds ?? pickInitialSessionIds(sessions, defaultSessionId)
   const [listId, setListId] = useState('')
   const [text, setText] = useState('')
   const [file, setFile] = useState<PanelFile | null>(null)
@@ -63,21 +70,32 @@ export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendF
   const lists = useAllBroadcastLists()
   const startBroadcast = useStartBroadcast()
 
-  const session = sessions.find((candidate) => candidate.sessionId === sessionId) ?? null
   const listOptions = lists.data?.items ?? []
   const chosenList = listOptions.find((list) => list.id === listId) ?? null
   const hasContent = contentMode === 'template' ? chosenTemplate !== null : text.trim().length > 0 || file !== null
-  const blocker = describeBlocker({ session, hasList: chosenList !== null, hasContent, pacing, whenMode, scheduleValue })
+  const sendingIds = isScheduling
+    ? sessionIds
+    : sessionIds.filter((sessionId) => sessions.find((session) => session.sessionId === sessionId)?.status === 'connected')
+  const blocker = describeBlocker({
+    sessionIds: sendingIds,
+    sessions,
+    requireConnected: !isScheduling,
+    hasList: chosenList !== null,
+    hasContent,
+    pacing,
+    whenMode,
+    scheduleValue,
+  })
   const estimate = chosenList && isValidPacing(pacing) ? `Tempo estimado: ~${estimateDurationMinutes(chosenList.memberCount, pacing)} min.` : ''
 
   const send = () => {
-    if (blocker || !session || !chosenList) return
+    if (blocker || sendingIds.length === 0 || !chosenList) return
     const scheduledAt = isScheduling ? localInputToIso(scheduleValue) ?? undefined : undefined
     const input: BroadcastInput = contentMode === 'template' && chosenTemplate
-      ? { listId: chosenList.id, pacing, scheduledAt, templateId: chosenTemplate.id }
-      : { listId: chosenList.id, pacing, scheduledAt, text: text.trim(), fileId: file?.id ?? null }
+      ? { listId: chosenList.id, pacing, scheduledAt, sessionIds: sendingIds, templateId: chosenTemplate.id }
+      : { listId: chosenList.id, pacing, scheduledAt, sessionIds: sendingIds, text: text.trim(), fileId: file?.id ?? null }
     startBroadcast.mutate(
-      { sessionId: session.sessionId, input },
+      { sessionId: sendingIds[0], input },
       {
         onSuccess: () => {
           setText('')
@@ -90,17 +108,13 @@ export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendF
   return (
     <section className="broadcast-send" aria-labelledby="broadcast-send-title">
       <h2 id="broadcast-send-title" className="broadcasts__section-title">Disparar</h2>
-      <label className="field">
-        <span className="field__label">Enviar pela instância</span>
-        <select className="field__input" value={sessionId} onChange={(event) => setChosenSessionId(event.target.value)}>
-          <option value="">Escolha…</option>
-          {sessions.map((candidate) => (
-            <option key={candidate.sessionId} value={candidate.sessionId} disabled={candidate.status !== 'connected'}>
-              {candidate.pushName ?? candidate.sessionId}{candidate.status === 'connected' ? '' : ' (desconectada)'}
-            </option>
-          ))}
-        </select>
-      </label>
+      <InstancePicker
+        sessions={sessions}
+        selectedIds={sendingIds}
+        onChange={setChosenSessionIds}
+        allowDisconnected={isScheduling}
+        isDisabled={startBroadcast.isPending}
+      />
 
       <label className="field">
         <span className="field__label">Lista</span>
@@ -173,13 +187,13 @@ export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendF
             onChange={(event) => setScheduleValue(event.target.value)}
           />
           <span className="broadcast-send__note">
-            Usa a lista e a mensagem como estiverem nesse horário. O painel (Docker) precisa estar rodando e a instância conectada.
+            Usa a lista e a mensagem como estiverem nesse horário. O painel (Docker) precisa estar rodando e todas as instâncias selecionadas conectadas.
           </span>
         </label>
       ) : null}
 
       <p className="broadcast-send__note">
-        Um contato por vez, esperando um tempo sorteado na faixa acima entre cada envio. Dá para abortar no histórico. {estimate}
+        Um contato por vez, com intervalo sorteado. Com várias instâncias, o envio alterna entre elas. Dá para abortar no histórico. {estimate}
       </p>
       {blocker ? <p className="broadcast-send__blocker">{blocker}</p> : null}
       {startBroadcast.isError ? <p className="broadcast-send__error" role="alert">{startBroadcast.error.message}</p> : null}

@@ -88,6 +88,27 @@ const detachRecoveryListeners = (client) => {
 
 const SHUTDOWN_DESTROY_TIMEOUT_MS = 15000
 
+// Falha ao abrir costuma ser passageira (página do WhatsApp recarregou durante a injeção): tenta de novo com espera
+const INIT_RETRY_DELAYS_MS = [10000, 30000, 60000]
+const initRetryAttempts = new Map()
+
+const scheduleInitRetry = (sessionId) => {
+  const attempt = initRetryAttempts.get(sessionId) ?? 0
+  if (attempt >= INIT_RETRY_DELAYS_MS.length) {
+    initRetryAttempts.delete(sessionId)
+    console.error(`[session] desistindo de reabrir sessão=${sessionId} após ${attempt} tentativas; use Iniciar no painel`)
+    return
+  }
+  initRetryAttempts.set(sessionId, attempt + 1)
+  const delay = INIT_RETRY_DELAYS_MS[attempt]
+  console.warn(`[session] nova tentativa ${attempt + 1}/${INIT_RETRY_DELAYS_MS.length} em ${delay / 1000}s sessão=${sessionId}`)
+  setTimeout(() => {
+    // Sessão encerrada/excluída nesse meio tempo, ou já reaberta pelo usuário: não recria
+    if (sessions.has(sessionId) || !fs.existsSync(`${sessionFolderPath}/session-${sessionId}`)) return
+    setupSession(sessionId)
+  }, delay).unref()
+}
+
 // Client que não inicializou sai do Map: senão o painel fica em "iniciando" para sempre e /session/start dá 422
 const discardFailedClient = (sessionId, client, error) => {
   console.error(`[session] falha ao inicializar sessão=${sessionId}:`, error.message)
@@ -95,6 +116,7 @@ const discardFailedClient = (sessionId, client, error) => {
   sessions.delete(sessionId)
   detachRecoveryListeners(client)
   client.destroy().catch(() => {}) // navegador pode nem ter aberto
+  scheduleInitRetry(sessionId)
 }
 
 const destroyWithTimeout = (sessionId, client) => Promise.race([
@@ -165,6 +187,7 @@ const setupSession = (sessionId) => {
     const client = new Client(clientOptions)
 
     client.initialize().catch(err => discardFailedClient(sessionId, client, err))
+    client.once('ready', () => initRetryAttempts.delete(sessionId))
 
     initializeEvents(client, sessionId)
     attachSessionRecorder(client, sessionId)

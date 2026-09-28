@@ -1,7 +1,7 @@
 const { query, withTransaction } = require('../database')
 const { messageKeyFromId } = require('./messageMapper')
 
-const RUN_COLUMNS = `id, session_id AS "sessionId", list_id AS "listId", list_name AS "listName", text,
+const RUN_COLUMNS = `id, session_id AS "sessionId", session_ids AS "sessionIds", list_id AS "listId", list_name AS "listName", text,
   file_id AS "fileId", file_name AS "fileName", status, total, sent, failed, error,
   delay_min_seconds AS "delayMinSeconds", delay_max_seconds AS "delayMaxSeconds", random_order AS "randomOrder",
   template_id AS "templateId", template_name AS "templateName", parts, scheduled_at AS "scheduledAt", user_id AS "userId",
@@ -11,14 +11,15 @@ const MAX_ERROR_LENGTH = 255
 const truncateError = (error) => (error ? String(error).slice(0, MAX_ERROR_LENGTH) : null)
 
 const createRun = (userId, {
-  sessionId, listId, listName, text, fileId, fileName, recipients, pacing, templateId = null, templateName = null, parts = null
+  sessionId, sessionIds = [sessionId], listId, listName, text, fileId, fileName, recipients, pacing, templateId = null, templateName = null, parts = null
 }) => withTransaction(async (client) => {
+  const ids = sessionIds.length > 0 ? sessionIds : [sessionId]
   const runResult = await client.query(
-    `INSERT INTO broadcast_runs (user_id, session_id, list_id, list_name, text, file_id, file_name, total,
+    `INSERT INTO broadcast_runs (user_id, session_id, session_ids, list_id, list_name, text, file_id, file_name, total,
                                  delay_min_seconds, delay_max_seconds, random_order, template_id, template_name, parts)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)
+     VALUES ($1, $2, $3::text[], $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb)
      RETURNING ${RUN_COLUMNS}`,
-    [userId, sessionId, listId, listName, text, fileId, fileName, recipients.length,
+    [userId, ids[0], ids, listId, listName, text, fileId, fileName, recipients.length,
       pacing.minSeconds, pacing.maxSeconds, pacing.randomOrder, templateId, templateName, parts ? JSON.stringify(parts) : null]
   )
   const run = runResult.rows[0]
@@ -33,10 +34,24 @@ const createRun = (userId, {
 
 /**
  * Marca o destinatário e atualiza o contador do disparo na mesma instrução; devolve o progresso.
+ * awaiting_reply: saudação enviada — não incrementa sent/failed.
  * `isSent` vai como parâmetro próprio: reusar o $ do status em comparação fazia o Postgres
  * deduzir tipos diferentes (varchar × text) e abortar o disparo.
  */
-const recordRecipientResult = async (runId, position, { status, error = null, messageId = null }) => {
+const recordRecipientResult = async (runId, position, {
+  status, error = null, messageId = null, greetingSessionId = null
+}) => {
+  if (status === 'awaiting_reply') {
+    await query(
+      `UPDATE broadcast_run_recipients
+       SET status = 'awaiting_reply', error = NULL, greeting_sent_at = CURRENT_TIMESTAMP,
+           greeting_session_id = $3, message_id = $4, message_key = $5, sent_at = NULL
+       WHERE run_id = $1 AND position = $2`,
+      [runId, position, greetingSessionId, messageId, messageKeyFromId(messageId)]
+    )
+    const result = await query(`SELECT ${RUN_COLUMNS} FROM broadcast_runs WHERE id = $1`, [runId])
+    return result.rows[0]
+  }
   const isSent = status === 'sent'
   const counter = isSent ? 'sent' : 'failed'
   const result = await query(
@@ -53,12 +68,41 @@ const recordRecipientResult = async (runId, position, { status, error = null, me
   return result.rows[0]
 }
 
+// done com awaiting_reply legados → awaiting. Novos disparos não criam mais saudação.
 const finishRun = async (runId, status, error = null) => {
+  if (status === 'done') {
+    const awaiting = await query(
+      `SELECT 1 FROM broadcast_run_recipients WHERE run_id = $1 AND status = 'awaiting_reply' LIMIT 1`,
+      [runId]
+    )
+    if (awaiting.rows.length > 0) {
+      const result = await query(
+        `UPDATE broadcast_runs SET status = 'awaiting', error = NULL, finished_at = NULL WHERE id = $1 RETURNING ${RUN_COLUMNS}`,
+        [runId]
+      )
+      return result.rows[0]
+    }
+  }
   const result = await query(
     `UPDATE broadcast_runs SET status = $2, error = $3, finished_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING ${RUN_COLUMNS}`,
     [runId, status, truncateError(error)]
   )
   return result.rows[0]
+}
+
+// Último follow-up: se não restar awaiting_reply e o run está awaiting, fecha como done
+const tryCloseAwaitingRun = async (runId) => {
+  const result = await query(
+    `UPDATE broadcast_runs
+     SET status = 'done', error = NULL, finished_at = CURRENT_TIMESTAMP
+     WHERE id = $1 AND status = 'awaiting'
+       AND NOT EXISTS (
+         SELECT 1 FROM broadcast_run_recipients r WHERE r.run_id = $1 AND r.status = 'awaiting_reply'
+       )
+     RETURNING ${RUN_COLUMNS}`,
+    [runId]
+  )
+  return result.rows[0] || null
 }
 
 const listRuns = async (userId, { page, perPage }) => {
@@ -79,7 +123,8 @@ const findRun = async (userId, runId) => {
   const run = runResult.rows[0]
   if (!run) return null
   const recipients = await query(
-    `SELECT position, name, phone, status, error, sent_at AS "sentAt"
+    `SELECT position, name, phone, status, error, sent_at AS "sentAt",
+            greeting_sent_at AS "greetingSentAt", greeting_session_id AS "greetingSessionId"
      FROM broadcast_run_recipients WHERE run_id = $1 ORDER BY position`,
     [runId]
   )
@@ -95,7 +140,7 @@ const reopenRunForRetry = (runId) => withTransaction(async (client) => {
   const runResult = await client.query(
     `UPDATE broadcast_runs
      SET status = 'running', failed = 0, error = NULL, finished_at = NULL
-     WHERE id = $1 AND status <> 'running'
+     WHERE id = $1 AND status NOT IN ('running', 'scheduled')
      RETURNING ${RUN_COLUMNS}`,
     [runId]
   )
@@ -103,13 +148,37 @@ const reopenRunForRetry = (runId) => withTransaction(async (client) => {
   if (!run) return null
   const recipients = await client.query(
     `UPDATE broadcast_run_recipients
-     SET status = 'pending', error = NULL, sent_at = NULL, message_id = NULL, message_key = NULL, delivered_at = NULL, read_at = NULL, played_at = NULL
+     SET status = 'pending', error = NULL, sent_at = NULL, message_id = NULL, message_key = NULL,
+         delivered_at = NULL, read_at = NULL, played_at = NULL,
+         greeting_sent_at = NULL, greeting_session_id = NULL
      WHERE run_id = $1 AND status <> 'sent'
      RETURNING position, name, phone`,
     [runId]
   )
   return { run, recipients: recipients.rows.sort((a, b) => a.position - b.position) }
 })
+
+// Troca o rodízio. session_id acompanha a primeira da lista (relatório e eventos).
+const updateRunSessions = async (runId, sessionIds) => {
+  const result = await query(
+    `UPDATE broadcast_runs SET session_ids = $2::text[], session_id = $3
+     WHERE id = $1
+     RETURNING ${RUN_COLUMNS}`,
+    [runId, sessionIds, sessionIds[0]]
+  )
+  return result.rows[0] || null
+}
+
+// Novo ritmo vale para o restante do disparo (e para Retomar/Reprocessar depois)
+const updateRunPacing = async (runId, { minSeconds, maxSeconds, randomOrder }) => {
+  const result = await query(
+    `UPDATE broadcast_runs SET delay_min_seconds = $2, delay_max_seconds = $3, random_order = $4
+     WHERE id = $1
+     RETURNING ${RUN_COLUMNS}`,
+    [runId, minSeconds, maxSeconds, randomOrder]
+  )
+  return result.rows[0] || null
+}
 
 // Boot: disparos que estavam rodando quando o processo caiu não são retomados (evita mensagem duplicada)
 const interruptRunningRuns = async () => {
@@ -125,13 +194,14 @@ const interruptRunningRuns = async () => {
  * Disparo programado: guarda só o que foi escolhido (lista, modelo ou texto/arquivo, ritmo, horário).
  * Destinatários e partes são montados no horário, com a lista e a mensagem como estiverem.
  */
-const createScheduledRun = async (userId, { sessionId, listId, listName, templateId, templateName, text, fileId, fileName, pacing, scheduledAt }) => {
+const createScheduledRun = async (userId, { sessionId, sessionIds = [sessionId], listId, listName, templateId, templateName, text, fileId, fileName, pacing, scheduledAt }) => {
+  const ids = sessionIds.length > 0 ? sessionIds : [sessionId]
   const result = await query(
-    `INSERT INTO broadcast_runs (user_id, session_id, list_id, list_name, template_id, template_name, text, file_id, file_name,
+    `INSERT INTO broadcast_runs (user_id, session_id, session_ids, list_id, list_name, template_id, template_name, text, file_id, file_name,
                                  total, status, scheduled_at, delay_min_seconds, delay_max_seconds, random_order)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 'scheduled', $10, $11, $12, $13)
+     VALUES ($1, $2, $3::text[], $4, $5, $6, $7, $8, $9, $10, 0, 'scheduled', $11, $12, $13, $14)
      RETURNING ${RUN_COLUMNS}`,
-    [userId, sessionId, listId, listName, templateId, templateName, text, fileId, fileName, scheduledAt,
+    [userId, ids[0], ids, listId, listName, templateId, templateName, text, fileId, fileName, scheduledAt,
       pacing.minSeconds, pacing.maxSeconds, pacing.randomOrder]
   )
   return result.rows[0]
@@ -182,7 +252,105 @@ const cancelScheduledRun = async (runId) => {
   return result.rows[0] || null
 }
 
+// Condicional: não fecha um pausado que acabou de ser retomado (corrida Retomar × Cancelar)
+const cancelPausedRun = async (runId, reason) => {
+  const result = await query(
+    `UPDATE broadcast_runs SET status = 'canceled', error = $2, finished_at = CURRENT_TIMESTAMP
+     WHERE id = $1 AND status = 'paused'
+     RETURNING ${RUN_COLUMNS}`,
+    [runId, truncateError(reason)]
+  )
+  return result.rows[0] || null
+}
+
+// Run em awaiting: marca awaiting_reply restantes e encerra
+const cancelAwaitingRun = async (runId, reason) => withTransaction(async (client) => {
+  await client.query(
+    `UPDATE broadcast_run_recipients
+     SET status = 'failed', error = $2
+     WHERE run_id = $1 AND status = 'awaiting_reply'`,
+    [runId, truncateError(reason)]
+  )
+  const failedCount = await client.query(
+    `SELECT COUNT(*)::int AS n FROM broadcast_run_recipients WHERE run_id = $1 AND status = 'failed'`,
+    [runId]
+  )
+  const result = await client.query(
+    `UPDATE broadcast_runs
+     SET status = 'canceled', error = $2, failed = $3, finished_at = CURRENT_TIMESTAMP
+     WHERE id = $1 AND status = 'awaiting'
+     RETURNING ${RUN_COLUMNS}`,
+    [runId, truncateError(reason), failedCount.rows[0].n]
+  )
+  return result.rows[0] || null
+})
+
+// Reserva atômica para follow-up (resposta ou timeout 24h)
+const claimAwaitingRecipient = async (runId, position) => {
+  const result = await query(
+    `UPDATE broadcast_run_recipients
+     SET status = 'pending'
+     WHERE run_id = $1 AND position = $2 AND status = 'awaiting_reply'
+     RETURNING position, name, phone, greeting_session_id AS "greetingSessionId",
+               greeting_sent_at AS "greetingSentAt"`,
+    [runId, position]
+  )
+  return result.rows[0] || null
+}
+
+const claimAwaitingRecipientByPhone = async (sessionId, phone) => {
+  const digits = String(phone || '').replace(/\D/g, '')
+  if (!digits) return null
+  const result = await query(
+    `WITH picked AS (
+       SELECT r2.run_id, r2.position
+       FROM broadcast_run_recipients r2
+       JOIN broadcast_runs run ON run.id = r2.run_id
+       WHERE r2.status = 'awaiting_reply'
+         AND r2.greeting_session_id = $1
+         AND run.status IN ('awaiting', 'running', 'paused')
+         AND (r2.phone = $2 OR r2.phone LIKE '%' || $2 OR $2 LIKE '%' || r2.phone)
+       ORDER BY r2.greeting_sent_at, r2.run_id, r2.position
+       LIMIT 1
+     )
+     UPDATE broadcast_run_recipients r
+     SET status = 'pending'
+     FROM picked
+     WHERE r.run_id = picked.run_id AND r.position = picked.position AND r.status = 'awaiting_reply'
+     RETURNING r.run_id AS "runId", r.position, r.name, r.phone,
+               r.greeting_session_id AS "greetingSessionId"`,
+    [sessionId, digits]
+  )
+  if (!result.rows[0]) return null
+  const run = await query(
+    `SELECT user_id AS "userId", session_id AS "sessionId" FROM broadcast_runs WHERE id = $1`,
+    [result.rows[0].runId]
+  )
+  return { ...result.rows[0], userId: run.rows[0]?.userId, sessionId: run.rows[0]?.sessionId }
+}
+
+const listDueAwaitingRecipients = async (before) => {
+  const result = await query(
+    `SELECT r.run_id AS "runId", r.position, r.name, r.phone,
+            r.greeting_session_id AS "greetingSessionId", run.user_id AS "userId",
+            run.session_id AS "sessionId"
+     FROM broadcast_run_recipients r
+     JOIN broadcast_runs run ON run.id = r.run_id
+     WHERE r.status = 'awaiting_reply'
+       AND r.greeting_sent_at <= $1
+       AND run.status IN ('awaiting', 'running', 'paused')
+     ORDER BY r.greeting_sent_at, r.run_id, r.position
+     LIMIT 50`,
+    [before]
+  )
+  return result.rows
+}
+
 module.exports = {
+  cancelPausedRun,
+  cancelAwaitingRun,
+  updateRunPacing,
+  updateRunSessions,
   createScheduledRun,
   listDueScheduledRuns,
   claimScheduledRun,
@@ -191,6 +359,10 @@ module.exports = {
   createRun,
   recordRecipientResult,
   finishRun,
+  tryCloseAwaitingRun,
+  claimAwaitingRecipient,
+  claimAwaitingRecipientByPhone,
+  listDueAwaitingRecipients,
   listRuns,
   findRun,
   reopenRunForRetry,

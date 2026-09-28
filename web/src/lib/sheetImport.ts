@@ -26,12 +26,40 @@ function bestColumn(rows: Cell[][], matches: (cell: Cell) => boolean, exclude: n
   return best
 }
 
+const headerName = (cell: Cell): string => cellText(cell).toLowerCase().replace(/\s+/g, '_')
+
+const columnIndex = (header: string[], name: string): number => header.indexOf(name)
+
+// Exportação de contatos (country_code, phone_number, saved_name, public_name, …).
+// O telefone já inclui o DDI; o "+" avisa o servidor para não tratar como número nacional do Brasil.
+// Nome: o salvo na agenda, e o nome público do WhatsApp quando o salvo está vazio.
+function extractContactExport(sheet: Cell[][]): ImportRow[] | null {
+  if (sheet.length === 0) return null
+  const header = sheet[0].map(headerName)
+  const phoneIndex = columnIndex(header, 'phone_number')
+  if (phoneIndex === -1 || columnIndex(header, 'country_code') === -1) return null
+  const savedIndex = columnIndex(header, 'saved_name')
+  const publicIndex = columnIndex(header, 'public_name')
+  return sheet
+    .slice(1)
+    .filter((row) => row.some((cell) => cellText(cell) !== ''))
+    .map((row) => {
+      const saved = savedIndex === -1 ? '' : cellText(row[savedIndex])
+      const published = publicIndex === -1 ? '' : cellText(row[publicIndex])
+      const digits = cellText(row[phoneIndex]).replace(/\D/g, '')
+      return { name: saved || published, phoneText: digits ? `+${digits}` : '' }
+    })
+}
+
 /**
- * Planilha (linhas × células) → { nome, texto do telefone }. Detecta as colunas pelo conteúdo, então aceita
- * o padrão "Nome | Cidade | (DD) 9XXXX-XXXX" com ou sem cabeçalho e em outra ordem de colunas.
+ * Planilha (linhas × células) → { nome, texto do telefone }.
+ * Aceita a exportação de contatos (phone_number + country_code) e, no mais, detecta as colunas pelo conteúdo:
+ * "Nome | Cidade | (DD) 9XXXX-XXXX", com ou sem cabeçalho e em outra ordem.
  * A normalização do telefone (código do país, 2 números na célula) fica no servidor.
  */
 export function extractImportRows(sheet: Cell[][]): ImportRow[] {
+  const exported = extractContactExport(sheet)
+  if (exported) return exported
   const phoneColumn = bestColumn(sheet, looksLikePhone, null)
   if (phoneColumn === null) return []
   const nameColumn = bestColumn(sheet, looksLikeName, phoneColumn)

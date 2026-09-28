@@ -220,6 +220,7 @@ export interface ContactPickerProps {
 }
 
 export interface BroadcastRunsSectionProps {
+  sessions: WhatsAppSession[]
   page: number
   openReportId: string | null
   onPageChange: (page: number) => void
@@ -230,6 +231,23 @@ export interface BroadcastRunActionsProps {
   run: BroadcastRun
   isReportOpen: boolean
   onOpenReport: (runId: string) => void
+}
+
+export interface RunPacingEditorProps {
+  run: BroadcastRun
+}
+
+export interface InstancePickerProps {
+  sessions: WhatsAppSession[]
+  selectedIds: string[]
+  onChange: (sessionIds: string[]) => void
+  allowDisconnected: boolean
+  isDisabled?: boolean
+}
+
+export interface RunInstancesEditorProps {
+  run: BroadcastRun
+  sessions: WhatsAppSession[]
 }
 
 export interface PacingFieldsProps {
@@ -247,6 +265,7 @@ export interface TemplateEditorProps {
   templateId: string | null
   initialName: string
   initialText: string
+  initialVariations: string[]
   initialAudioAsVoice: boolean
   initialFiles: TemplateFile[]
   onDone: () => void

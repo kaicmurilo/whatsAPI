@@ -123,11 +123,13 @@ export interface BroadcastListInput {
   contactIds: string[]
 }
 
-export type BroadcastRunStatus = 'scheduled' | 'running' | 'done' | 'failed' | 'interrupted' | 'canceled'
+export type BroadcastRunStatus = 'scheduled' | 'running' | 'paused' | 'awaiting' | 'done' | 'failed' | 'interrupted' | 'canceled'
 
 export interface BroadcastRun {
   id: string
   sessionId: string
+  // Instâncias do rodízio. A primeira é sessionId.
+  sessionIds: string[]
   listId: string | null
   listName: string
   text: string | null
@@ -161,7 +163,7 @@ export interface BroadcastPacing {
 
 // Conteúdo do disparo: modelo salvo OU texto/arquivo avulso
 // Conteúdo do disparo: modelo salvo OU texto/arquivo avulso; scheduledAt (ISO) programa em vez de enviar agora
-export type BroadcastInput = { listId: string; pacing: BroadcastPacing; scheduledAt?: string } & (
+export type BroadcastInput = { listId: string; pacing: BroadcastPacing; scheduledAt?: string; sessionIds: string[] } & (
   | { templateId: string }
   | { text: string; fileId: string | null }
 )
@@ -179,6 +181,7 @@ export interface MessageTemplateSummary {
   text: string | null
   audioAsVoice: boolean
   attachmentCount: number
+  variationCount: number
   updatedAt: string
 }
 
@@ -188,6 +191,7 @@ export interface MessageTemplateDetail {
   id: string
   name: string
   text: string | null
+  variations: string[]
   audioAsVoice: boolean
   files: TemplateFile[]
 }
@@ -195,6 +199,7 @@ export interface MessageTemplateDetail {
 export interface TemplateInput {
   name: string
   text: string
+  variations: string[]
   audioAsVoice: boolean
   fileIds: string[]
 }
@@ -204,7 +209,7 @@ export interface OutgoingMessage {
   fileId: string | null
 }
 
-export type ReportSituation = 'all' | 'pending' | 'sent' | 'delivered' | 'read' | 'failed'
+export type ReportSituation = 'all' | 'pending' | 'awaiting_reply' | 'sent' | 'delivered' | 'read' | 'failed'
 export type RecipientSituation = Exclude<ReportSituation, 'all'>
 
 export interface BroadcastReportSummary {
@@ -217,6 +222,7 @@ export interface BroadcastReportSummary {
   total: number
   sent: number
   failed: number
+  awaiting: number
   delivered: number
   read: number
   played: number

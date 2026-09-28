@@ -193,6 +193,29 @@
 .broadcast-send__ok { margin: 0; font-size: var(--text-xs); color: var(--color-live); }
 .broadcast-send__submit { padding: var(--space-3); font-size: var(--text-base); }
 
+.instance-picker {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.instance-picker__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+.instance-picker__option span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.run-content__instances { display: block; font-size: var(--text-xs); color: var(--color-ink-soft); }
+.run-instances { display: grid; gap: var(--space-1); min-width: min(22rem, 70vw); }
+
 .list-editor {
   display: grid;
   gap: var(--space-3);
@@ -256,7 +279,9 @@
 .run-progress__failed { background: var(--color-alert); transition: width 400ms var(--ease-out); }
 .run-progress__label { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-muted); }
 .run-status { font-size: var(--text-xs); font-weight: 600; white-space: nowrap; }
-.run-status[data-status='running'] { color: var(--color-pending); }
+.run-status[data-status='running'],
+.run-status[data-status='paused'],
+.run-status[data-status='awaiting'] { color: var(--color-pending); }
 .run-status[data-status='done'] { color: var(--color-live); }
 .run-status[data-status='failed'],
 .run-status[data-status='interrupted'] { color: var(--color-alert); }
@@ -304,6 +329,19 @@
 }
 .template-editor__preview ol { margin: 0; padding-left: var(--space-5); }
 .template-editor__preview p { margin: 0; color: var(--color-muted); }
+.template-variations { display: grid; gap: var(--space-2); }
+.template-variations__note { margin: 0; color: var(--color-muted); font-size: var(--text-sm); }
+.template-variations__item { display: grid; gap: var(--space-1); }
+.template-variations__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.template-variations__remove,
+.template-variations__add {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: none;
+  font-size: var(--text-sm);
+}
+.template-variations__add { justify-self: start; }
 .content-mode { display: flex; gap: var(--space-1); }
 
 /* ─── Importar planilha ─────────────────────────────────── */
@@ -405,7 +443,8 @@
 .report-situation[data-situation='read'] { color: var(--color-live); }
 .report-situation[data-situation='delivered'] { color: var(--color-ink-soft); }
 .report-situation[data-situation='failed'] { color: var(--color-alert); }
-.report-situation[data-situation='pending'] { color: var(--color-pending); }
+.report-situation[data-situation='pending'],
+.report-situation[data-situation='awaiting_reply'] { color: var(--color-pending); }
 
 .run-actions .row-actions__primary[aria-pressed='true'] { background: var(--color-ink); color: var(--color-paper); }
 
@@ -419,3 +458,18 @@
 @media (max-width: 640px) {
   .library { padding: var(--space-4); }
 }
+
+/* Edição do intervalo de um disparo no histórico */
+.run-pacing__edit {
+  margin-left: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.run-pacing { display: grid; gap: var(--space-1); min-width: min(22rem, 70vw); }
+.run-pacing__hint { font-size: var(--text-xs); color: var(--color-muted); }
+.run-pacing__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); }

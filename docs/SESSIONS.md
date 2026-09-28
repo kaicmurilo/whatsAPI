@@ -9,6 +9,13 @@ Cada sessão representa uma instância única do WhatsApp Web conectada a um nú
 3. **Ready**: A sessão está ativa e pronta para enviar/receber dados.
 4. **Interrupção (`/session/terminate/:sessionId`)**: Fecha o browser e limpa dados temporários (se configurado).
 
+## Recuperação e diagnóstico
+
+- **Queda do processo**: erros assíncronos internos do whatsapp-web.js/puppeteer (ex.: a página do WhatsApp Web recarrega no meio da reinjeção) são capturados em `server.js` (`unhandledRejection`) e logados com `[process]`. O processo continua; antes, o Node 22 encerrava a API e todas as sessões caíam.
+- **Nova tentativa ao abrir**: se `initialize()` falhar (ex.: "Execution context was destroyed"), a sessão tenta de novo em 10 s, 30 s e 60 s. Não recria sessão excluída nem duplica sessão já reaberta. Depois de 3 tentativas, use Iniciar no painel.
+- **Motivo da desconexão**: logado como `[session] desconectada sessão=<id> motivo=<reason>`. `LOGOUT` = o WhatsApp desvinculou o aparelho (precisa de novo QR); `CONFLICT` = sessão aberta em outro lugar.
+- **Reinício do container**: travas órfãs do perfil do Chromium são removidas e o desligamento fecha os navegadores, para não pedir QR de novo.
+
 ## Segurança e Propriedade (Ownership)
 
 O sistema garante que um usuário (autenticado via JWT) só possa interagir com sessões que ele mesmo criou:

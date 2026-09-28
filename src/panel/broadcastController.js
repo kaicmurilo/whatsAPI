@@ -2,6 +2,7 @@ const { sendErrorResponse } = require('../utils')
 const { listRuns, findRun } = require('./broadcastRunRepository')
 const broadcastService = require('./broadcastService')
 const { parsePacing } = require('./broadcastPacing')
+const { parseSessionIds } = require('./broadcastSessions')
 const { parseScheduledAt } = require('./broadcastSchedule')
 const { parseId, parsePagination, isValidPagination } = require('./validators')
 
@@ -36,15 +37,18 @@ const parseBroadcastInput = (body) => {
   if (pacingError) return { error: pacingError }
   const { scheduledAt, error: scheduleError } = parseScheduledAt(body?.scheduledAt)
   if (scheduleError) return { error: scheduleError }
-  return { input: { listId, pacing, ...content }, scheduledAt }
+  const { sessionIds, error: sessionsError } = parseSessionIds(body?.sessionIds, body?.sessionId)
+  if (sessionsError) return { error: sessionsError }
+  return { input: { listId, pacing, sessionIds, ...content }, scheduledAt }
 }
 
 // Com scheduledAt → programa; sem → dispara agora
 const startBroadcast = async (req, res) => {
   const { sessionId } = req.params
   const userId = req.user.user_id
-  const { input, scheduledAt, error } = parseBroadcastInput(req.body)
+  const { input, scheduledAt, error } = parseBroadcastInput({ ...req.body, sessionId })
   if (error) return sendErrorResponse(res, 422, error)
+  if (!input.sessionIds.includes(sessionId)) return sendErrorResponse(res, 422, 'A instância da requisição precisa estar entre as selecionadas')
   try {
     const result = scheduledAt
       ? await broadcastService.schedule(userId, sessionId, input, scheduledAt)
@@ -86,6 +90,53 @@ const cancelBroadcast = async (req, res) => {
   }
 }
 
+const pauseBroadcast = async (req, res) => {
+  const userId = req.user.user_id
+  const runId = parseId(req.params.runId)
+  if (runId === null) return sendErrorResponse(res, 422, 'Id de disparo inválido')
+  try {
+    const result = await broadcastService.pause(userId, runId)
+    if (result.error) return sendErrorResponse(res, ...result.error)
+    res.status(202).json({ success: true, message: 'Pausando: nenhum novo contato será enviado' })
+  } catch (pauseError) {
+    console.error(`[panel] falha ao pausar disparo run=${runId} user=${userId}:`, pauseError)
+    sendErrorResponse(res, 500, 'Erro ao pausar disparo')
+  }
+}
+
+const updateBroadcastPacing = async (req, res) => {
+  const userId = req.user.user_id
+  const runId = parseId(req.params.runId)
+  if (runId === null) return sendErrorResponse(res, 422, 'Id de disparo inválido')
+  if (!req.body?.pacing) return sendErrorResponse(res, 422, 'Informe o novo intervalo')
+  const { pacing, error } = parsePacing(req.body.pacing)
+  if (error) return sendErrorResponse(res, 422, error)
+  try {
+    const result = await broadcastService.changePacing(userId, runId, pacing)
+    if (result.error) return sendErrorResponse(res, ...result.error)
+    res.json({ success: true, data: result.run })
+  } catch (pacingError) {
+    console.error(`[panel] falha ao alterar ritmo run=${runId} user=${userId}:`, pacingError)
+    sendErrorResponse(res, 500, 'Erro ao alterar o intervalo')
+  }
+}
+
+const updateBroadcastSessions = async (req, res) => {
+  const userId = req.user.user_id
+  const runId = parseId(req.params.runId)
+  if (runId === null) return sendErrorResponse(res, 422, 'Id de disparo inválido')
+  const { sessionIds, error } = parseSessionIds(req.body?.sessionIds ?? [], null)
+  if (error) return sendErrorResponse(res, 422, error)
+  try {
+    const result = await broadcastService.changeSessions(userId, runId, sessionIds)
+    if (result.error) return sendErrorResponse(res, ...result.error)
+    res.json({ success: true, data: result.run })
+  } catch (sessionsError) {
+    console.error(`[panel] falha ao alterar instâncias run=${runId} user=${userId}:`, sessionsError)
+    sendErrorResponse(res, 500, 'Erro ao alterar as instâncias')
+  }
+}
+
 const getRuns = async (req, res) => {
   const pagination = parsePagination(req.query, { defaultPerPage: RUNS_DEFAULT_PER_PAGE })
   if (!isValidPagination(pagination)) return sendErrorResponse(res, 422, 'Parâmetros de paginação inválidos')
@@ -110,4 +161,4 @@ const getRun = async (req, res) => {
   }
 }
 
-module.exports = { startBroadcast, retryBroadcast, cancelBroadcast, getRuns, getRun }
+module.exports = { startBroadcast, retryBroadcast, pauseBroadcast, cancelBroadcast, updateBroadcastPacing, updateBroadcastSessions, getRuns, getRun }

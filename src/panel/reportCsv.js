@@ -6,6 +6,7 @@ const LINE_BREAK = '\r\n'
 
 const SITUATION_LABELS = {
   pending: 'Pendente',
+  awaiting_reply: 'Aguardando resposta',
   sent: 'Enviado',
   delivered: 'Entregue',
   read: 'Lido',

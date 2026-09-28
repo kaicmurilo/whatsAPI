@@ -3,6 +3,7 @@ import type { ReportSituationFilterProps } from '../types/components'
 
 const OPTIONS: { value: ReportSituation; label: string }[] = [
   { value: 'all', label: 'Todos' },
+  { value: 'awaiting_reply', label: 'Aguardando resposta' },
   { value: 'delivered', label: 'Entregues' },
   { value: 'read', label: 'Lidos' },
   { value: 'sent', label: 'Enviados' },

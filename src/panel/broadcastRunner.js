@@ -1,14 +1,22 @@
 const { serializeMessageId, serializeWid } = require('./messageMapper')
+const { partsForRecipient } = require('./messageParts')
+const { acquireSession, releaseSession, sessionReady } = require('./broadcastLane')
 
 const MS_PER_SECOND = 1000
-// Pausa curta entre as partes de um mesmo contato (texto → áudio → vídeo): ritmo de quem está enviando à mão
 const PART_PAUSE = { minSeconds: 1.5, maxSeconds: 4 }
-const INSTANCE_DOWN_ERROR = 'Instância desconectada durante o envio'
 const CANCELED_REASON = 'Cancelado pelo usuário'
+const NO_WHATSAPP_ERROR = 'Número sem WhatsApp'
+const PAUSE_REQUEST = 'pause'
+const MAX_CONSECUTIVE_FAILURES = 3
+
+const PAUSE_REASONS = {
+  requested: 'Pausado pelo usuário',
+  instanceDown: 'Pausado: nenhuma instância selecionada está conectada. Retome quando algum número voltar.',
+  failureStreak: `Pausado: ${MAX_CONSECUTIVE_FAILURES} falhas seguidas (possível bloqueio ou limitação do número). Retome mais tarde.`
+}
 
 const describeError = (error) => (typeof error === 'string' ? error : error?.message || 'erro desconhecido').slice(0, 255)
 
-// Fisher–Yates: cada disparo sai numa ordem diferente, sem padrão repetido para o WhatsApp
 const shuffle = (items, random = Math.random) => {
   const shuffled = [...items]
   for (let index = shuffled.length - 1; index > 0; index--) {
@@ -18,14 +26,12 @@ const shuffle = (items, random = Math.random) => {
   return shuffled
 }
 
-// Intervalo sorteado dentro da faixa do disparo (inclusive nas pontas)
 const pickDelayMs = ({ minSeconds, maxSeconds }, random = Math.random) => {
   const minMs = Math.round(minSeconds * MS_PER_SECOND)
   const maxMs = Math.round(maxSeconds * MS_PER_SECOND)
   return minMs + Math.floor(random() * (maxMs - minMs + 1))
 }
 
-// Espera que termina na hora se o disparo for abortado (não obriga a aguardar os 45 s restantes)
 const waitOrAbort = (ms, signal) => new Promise((resolve) => {
   if (signal?.aborted) return resolve()
   const onAbort = () => {
@@ -39,61 +45,102 @@ const waitOrAbort = (ms, signal) => new Promise((resolve) => {
   signal?.addEventListener('abort', onAbort, { once: true })
 })
 
-const finalStatus = ({ canceled, instanceDown }) => {
-  if (canceled) return ['canceled', CANCELED_REASON]
-  if (instanceDown) return ['failed', INSTANCE_DOWN_ERROR]
-  return ['done', null]
+const stopByUser = (signal) => (signal.reason === PAUSE_REQUEST ? ['paused', PAUSE_REASONS.requested] : ['canceled', CANCELED_REASON])
+
+const pickSender = (sessionIds, cursor, excluded, getClient, isReady = () => true) => {
+  const count = sessionIds.length
+  if (count === 0) return null
+  const choose = (requireReady) => {
+    for (let attempt = 0; attempt < count; attempt += 1) {
+      const index = (cursor + attempt) % count
+      const sessionId = sessionIds[index]
+      if (excluded.has(sessionId)) continue
+      if (requireReady && !isReady(sessionId)) continue
+      const client = getClient(sessionId)
+      if (client) return { sessionId, client, nextCursor: (index + 1) % count }
+    }
+    return null
+  }
+  // Prefere instância livre. Se todas estão na vez de outra lista, espera na próxima do rodízio.
+  return choose(true) ?? choose(false)
+}
+
+const pauseWhenNobodyCanSend = (sessionIds, excluded) => (
+  sessionIds.length > 0 && sessionIds.every((sessionId) => excluded.has(sessionId))
+    ? PAUSE_REASONS.failureStreak
+    : PAUSE_REASONS.instanceDown
+)
+
+const nextFailureStreak = (streak, outcome) => {
+  if (outcome.status === 'sent') return 0
+  return outcome.error === NO_WHATSAPP_ERROR ? streak : streak + 1
 }
 
 /**
  * Envia um disparo destinatário por destinatário. Nunca lança: falhas ficam registradas por contato.
- * O cancelamento só acontece entre envios — um envio já em andamento no WhatsApp termina normalmente.
+ * Parar (cancelar/pausar) só acontece entre contatos — um envio em andamento no WhatsApp termina normalmente.
+ * Pausa sozinho ao sinal de bloqueio (instância caiu ou falhas seguidas): quem não recebeu fica pendente.
  *
- * @param {object} run  { id, recipients: [{ position, name, phone }],
- *                        parts: [{ kind: 'text', text } | { kind: 'media', media, options }], trackedPart: number,
- *                        pacing: { minSeconds, maxSeconds, randomOrder }, signal?: AbortSignal }
  * @param {object} deps
- * @param {() => object|null} deps.getClient   client atual da sessão (null se caiu no meio)
- * @param {Function} deps.recordResult         (runId, position, { status, error, messageId }) → progresso
- * @param {Function} deps.finish               (runId, status, error) → disparo finalizado
- * @param {Function} deps.publish              (progress) → notifica o painel
- * @param {Function} [deps.pause]              (ms, signal) espera entre contatos (injetável em teste)
- * @param {Function} [deps.partPause]          (ms) espera entre as partes de um contato (injetável em teste)
- * @param {Function} [deps.random]             gerador [0,1) (injetável em teste)
+ * @param {(sessionId: string) => object|null} deps.getClient   client conectado (null se caiu / QR)
  */
-const runBroadcast = async (run, { getClient, recordResult, finish, publish, pause = waitOrAbort, partPause = waitOrAbort, random = Math.random }) => {
+const runBroadcast = async (run, {
+  getClient, recordResult, finish, publish,
+  pause = waitOrAbort, partPause = waitOrAbort, random = Math.random,
+  acquireTurn = acquireSession, releaseTurn = releaseSession, isSessionReady = sessionReady
+}) => {
   const recipients = run.pacing.randomOrder ? shuffle(run.recipients, random) : run.recipients
-  const state = { canceled: false, instanceDown: false }
+  let stop = null
+  let cursor = 0
+  const excluded = new Set()
+  const streaks = new Map()
 
   for (const [index, recipient] of recipients.entries()) {
     if (run.signal?.aborted) {
-      state.canceled = true
+      stop = stopByUser(run.signal)
       break
     }
-    const client = getClient()
-    if (!client) {
-      state.instanceDown = true
-      await recordResult(run.id, recipient.position, { status: 'failed', error: INSTANCE_DOWN_ERROR })
-      continue
+    const sessionIds = Array.isArray(run.sessionIds) ? run.sessionIds : []
+    const sender = pickSender(sessionIds, cursor, excluded, getClient, isSessionReady)
+    if (!sender) {
+      stop = ['paused', pauseWhenNobodyCanSend(sessionIds, excluded)]
+      break
     }
-    const outcome = await sendToRecipient(client, recipient, run, () => partPause(pickDelayMs(PART_PAUSE, random)))
+    cursor = sender.nextCursor
+    const granted = await acquireTurn(sender.sessionId, run.id, run.signal)
+    if (!granted) {
+      stop = stopByUser(run.signal)
+      break
+    }
+    const delayMs = pickDelayMs(run.pacing, random)
+    let outcome
+    try {
+      outcome = await sendToRecipient(sender.client, recipient, run, () => partPause(pickDelayMs(PART_PAUSE, random)))
+    } finally {
+      releaseTurn(sender.sessionId, delayMs)
+    }
     publish(await recordResult(run.id, recipient.position, outcome))
-    if (index < recipients.length - 1) await pause(pickDelayMs(run.pacing, random), run.signal)
+    const streak = nextFailureStreak(streaks.get(sender.sessionId) ?? 0, outcome)
+    streaks.set(sender.sessionId, streak)
+    if (streak >= MAX_CONSECUTIVE_FAILURES) {
+      excluded.add(sender.sessionId)
+      console.warn(`[panel] instância fora do rodízio run=${run.id} sessão=${sender.sessionId}: ${MAX_CONSECUTIVE_FAILURES} falhas seguidas`)
+      const moreRecipients = index < recipients.length - 1
+      if (moreRecipients && !pickSender(run.sessionIds, cursor, excluded, getClient)) {
+        stop = ['paused', PAUSE_REASONS.failureStreak]
+        break
+      }
+    }
+    if (index < recipients.length - 1) await pause(delayMs, run.signal)
   }
-  if (run.signal?.aborted) state.canceled = true
+  if (!stop && run.signal?.aborted) stop = stopByUser(run.signal)
 
-  publish(await finish(run.id, ...finalStatus(state)))
+  publish(await finish(run.id, ...(stop ?? ['done', null])))
 }
 
 const sendPart = (client, chatId, part) =>
   part.kind === 'text' ? client.sendMessage(chatId, part.text) : client.sendMessage(chatId, part.media, part.options)
 
-/**
- * Envia todas as partes para um contato. O id da parte rastreada liga os tiques (entregue/lido) ao destinatário;
- * às vezes o wwebjs devolve undefined (chats @lid) e o deliveryTracker vincula depois pelo primeiro ack.
- * Se a 1ª parte já saiu e uma seguinte falha, o contato fica "enviado" com erro de parcial: reprocessar
- * não reenvia (duplicaria o que já chegou).
- */
 const sendToRecipient = async (client, recipient, { parts, trackedPart = 0 }, pauseBetweenParts) => {
   let chatId
   try {
@@ -101,20 +148,24 @@ const sendToRecipient = async (client, recipient, { parts, trackedPart = 0 }, pa
   } catch (error) {
     return { status: 'failed', error: describeError(error) }
   }
-  if (!chatId) return { status: 'failed', error: 'Número sem WhatsApp' }
+  if (!chatId) return { status: 'failed', error: NO_WHATSAPP_ERROR }
 
+  const recipientParts = partsForRecipient(parts, recipient.position)
   let messageId = null
-  for (const [index, part] of parts.entries()) {
+  for (const [index, part] of recipientParts.entries()) {
     try {
       if (index > 0) await pauseBetweenParts()
       const sent = await sendPart(client, chatId, part)
       if (index === trackedPart && sent) messageId = serializeMessageId(sent)
     } catch (error) {
       if (index === 0) return { status: 'failed', error: describeError(error) }
-      return { status: 'sent', messageId, error: describeError(`Parcial: parte ${index + 1} de ${parts.length} falhou: ${error.message}`) }
+      return { status: 'sent', messageId, error: describeError(`Parcial: parte ${index + 1} de ${recipientParts.length} falhou: ${error.message}`) }
     }
   }
   return { status: 'sent', messageId }
 }
 
-module.exports = { runBroadcast, shuffle, pickDelayMs, waitOrAbort, CANCELED_REASON }
+module.exports = {
+  runBroadcast, sendToRecipient, pickSender, shuffle, pickDelayMs, waitOrAbort,
+  CANCELED_REASON, PAUSE_REQUEST, MAX_CONSECUTIVE_FAILURES
+}

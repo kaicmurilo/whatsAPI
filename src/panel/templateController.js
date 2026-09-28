@@ -13,10 +13,26 @@ const SAVE_ERRORS = {
   foreign_files: [422, 'Algum anexo não está na sua biblioteca']
 }
 
+const parseVariations = (body) => {
+  if (body?.variations === undefined) return { variations: [] }
+  if (!Array.isArray(body.variations)) return { error: 'Variações inválidas' }
+  const variations = []
+  for (const item of body.variations) {
+    if (typeof item !== 'string') return { error: 'Cada variação precisa ser texto' }
+    const trimmed = item.trim()
+    if (!trimmed) continue
+    if (trimmed.length > MAX_TEXT_LENGTH) return { error: `Variação maior que ${MAX_TEXT_LENGTH} caracteres` }
+    variations.push(trimmed)
+  }
+  return { variations }
+}
+
 const parseTemplateInput = (body) => {
   const name = typeof body?.name === 'string' ? body.name.trim() : ''
   const text = typeof body?.text === 'string' ? body.text.trim() : ''
   const rawFileIds = Array.isArray(body?.fileIds) ? body.fileIds : []
+  const parsedVariations = parseVariations(body)
+  if (parsedVariations.error) return parsedVariations
   if (!name || name.length > MAX_NAME_LENGTH) return { error: 'Nome é obrigatório (até 100 caracteres)' }
   if (text.length > MAX_TEXT_LENGTH) return { error: `Texto maior que ${MAX_TEXT_LENGTH} caracteres` }
   if (rawFileIds.length > MAX_ATTACHMENTS) return { error: `Máximo de ${MAX_ATTACHMENTS} anexos por modelo` }
@@ -24,8 +40,10 @@ const parseTemplateInput = (body) => {
   if (fileIds.includes(null)) return { error: 'Anexo inválido' }
   // Ordem importa (é a ordem de envio), mas o mesmo arquivo duas vezes não faz sentido
   if (new Set(fileIds).size !== fileIds.length) return { error: 'O mesmo arquivo foi adicionado duas vezes' }
-  if (!text && fileIds.length === 0) return { error: 'Escreva um texto ou adicione ao menos um anexo' }
-  return { input: { name, text: text || null, audioAsVoice: body?.audioAsVoice !== false, fileIds } }
+  if (!text && parsedVariations.variations.length === 0 && fileIds.length === 0) {
+    return { error: 'Escreva um texto, uma variação ou adicione ao menos um anexo' }
+  }
+  return { input: { name, text: text || null, variations: parsedVariations.variations, audioAsVoice: body?.audioAsVoice !== false, fileIds } }
 }
 
 const getTemplates = async (req, res) => {
@@ -62,7 +80,7 @@ const saveTemplateHandler = async (req, res) => {
   try {
     const result = await saveTemplate(req.user.user_id, { templateId, ...input })
     if (result.error) return sendErrorResponse(res, ...SAVE_ERRORS[result.error])
-    console.log(`[panel] modelo ${hasId ? 'atualizado' : 'criado'} user=${req.user.user_id} id=${result.template.id} anexos=${input.fileIds.length}`)
+    console.log(`[panel] modelo ${hasId ? 'atualizado' : 'criado'} user=${req.user.user_id} id=${result.template.id} anexos=${input.fileIds.length} variações=${input.variations.length}`)
     res.status(hasId ? 200 : 201).json({ success: true, data: result.template })
   } catch (saveError) {
     if (saveError.code === UNIQUE_VIOLATION) return sendErrorResponse(res, 409, 'Já existe um modelo com esse nome')
