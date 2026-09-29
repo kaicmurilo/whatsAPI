@@ -9,6 +9,9 @@ const OPTIONS: { value: ReportSituation; label: string }[] = [
   { value: 'sent', label: 'Enviados' },
   { value: 'failed', label: 'Falhas' },
   { value: 'pending', label: 'Pendentes' },
+  { value: 'suppressed', label: 'Suprimidos' },
+  { value: 'duplicate', label: 'Duplicados' },
+  { value: 'replied', label: 'Responderam' },
 ]
 
 export function ReportSituationFilter({ value, onChange }: ReportSituationFilterProps) {

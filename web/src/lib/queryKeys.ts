@@ -22,4 +22,7 @@ export const queryKeys = {
   template: (templateId: string) => ['templates', 'detail', templateId] as const,
   reportOf: (runId: string) => ['broadcast-report', runId] as const,
   reportRecipients: (runId: string, page: number, situation: string) => ['broadcast-report', runId, 'recipients', page, situation] as const,
+  settings: ['panel-settings'] as const,
+  allSuppressed: ['suppression'] as const,
+  suppressed: (query: PageQuery) => ['suppression', query] as const,
 }

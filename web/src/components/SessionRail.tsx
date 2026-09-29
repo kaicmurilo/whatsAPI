@@ -8,6 +8,7 @@ const RAIL_VIEWS: { view: PanelView; label: string }[] = [
   { view: 'templates', label: 'Mensagens' },
   { view: 'broadcasts', label: 'Transmissão' },
   { view: 'files', label: 'Arquivos' },
+  { view: 'settings', label: 'Configurações' },
 ]
 
 export function SessionRail({ sessions, isLoading, selectedSessionId, activeView, onSelect, onOpenView, onLogout }: SessionRailProps) {

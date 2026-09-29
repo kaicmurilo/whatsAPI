@@ -30,6 +30,22 @@ const headerName = (cell: Cell): string => cellText(cell).toLowerCase().replace(
 
 const columnIndex = (header: string[], name: string): number => header.indexOf(name)
 
+const findHeader = (sheet: Cell[][], matches: (header: string[]) => boolean): { header: string[]; index: number } | null => {
+  for (let index = 0; index < sheet.length; index++) {
+    const header = sheet[index].map(headerName)
+    if (matches(header)) return { header, index }
+  }
+  return null
+}
+
+const firstFilled = (row: Cell[], indexes: number[]): string => {
+  for (const index of indexes) {
+    const value = cellText(row[index])
+    if (value) return value
+  }
+  return ''
+}
+
 // Exportação de contatos (country_code, phone_number, saved_name, public_name, …).
 // O telefone já inclui o DDI; o "+" avisa o servidor para não tratar como número nacional do Brasil.
 // Nome: o salvo na agenda, e o nome público do WhatsApp quando o salvo está vazio.
@@ -51,14 +67,34 @@ function extractContactExport(sheet: Cell[][]): ImportRow[] | null {
     })
 }
 
+// Exportação de pacientes (Odontostetic e afins): título nas primeiras linhas e o cabeçalho
+// ("Nome Completo", "Celulares", "Telefones") mais abaixo. Celular e telefone fixo viram contatos;
+// o servidor separa vários números na mesma célula.
+function extractPatientExport(sheet: Cell[][]): ImportRow[] | null {
+  const found = findHeader(
+    sheet,
+    (header) => header.includes('nome_completo') && (header.includes('celulares') || header.includes('telefones')),
+  )
+  if (!found) return null
+  const nameIndexes = ['nome_completo', 'nome_social', 'apelido'].map((name) => columnIndex(found.header, name)).filter((index) => index !== -1)
+  const phoneIndexes = ['celulares', 'telefones'].map((name) => columnIndex(found.header, name)).filter((index) => index !== -1)
+  return sheet
+    .slice(found.index + 1)
+    .filter((row) => row.some((cell) => cellText(cell) !== ''))
+    .map((row) => ({
+      name: firstFilled(row, nameIndexes),
+      phoneText: phoneIndexes.map((index) => cellText(row[index])).filter(Boolean).join(', '),
+    }))
+}
+
 /**
  * Planilha (linhas × células) → { nome, texto do telefone }.
- * Aceita a exportação de contatos (phone_number + country_code) e, no mais, detecta as colunas pelo conteúdo:
+ * Aceita exportação de contatos, exportação de pacientes e, no mais, detecta as colunas pelo conteúdo:
  * "Nome | Cidade | (DD) 9XXXX-XXXX", com ou sem cabeçalho e em outra ordem.
  * A normalização do telefone (código do país, 2 números na célula) fica no servidor.
  */
 export function extractImportRows(sheet: Cell[][]): ImportRow[] {
-  const exported = extractContactExport(sheet)
+  const exported = extractContactExport(sheet) ?? extractPatientExport(sheet)
   if (exported) return exported
   const phoneColumn = bestColumn(sheet, looksLikePhone, null)
   if (phoneColumn === null) return []

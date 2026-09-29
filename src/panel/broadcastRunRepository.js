@@ -38,9 +38,21 @@ const createRun = (userId, {
  * `isSent` vai como parâmetro próprio: reusar o $ do status em comparação fazia o Postgres
  * deduzir tipos diferentes (varchar × text) e abortar o disparo.
  */
+const SKIP_STATUSES = new Set(['suppressed', 'duplicate', 'replied'])
+
 const recordRecipientResult = async (runId, position, {
-  status, error = null, messageId = null, greetingSessionId = null
+  status, error = null, messageId = null, greetingSessionId = null, senderSessionId = null
 }) => {
+  if (SKIP_STATUSES.has(status)) {
+    await query(
+      `UPDATE broadcast_run_recipients
+       SET status = $3, error = $4, sent_at = NULL, message_id = NULL, message_key = NULL, sender_session_id = NULL
+       WHERE run_id = $1 AND position = $2`,
+      [runId, position, status, truncateError(error)]
+    )
+    const result = await query(`SELECT ${RUN_COLUMNS} FROM broadcast_runs WHERE id = $1`, [runId])
+    return result.rows[0]
+  }
   if (status === 'awaiting_reply') {
     await query(
       `UPDATE broadcast_run_recipients
@@ -58,18 +70,19 @@ const recordRecipientResult = async (runId, position, {
     `WITH recipient AS (
        UPDATE broadcast_run_recipients
        SET status = $3, error = $4, sent_at = CASE WHEN $5::boolean THEN CURRENT_TIMESTAMP END,
-           message_id = $6, message_key = $7
+           message_id = $6, message_key = $7,
+           sender_session_id = CASE WHEN $5::boolean THEN $8 ELSE NULL END
        WHERE run_id = $1 AND position = $2
      )
      UPDATE broadcast_runs SET ${counter} = ${counter} + 1 WHERE id = $1
      RETURNING ${RUN_COLUMNS}`,
-    [runId, position, status, truncateError(error), isSent, messageId, messageKeyFromId(messageId)]
+    [runId, position, status, truncateError(error), isSent, messageId, messageKeyFromId(messageId), senderSessionId]
   )
   return result.rows[0]
 }
 
 // done com awaiting_reply legados → awaiting. Novos disparos não criam mais saudação.
-const finishRun = async (runId, status, error = null) => {
+const finishRun = async (runId, status, error = null, pauseCode = null) => {
   if (status === 'done') {
     const awaiting = await query(
       `SELECT 1 FROM broadcast_run_recipients WHERE run_id = $1 AND status = 'awaiting_reply' LIMIT 1`,
@@ -77,15 +90,17 @@ const finishRun = async (runId, status, error = null) => {
     )
     if (awaiting.rows.length > 0) {
       const result = await query(
-        `UPDATE broadcast_runs SET status = 'awaiting', error = NULL, finished_at = NULL WHERE id = $1 RETURNING ${RUN_COLUMNS}`,
+        `UPDATE broadcast_runs SET status = 'awaiting', error = NULL, pause_code = NULL, finished_at = NULL WHERE id = $1 RETURNING ${RUN_COLUMNS}`,
         [runId]
       )
       return result.rows[0]
     }
   }
   const result = await query(
-    `UPDATE broadcast_runs SET status = $2, error = $3, finished_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING ${RUN_COLUMNS}`,
-    [runId, status, truncateError(error)]
+    `UPDATE broadcast_runs
+     SET status = $2, error = $3, finished_at = CURRENT_TIMESTAMP, pause_code = $4
+     WHERE id = $1 RETURNING ${RUN_COLUMNS}`,
+    [runId, status, truncateError(error), status === 'paused' ? pauseCode : null]
   )
   return result.rows[0]
 }
@@ -151,7 +166,7 @@ const reopenRunForRetry = (runId) => withTransaction(async (client) => {
      SET status = 'pending', error = NULL, sent_at = NULL, message_id = NULL, message_key = NULL,
          delivered_at = NULL, read_at = NULL, played_at = NULL,
          greeting_sent_at = NULL, greeting_session_id = NULL
-     WHERE run_id = $1 AND status <> 'sent'
+     WHERE run_id = $1 AND status IN ('failed', 'pending', 'awaiting_reply')
      RETURNING position, name, phone`,
     [runId]
   )
@@ -346,6 +361,46 @@ const listDueAwaitingRecipients = async (before) => {
   return result.rows
 }
 
+const listPolicyPausedRuns = async () => {
+  const result = await query(
+    `SELECT ${RUN_COLUMNS} FROM broadcast_runs
+     WHERE status = 'paused' AND pause_code IN ('quiet', 'cap')
+     ORDER BY id`
+  )
+  return result.rows
+}
+
+// Retoma só quem ficou pendente. Falha, supressão, duplicata e resposta não voltam para a fila.
+const claimPausedForResume = (runId) => withTransaction(async (client) => {
+  const runResult = await client.query(
+    `UPDATE broadcast_runs
+     SET status = 'running', error = NULL, pause_code = NULL, finished_at = NULL
+     WHERE id = $1 AND status = 'paused' AND pause_code IN ('quiet', 'cap')
+     RETURNING ${RUN_COLUMNS}`,
+    [runId]
+  )
+  const run = runResult.rows[0]
+  if (!run) return null
+  const recipients = await client.query(
+    `SELECT position, name, phone
+     FROM broadcast_run_recipients
+     WHERE run_id = $1 AND status = 'pending'
+     ORDER BY position`,
+    [runId]
+  )
+  if (recipients.rows.length === 0) {
+    const closed = await client.query(
+      `UPDATE broadcast_runs
+       SET status = 'done', error = NULL, pause_code = NULL, finished_at = CURRENT_TIMESTAMP
+       WHERE id = $1
+       RETURNING ${RUN_COLUMNS}`,
+      [runId]
+    )
+    return { run: closed.rows[0], recipients: [] }
+  }
+  return { run, recipients: recipients.rows }
+})
+
 module.exports = {
   cancelPausedRun,
   cancelAwaitingRun,
@@ -366,5 +421,7 @@ module.exports = {
   listRuns,
   findRun,
   reopenRunForRetry,
-  interruptRunningRuns
+  interruptRunningRuns,
+  listPolicyPausedRuns,
+  claimPausedForResume
 }

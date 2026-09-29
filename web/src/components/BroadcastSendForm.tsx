@@ -193,7 +193,7 @@ export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendF
       ) : null}
 
       <p className="broadcast-send__note">
-        Um contato por vez, com intervalo sorteado. Com várias instâncias, o envio alterna entre elas. Dá para abortar no histórico. {estimate}
+        Fila única: um contato por vez, no intervalo sorteado. Várias instâncias ou várias listas não disparam juntas — a próxima só sai depois da espera. Dá para abortar no histórico. {estimate}
       </p>
       {blocker ? <p className="broadcast-send__blocker">{blocker}</p> : null}
       {startBroadcast.isError ? <p className="broadcast-send__error" role="alert">{startBroadcast.error.message}</p> : null}

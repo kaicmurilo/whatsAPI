@@ -1,5 +1,6 @@
 const { toMessageRecord, isRecordableMessage, resolveChatId } = require('./messageMapper')
 const { saveMessage } = require('./messageRepository')
+const { noteSuppressionKeyword } = require('./suppressionRepository')
 const { publishPanelEvent, setSessionStatus } = require('./panelEvents')
 const { backfillRecentHistory } = require('./historyBackfill')
 const { createChatIdResolver } = require('./chatIdResolver')
@@ -30,7 +31,12 @@ const recordMessage = async (sessionId, message, resolveCanonicalChatId) => {
       return
     }
     const saved = await saveMessage(record)
-    if (saved) publishPanelEvent({ type: 'message', sessionId, message: saved })
+    if (saved) {
+      publishPanelEvent({ type: 'message', sessionId, message: saved })
+      noteSuppressionKeyword(sessionId, saved).catch((error) => {
+        console.error(`[panel] falha ao registrar supressão sessão=${sessionId}:`, error.message)
+      })
+    }
   } catch (error) {
     console.error(`[panel] falha ao salvar mensagem sessão=${sessionId}:`, error.message)
   }

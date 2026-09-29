@@ -5,6 +5,7 @@ import { ContactsPane } from '../components/ContactsPane'
 import { ConversationPane } from '../components/ConversationPane'
 import { EmptyState } from '../components/EmptyState'
 import { FilesPane } from '../components/FilesPane'
+import { SettingsPane } from '../components/SettingsPane'
 import { QrCard } from '../components/QrCard'
 import { SessionRail } from '../components/SessionRail'
 import { TemplatesPane } from '../components/TemplatesPane'
@@ -74,6 +75,8 @@ export function PanelPage() {
             onSearchChange={(search) => actions.setTableSearch('files', search)}
           />
         ) : null}
+
+        {view === 'settings' ? <SettingsPane /> : null}
 
         {isChatsView && !selectedSession ? (
           <EmptyState title={selection.sessionId ? 'Instância não encontrada' : 'Escolha uma instância'}>

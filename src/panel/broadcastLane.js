@@ -1,5 +1,6 @@
-// Uma instância envia um contato por vez. Várias listas na mesma instância alternam a vez
-// e respeitam o intervalo de quem acabou de enviar — o ritmo da instância não dobra.
+// Fila global: um envio por vez em todo o processo. O próximo (outra instância ou outra lista)
+// só começa depois do intervalo de quem acabou de enviar — instâncias diferentes não disparam juntas.
+// Cada instância ainda tem a própria fila: um contato por vez e o mesmo intervalo antes de repetir o número.
 
 const lanes = new Map()
 
@@ -69,10 +70,16 @@ const laneFor = (sessionId) => {
   return lane
 }
 
+const sendSlot = createLane()
+
 const acquireSession = (sessionId, runId, signal) => laneFor(sessionId).acquire(runId, signal)
 
 const releaseSession = (sessionId, delayMs) => laneFor(sessionId).release(delayMs)
 
 const sessionReady = (sessionId) => laneFor(sessionId).ready()
 
-module.exports = { acquireSession, releaseSession, sessionReady }
+const acquireSendSlot = (runId, signal) => sendSlot.acquire(runId, signal)
+
+const releaseSendSlot = (delayMs) => sendSlot.release(delayMs)
+
+module.exports = { acquireSession, releaseSession, sessionReady, acquireSendSlot, releaseSendSlot }

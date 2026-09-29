@@ -12,6 +12,9 @@ import { ReportSummaryCards } from './ReportSummaryCards'
 const SITUATION_LABELS: Record<RecipientSituation, string> = {
   pending: 'Pendente',
   awaiting_reply: 'Aguardando resposta',
+  suppressed: 'Suprimido',
+  duplicate: 'Duplicado',
+  replied: 'Respondeu',
   sent: 'Enviado',
   delivered: 'Entregue',
   read: 'Lido',

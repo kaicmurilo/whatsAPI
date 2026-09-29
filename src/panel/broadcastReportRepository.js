@@ -5,6 +5,9 @@ const SITUATION_SQL = `CASE
   WHEN status = 'failed' THEN 'failed'
   WHEN status = 'pending' THEN 'pending'
   WHEN status = 'awaiting_reply' THEN 'awaiting_reply'
+  WHEN status = 'suppressed' THEN 'suppressed'
+  WHEN status = 'duplicate' THEN 'duplicate'
+  WHEN status = 'replied' THEN 'replied'
   WHEN read_at IS NOT NULL THEN 'read'
   WHEN delivered_at IS NOT NULL THEN 'delivered'
   ELSE 'sent' END`
@@ -13,6 +16,9 @@ const SITUATION_FILTERS = {
   all: 'TRUE',
   pending: "status = 'pending'",
   awaiting_reply: "status = 'awaiting_reply'",
+  suppressed: "status = 'suppressed'",
+  duplicate: "status = 'duplicate'",
+  replied: "status = 'replied'",
   sent: "status = 'sent'",
   delivered: 'delivered_at IS NOT NULL',
   read: 'read_at IS NOT NULL',

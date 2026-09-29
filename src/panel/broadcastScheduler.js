@@ -1,6 +1,6 @@
 const { validateSession } = require('../sessions')
 const { sessionsOf } = require('./broadcastSessions')
-const { listDueScheduledRuns } = require('./broadcastRunRepository')
+const { listDueScheduledRuns, listPolicyPausedRuns } = require('./broadcastRunRepository')
 const { decideScheduledAction, LATE_GRACE_MS } = require('./broadcastSchedule')
 const broadcastService = require('./broadcastService')
 
@@ -33,6 +33,13 @@ const tick = async () => {
         await handleDueRun(run, now)
       } catch (error) {
         console.error(`[panel] falha no agendador run=${run.id}:`, error.message)
+      }
+    }
+    for (const run of await listPolicyPausedRuns()) {
+      try {
+        await broadcastService.resumePolicyPause(run)
+      } catch (error) {
+        console.error(`[panel] falha ao retomar disparo run=${run.id}:`, error.message)
       }
     }
   } catch (error) {

@@ -2,6 +2,7 @@ const { sessions, validateSession } = require('../sessions')
 const { findBroadcastList } = require('./broadcastListRepository')
 const runs = require('./broadcastRunRepository')
 const { runBroadcast, CANCELED_REASON, PAUSE_REQUEST } = require('./broadcastRunner')
+const { createBroadcastGate, canResumeRun } = require('./broadcastGate')
 const { findTemplate } = require('./templateRepository')
 const { findOwnedFile } = require('./fileRepository')
 const { partsFromTemplate, partsFromAdHoc, partsOfRun, trackedPartIndex, loadRuntimeParts } = require('./messageParts')
@@ -29,11 +30,13 @@ const executeInBackground = ({ sessionIds, run, recipients, storedParts, runtime
   activeRuns.set(String(run.id), active)
   const startedAt = Date.now()
   const primarySessionId = () => ids[0]
+  const gate = createBroadcastGate({ userId: run.userId, runId: run.id, createdAt: run.createdAt })
   runBroadcast(runInput, {
     getClient: getConnectedClient,
     recordResult: runs.recordRecipientResult,
     finish: runs.finishRun,
-    publish: (progress) => publishProgress(primarySessionId(), progress)
+    publish: (progress) => publishProgress(primarySessionId(), progress),
+    gate
   })
     .then(() => console.log(`[panel] disparo concluído run=${run.id} sessões=${ids.join(',')} destinatários=${recipients.length} em ${Date.now() - startedAt}ms`))
     .catch((error) => {
@@ -175,6 +178,10 @@ const findRetryBlocker = async (userId, run) => {
   if (run.status === 'scheduled') return [409, 'Este disparo ainda está programado']
   if (run.recipients.length === 0) return [422, 'Este disparo não chegou a ter destinatários']
   if (run.recipients.every((recipient) => recipient.status === 'sent')) return [422, 'Todos os contatos já receberam']
+  const resendable = new Set(['failed', 'pending', 'awaiting_reply'])
+  if (!run.recipients.some((recipient) => resendable.has(recipient.status))) {
+    return [422, 'Não há contatos pendentes para reenviar']
+  }
   return findSessionsBlocker(userId, sessionsOf(run), 'any-connected')
 }
 
@@ -313,7 +320,40 @@ const cancel = async (userId, runId) => {
   return { status: 'canceled', run: finished }
 }
 
+const resumePolicyPause = async (run) => {
+  if (activeRuns.has(String(run.id))) return
+  if (!(await canResumeRun(run, new Date()))) return
+  const sessionIds = sessionsOf(run)
+  let connected = false
+  for (const sessionId of sessionIds) {
+    if ((await validateSession(sessionId)).success) connected = true
+  }
+  if (!connected) return
+  const claimed = await runs.claimPausedForResume(run.id)
+  if (!claimed) return
+  if (claimed.recipients.length === 0) {
+    publishProgress(sessionIds[0], claimed.run)
+    return
+  }
+  try {
+    const { storedParts, runtimeParts, error } = await loadPartsOfRun(run.userId, claimed.run)
+    if (error) {
+      const finished = await runs.finishRun(run.id, 'failed', error[1])
+      publishProgress(sessionIds[0], finished)
+      return
+    }
+    console.log(`[panel] disparo retomado pela política run=${run.id} pendentes=${claimed.recipients.length}`)
+    executeInBackground({
+      sessionIds, run: claimed.run, recipients: claimed.recipients, storedParts, runtimeParts, pacing: pacingOfRun(claimed.run)
+    })
+    publishProgress(sessionIds[0], claimed.run)
+  } catch (error) {
+    const finished = await runs.finishRun(run.id, 'failed', `Erro ao retomar: ${error.message}`)
+    publishProgress(sessionIds[0], finished)
+  }
+}
+
 module.exports = {
   startNow, schedule, startScheduled, retry, pause, cancel, changePacing, changeSessions,
-  failScheduled
+  failScheduled, resumePolicyPause
 }

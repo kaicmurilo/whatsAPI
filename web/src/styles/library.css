@@ -445,6 +445,9 @@
 .report-situation[data-situation='failed'] { color: var(--color-alert); }
 .report-situation[data-situation='pending'],
 .report-situation[data-situation='awaiting_reply'] { color: var(--color-pending); }
+.report-situation[data-situation='suppressed'],
+.report-situation[data-situation='duplicate'],
+.report-situation[data-situation='replied'] { color: var(--color-muted); }
 
 .run-actions .row-actions__primary[aria-pressed='true'] { background: var(--color-ink); color: var(--color-paper); }
 

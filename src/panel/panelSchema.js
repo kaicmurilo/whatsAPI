@@ -187,6 +187,44 @@ const ensureTemplateTables = async () => {
   // Envio programado (status 'scheduled' até o horário; lista e mensagem são lidas no momento do envio)
   await query('ALTER TABLE broadcast_runs ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ')
   await query("CREATE INDEX IF NOT EXISTS idx_broadcast_runs_scheduled ON broadcast_runs(scheduled_at) WHERE status = 'scheduled'")
+  // Pausa automática (horário / teto) é retomada pelo agendador; pausa do usuário não
+  await query('ALTER TABLE broadcast_runs ADD COLUMN IF NOT EXISTS pause_code VARCHAR(20)')
+  await query("CREATE INDEX IF NOT EXISTS idx_broadcast_runs_policy_pause ON broadcast_runs(pause_code) WHERE status = 'paused'")
+  // Qual instância enviou: o teto diário é por número, não por disparo
+  await query('ALTER TABLE broadcast_run_recipients ADD COLUMN IF NOT EXISTS sender_session_id VARCHAR(255)')
+  await query(`CREATE INDEX IF NOT EXISTS idx_broadcast_recipients_sender_day
+    ON broadcast_run_recipients(sender_session_id, sent_at) WHERE status = 'sent'`)
+}
+
+// Configuração do painel por usuário e números que pediram para não receber
+const ensureSettingsTables = async () => {
+  await query(`
+    CREATE TABLE IF NOT EXISTS panel_user_settings (
+      user_id VARCHAR(255) PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+      suppression_enabled BOOLEAN NOT NULL DEFAULT true,
+      suppression_keywords TEXT[] NOT NULL DEFAULT ARRAY['SAIR', 'PARAR', 'REMOVER', 'STOP'],
+      stop_on_reply BOOLEAN NOT NULL DEFAULT false,
+      prepend_first_name BOOLEAN NOT NULL DEFAULT false,
+      daily_cap_enabled BOOLEAN NOT NULL DEFAULT false,
+      daily_cap INTEGER NOT NULL DEFAULT 80,
+      quiet_hours_enabled BOOLEAN NOT NULL DEFAULT false,
+      quiet_start VARCHAR(5) NOT NULL DEFAULT '08:00',
+      quiet_end VARCHAR(5) NOT NULL DEFAULT '20:00',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+  await query(`
+    CREATE TABLE IF NOT EXISTS suppressed_numbers (
+      id BIGSERIAL PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      phone VARCHAR(15) NOT NULL,
+      phone_alt VARCHAR(15),
+      keyword VARCHAR(32) NOT NULL,
+      requested_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE (user_id, phone)
+    )
+  `)
+  await query('CREATE INDEX IF NOT EXISTS idx_suppressed_numbers_alt ON suppressed_numbers(user_id, phone_alt)')
 }
 
 // Idempotente: roda a cada boot porque o init.sql só executa em volume novo do Postgres
@@ -196,6 +234,7 @@ const ensurePanelSchema = async () => {
   await ensureFilesTable()
   await ensureBroadcastTables()
   await ensureTemplateTables()
+  await ensureSettingsTables()
 }
 
 module.exports = { ensurePanelSchema }

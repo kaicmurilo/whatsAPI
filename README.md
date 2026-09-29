@@ -96,8 +96,9 @@ Interface web (React + Vite) servida pela própria API em `/app`. Login com o `u
 | **Contatos** | Agenda interna do painel (não altera a agenda do celular); o nome aparece nas conversas |
 | **Mensagens** | Modelos reutilizáveis: texto, **variações ilimitadas**, até 10 anexos (áudio, vídeo, imagem, documento) em ordem; áudio como mensagem de voz |
 | **Arquivos** | Biblioteca de arquivos reutilizáveis (até 50 MB); vídeo/imagem vão com play/preview até 64 MB |
-| **Transmissão** | Listas de contatos (até 5.000), **importação de planilha .xlsx** (lista simples ou exportação de contatos), disparo com mensagem salva ou avulsa, **uma ou várias instâncias em rodízio**, **várias listas ao mesmo tempo** (a instância alterna os envios), **envio agora ou programado**, intervalo aleatório configurável (editável durante o envio), ordem embaralhada, **pausar/retomar**, pausa automática ao sinal de bloqueio, abortar, reprocessar |
+| **Transmissão** | Listas de contatos (até 5.000), **importação de planilha .xlsx** (lista simples, exportação de contatos ou de pacientes), disparo com mensagem salva ou avulsa, **uma ou várias instâncias em rodízio**, **várias listas ao mesmo tempo** (a instância alterna os envios), **envio agora ou programado**, intervalo aleatório configurável (editável durante o envio), ordem embaralhada, **pausar/retomar**, pausa automática ao sinal de bloqueio, abortar, reprocessar |
 | **Relatório** | Por disparo: enviado, entregue, lido e reproduzido por contato (tiques do WhatsApp), "Atualizar tiques" + exportação CSV para Excel |
+| **Configurações** | Supressão (palavra, números e data, com remoção), parar quem respondeu, primeiro nome no início do texto, teto diário e horário de envio |
 
 ### Rodar com Docker (recomendado)
 
@@ -149,6 +150,7 @@ npm run build:web                # gera web/dist (o Dockerfile já faz isso no b
   - **3 falhas de envio seguidas** ("Número sem WhatsApp" não conta; um envio com sucesso zera a contagem).
 - **Editar intervalo**: link **Editar** ao lado de "⏱" no histórico (mesmos limites do formulário: 3–600 s). A ordem já sorteada de um envio em andamento não muda.
 - Retomar/Reprocessar exigem a instância conectada. Outra lista já em envio na mesma instância não bloqueia: os contatos alternam.
+- **Supressão, nome, teto e horário** ficam em Configurações. Detalhe em [docs/BROADCAST_SEND.md](docs/BROADCAST_SEND.md).
 
 ### Envio programado
 
@@ -170,9 +172,10 @@ npm run build:web                # gera web/dist (o Dockerfile já faz isso no b
 ### Importar lista de planilha (.xlsx)
 
 - Em **Transmissão → Importar planilha**. O nome do arquivo vira o nome da lista (`INTERIOR.xlsx` → **INTERIOR**; se já existir, "INTERIOR (2)").
-- Dois formatos:
-  - **Lista simples:** colunas de nome e telefone detectadas pelo conteúdo, com ou sem cabeçalho. Telefone nacional recebe o código **55**. Célula com dois números separados por `/` gera dois contatos.
+- Três formatos:
+  - **Lista simples:** colunas de nome e telefone detectadas pelo conteúdo, com ou sem cabeçalho. Telefone nacional recebe o código **55**. Célula com dois números separados por `/` ou vírgula gera dois contatos.
   - **Exportação de contatos** (cabeçalho com `country_code`, `phone_number`, `saved_name`, `public_name`): o telefone já vem com DDI e é guardado assim. O nome é o salvo na agenda, ou o nome público do WhatsApp se o salvo estiver vazio. Sem nenhum dos dois, entra como **Sem nome**.
+  - **Exportação de pacientes** (cabeçalho com `Nome Completo` e `Celulares` ou `Telefones`, mesmo depois de um bloco de título): o nome é o completo, depois o social, depois o apelido. Celular e telefone fixo entram os dois. Telefone nacional recebe o **55**.
 - Número repetido no arquivo entra uma vez.
 - Contato que já está na agenda (inclusive com/sem o 9º dígito) é **reaproveitado**, sem alterar o nome. Linhas sem telefone válido aparecem no resumo com o motivo.
 - A planilha é lida no navegador; o servidor recebe só texto e faz a validação. Tudo numa transação.

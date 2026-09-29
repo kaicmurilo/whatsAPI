@@ -209,7 +209,7 @@ export interface OutgoingMessage {
   fileId: string | null
 }
 
-export type ReportSituation = 'all' | 'pending' | 'awaiting_reply' | 'sent' | 'delivered' | 'read' | 'failed'
+export type ReportSituation = 'all' | 'pending' | 'awaiting_reply' | 'suppressed' | 'duplicate' | 'replied' | 'sent' | 'delivered' | 'read' | 'failed'
 export type RecipientSituation = Exclude<ReportSituation, 'all'>
 
 export interface BroadcastReportSummary {
@@ -264,4 +264,23 @@ export interface ListImportResult {
   totalRows: number
   duplicates: number
   skipped: { row: number; reason: string }[]
+}
+
+export interface PanelSettings {
+  suppressionEnabled: boolean
+  suppressionKeywords: string[]
+  stopOnReply: boolean
+  prependFirstName: boolean
+  dailyCapEnabled: boolean
+  dailyCap: number
+  quietHoursEnabled: boolean
+  quietStart: string
+  quietEnd: string
+}
+
+export interface SuppressedNumber {
+  id: string
+  phone: string
+  keyword: string
+  requestedAt: string
 }

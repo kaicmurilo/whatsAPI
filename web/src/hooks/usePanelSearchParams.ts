@@ -13,7 +13,7 @@ const PARAM = {
   reportSituation: 'repsit',
 } as const
 
-const REPORT_SITUATIONS: ReportSituation[] = ['all', 'pending', 'awaiting_reply', 'sent', 'delivered', 'read', 'failed']
+const REPORT_SITUATIONS: ReportSituation[] = ['all', 'pending', 'awaiting_reply', 'suppressed', 'duplicate', 'replied', 'sent', 'delivered', 'read', 'failed']
 
 // Cada tabela paginada tem página e busca próprias na URL
 const TABLE_PARAMS = {
@@ -26,7 +26,7 @@ const TABLE_PARAMS = {
 
 export type TableKey = keyof typeof TABLE_PARAMS
 
-const PANEL_VIEWS = ['chats', 'contacts', 'templates', 'broadcasts', 'files'] as const
+const PANEL_VIEWS = ['chats', 'contacts', 'templates', 'broadcasts', 'files', 'settings'] as const
 export type PanelView = (typeof PANEL_VIEWS)[number]
 
 export interface TableState {

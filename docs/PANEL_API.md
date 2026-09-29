@@ -50,10 +50,40 @@ Corpo de criar/editar modelo:
 | POST | `/panel/broadcast-lists/import` | Importa linhas de planilha (`{ fileName, rows }`; o nome do arquivo vira o nome da lista) |
 | GET · PUT · DELETE | `/panel/broadcast-lists/:listId` | Detalhe / edita / remove lista |
 
-A planilha é lida no navegador. Dois formatos:
+A planilha é lida no navegador. Três formatos:
 
 - Lista simples: colunas de nome e telefone detectadas pelo conteúdo (`Nome | Cidade | (67) 99999-9999`), com ou sem cabeçalho. Telefone nacional brasileiro ganha o `55`.
 - Exportação de contatos: cabeçalho com `country_code` e `phone_number` (e `saved_name` / `public_name`). O telefone já vem com DDI e é guardado assim. O nome é o `saved_name`, ou o `public_name` quando o salvo está vazio.
+- Exportação de pacientes: cabeçalho com `Nome Completo` e `Celulares` ou `Telefones`, mesmo com linhas de título antes. O nome é o completo, ou o social, ou o apelido. Celular e telefone fixo entram; vários números na mesma célula viram contatos separados. Telefone nacional ganha o `55`.
+
+## Configurações e supressão
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/panel/settings` | Configuração da conta (cria o padrão na primeira leitura) |
+| PUT | `/panel/settings` | Substitui a configuração. Rate limit: 30/min por usuário |
+| GET | `/panel/suppression` | Números que pediram para sair (`page`, `perPage`, `search`) |
+| DELETE | `/panel/suppression/:suppressionId` | Tira o número da supressão. Não apaga o contato da agenda |
+
+Padrão ao criar a linha: supressão **ligada** com `SAIR`, `PARAR`, `REMOVER`, `STOP`. Parar quem respondeu, nome no início, teto diário e horário de envio começam **desligados**. Teto padrão 80 (mínimo 20, máximo 400). Janela padrão `08:00`–`20:00` (fuso `REPORT_TIMEZONE`, padrão `America/Sao_Paulo`).
+
+```json
+{
+  "suppressionEnabled": true,
+  "suppressionKeywords": ["SAIR", "PARAR"],
+  "stopOnReply": false,
+  "prependFirstName": false,
+  "dailyCapEnabled": false,
+  "dailyCap": 80,
+  "quietHoursEnabled": false,
+  "quietStart": "08:00",
+  "quietEnd": "20:00"
+}
+```
+
+Cada palavra é um termo só, sem espaço, até 32 caracteres, no máximo 10. Com a supressão ligada, a lista não pode ficar vazia. Horário inicial e final não podem ser iguais.
+
+No relatório, destinatário também pode ficar `suppressed`, `duplicate` ou `replied` (não entra em enviado nem em falha).
 
 ## Disparos
 
@@ -98,3 +128,7 @@ A planilha é lida no navegador. Dois formatos:
 - `paused`: pelo usuário, instância desconectada ou 3 falhas de envio seguidas (motivo em `error`).
 - `interrupted`: a API reiniciou durante o envio.
 - `retry` aceita qualquer status exceto `running` e `scheduled`; quem tem status `sent` nunca é reaberto.
+
+## Login do painel
+
+A tela de login (`/app`) tem a opção **Salvar user id e secret neste navegador**. Marcada, grava `user_id` e `user_secret` no `localStorage` ao enviar o formulário e preenche os campos na próxima visita. Desmarcada, apaga o que estava salvo. O access token continua só na aba (`sessionStorage`) e some ao fechar.

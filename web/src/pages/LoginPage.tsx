@@ -1,10 +1,22 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '../auth/useAuth'
+import { clearSavedCredentials, readSavedCredentials, storeSavedCredentials } from '../lib/authStorage'
+
+function initialLoginForm() {
+  const saved = readSavedCredentials()
+  return {
+    userId: saved?.userId ?? '',
+    userSecret: saved?.userSecret ?? '',
+    remember: saved !== null,
+  }
+}
 
 export function LoginPage() {
   const { login } = useAuth()
-  const [userId, setUserId] = useState('')
-  const [userSecret, setUserSecret] = useState('')
+  const [form] = useState(initialLoginForm)
+  const [userId, setUserId] = useState(form.userId)
+  const [userSecret, setUserSecret] = useState(form.userSecret)
+  const [remember, setRemember] = useState(form.remember)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -12,8 +24,11 @@ export function LoginPage() {
     event.preventDefault()
     setIsSubmitting(true)
     setError(null)
+    const trimmedUserId = userId.trim()
+    if (remember) storeSavedCredentials(trimmedUserId, userSecret)
+    else clearSavedCredentials()
     try {
-      await login(userId.trim(), userSecret)
+      await login(trimmedUserId, userSecret)
     } catch (loginError) {
       setError(loginError instanceof Error ? loginError.message : 'Falha no login')
     } finally {
@@ -34,6 +49,11 @@ export function LoginPage() {
         <label className="field">
           <span className="field__label">Secret</span>
           <input className="field__input" type="password" value={userSecret} onChange={(event) => setUserSecret(event.target.value)} autoComplete="current-password" required />
+        </label>
+
+        <label className="login__remember">
+          <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />
+          <span>Salvar user id e secret neste navegador</span>
         </label>
 
         {error ? <p className="login__error" role="alert">{error}</p> : null}
