@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { useDeleteSuppressed, useSaveSettings, useSettings, useSuppressed } from '../hooks/useSettings'
 import { formatDateTime, formatPhone } from '../lib/format'
 import { SUPPRESSION_PER_PAGE } from '../lib/settingsApi'
@@ -12,6 +12,28 @@ import { SearchInput } from './SearchInput'
 
 const DAILY_CAP_MIN = 20
 const DAILY_CAP_MAX = 400
+
+function SettingToggle({
+  checked,
+  title,
+  children,
+  onChange,
+}: {
+  checked: boolean
+  title: string
+  children: ReactNode
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <label className="settings__toggle">
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      <span className="settings__toggle-copy">
+        <span className="settings__toggle-title">{title}</span>
+        <span className="settings__toggle-text">{children}</span>
+      </span>
+    </label>
+  )
+}
 
 const keywordTextOf = (keywords: string[]): string => keywords.join('\n')
 
@@ -73,7 +95,7 @@ export function SettingsPane() {
 
   return (
     <section className="settings" aria-labelledby="settings-title">
-      <header className="contacts__header">
+      <header className="settings__header">
         <p className="contacts__eyebrow">Conta</p>
         <h1 id="settings-title" className="contacts__title">Configurações</h1>
         <p className="contacts__note">Vale para todas as instâncias. Supressão e dedup protegem o número; o restante só entra quando você liga.</p>
@@ -83,114 +105,121 @@ export function SettingsPane() {
 
       {draft ? (
         <form className="settings__form" onSubmit={handleSubmit}>
-          <fieldset className="settings__section">
-            <legend className="settings__legend">Supressão</legend>
-            <label className="settings__toggle">
-              <input
-                type="checkbox"
+          <div className="settings__grid">
+            <section className="settings__section" aria-labelledby="settings-suppression">
+              <h2 id="settings-suppression" className="settings__legend">Supressão</h2>
+              <SettingToggle
                 checked={draft.suppressionEnabled}
-                onChange={(event) => setDraft({ ...draft, suppressionEnabled: event.target.checked })}
-              />
-              <span>Não enviar para quem mandar uma destas palavras sozinha. Ligado por padrão.</span>
-            </label>
-            <label className="field">
-              <span className="field__label">Palavras, uma por linha</span>
-              <textarea
-                className="field__input"
-                rows={4}
-                value={keywordText}
-                onChange={(event) => setKeywordText(event.target.value)}
-                spellCheck={false}
-              />
-            </label>
-            <p className="settings__hint">A mensagem inteira precisa ser a palavra. “Não quero sair da consulta” não entra na lista.</p>
-          </fieldset>
+                title="Não enviar para quem pedir para sair"
+                onChange={(suppressionEnabled) => setDraft({ ...draft, suppressionEnabled })}
+              >
+                Ligado por padrão. Só entra quem mandar uma destas palavras sozinha.
+              </SettingToggle>
+              <label className="field">
+                <span className="field__label">Palavras, uma por linha</span>
+                <textarea
+                  className="field__input"
+                  rows={5}
+                  value={keywordText}
+                  onChange={(event) => setKeywordText(event.target.value)}
+                  spellCheck={false}
+                />
+              </label>
+              <p className="settings__hint">A mensagem inteira precisa ser a palavra. “Não quero sair da consulta” não entra na lista.</p>
+            </section>
 
-          <fieldset className="settings__section">
-            <legend className="settings__legend">Durante o disparo</legend>
-            <label className="settings__toggle">
-              <input
-                type="checkbox"
+            <section className="settings__section" aria-labelledby="settings-during">
+              <h2 id="settings-during" className="settings__legend">Durante o disparo</h2>
+              <SettingToggle
                 checked={draft.stopOnReply}
-                onChange={(event) => setDraft({ ...draft, stopOnReply: event.target.checked })}
-              />
-              <span>Tirar da fila quem responder antes de receber. Só aquele contato, não a campanha.</span>
-            </label>
-            <label className="settings__toggle">
-              <input
-                type="checkbox"
+                title="Tirar da fila quem responder"
+                onChange={(stopOnReply) => setDraft({ ...draft, stopOnReply })}
+              >
+                Só aquele contato, não a campanha. Quem responder antes de receber sai da fila.
+              </SettingToggle>
+              <SettingToggle
                 checked={draft.prependFirstName}
-                onChange={(event) => setDraft({ ...draft, prependFirstName: event.target.checked })}
-              />
-              <span>Colocar o primeiro nome no início do texto. Sem nome no contato, o marcador {'{nome}'} sai e o resto segue.</span>
-            </label>
-          </fieldset>
+                title="Primeiro nome no início do texto"
+                onChange={(prependFirstName) => setDraft({ ...draft, prependFirstName })}
+              >
+                Sem nome no contato, o marcador {'{nome}'} sai e o resto segue.
+              </SettingToggle>
+            </section>
 
-          <fieldset className="settings__section">
-            <legend className="settings__legend">Ritmo</legend>
-            <label className="settings__toggle">
-              <input
-                type="checkbox"
-                checked={draft.dailyCapEnabled}
-                onChange={(event) => setDraft({ ...draft, dailyCapEnabled: event.target.checked })}
-              />
-              <span>Teto diário por instância. Ao bater, o disparo pausa e retoma sozinho quando houver cota.</span>
-            </label>
-            <label className="field">
-              <span className="field__label">Mensagens por instância por dia ({DAILY_CAP_MIN}–{DAILY_CAP_MAX})</span>
-              <input
-                className="field__input"
-                type="number"
-                min={DAILY_CAP_MIN}
-                max={DAILY_CAP_MAX}
-                value={draft.dailyCap}
-                onChange={(event) => setDraft({ ...draft, dailyCap: Number(event.target.value) })}
-              />
-            </label>
-            <label className="settings__toggle">
-              <input
-                type="checkbox"
-                checked={draft.quietHoursEnabled}
-                onChange={(event) => setDraft({ ...draft, quietHoursEnabled: event.target.checked })}
-              />
-              <span>Enviar só neste horário (São Paulo). Fora dele, pausa e retoma na próxima janela.</span>
-            </label>
-            <div className="settings__clocks">
-              <label className="field">
-                <span className="field__label">De</span>
-                <input
-                  className="field__input"
-                  type="time"
-                  value={draft.quietStart}
-                  onChange={(event) => setDraft({ ...draft, quietStart: event.target.value })}
-                  required
-                />
-              </label>
-              <label className="field">
-                <span className="field__label">Até</span>
-                <input
-                  className="field__input"
-                  type="time"
-                  value={draft.quietEnd}
-                  onChange={(event) => setDraft({ ...draft, quietEnd: event.target.value })}
-                  required
-                />
-              </label>
-            </div>
-          </fieldset>
+            <section className="settings__section settings__section--span" aria-labelledby="settings-pace">
+              <h2 id="settings-pace" className="settings__legend">Ritmo</h2>
+              <div className="settings__pair">
+                <div>
+                  <SettingToggle
+                    checked={draft.dailyCapEnabled}
+                    title="Teto diário por instância"
+                    onChange={(dailyCapEnabled) => setDraft({ ...draft, dailyCapEnabled })}
+                  >
+                    Ao bater, o disparo pausa e retoma sozinho quando houver cota.
+                  </SettingToggle>
+                  <label className="field settings__cap">
+                    <span className="field__label">Por dia ({DAILY_CAP_MIN}–{DAILY_CAP_MAX})</span>
+                    <input
+                      className="field__input"
+                      type="number"
+                      min={DAILY_CAP_MIN}
+                      max={DAILY_CAP_MAX}
+                      value={draft.dailyCap}
+                      onChange={(event) => setDraft({ ...draft, dailyCap: Number(event.target.value) })}
+                    />
+                  </label>
+                </div>
+                <div>
+                  <SettingToggle
+                    checked={draft.quietHoursEnabled}
+                    title="Enviar só neste horário"
+                    onChange={(quietHoursEnabled) => setDraft({ ...draft, quietHoursEnabled })}
+                  >
+                    Fuso de São Paulo. Fora da janela, pausa e retoma na próxima.
+                  </SettingToggle>
+                  <div className="settings__clocks">
+                    <label className="field">
+                      <span className="field__label">De</span>
+                      <input
+                        className="field__input"
+                        type="time"
+                        value={draft.quietStart}
+                        onChange={(event) => setDraft({ ...draft, quietStart: event.target.value })}
+                        required
+                      />
+                    </label>
+                    <label className="field">
+                      <span className="field__label">Até</span>
+                      <input
+                        className="field__input"
+                        type="time"
+                        value={draft.quietEnd}
+                        onChange={(event) => setDraft({ ...draft, quietEnd: event.target.value })}
+                        required
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
 
-          <button className="contact-form__submit" type="submit" disabled={save.isPending}>
-            {save.isPending ? 'Salvando…' : 'Salvar'}
-          </button>
-          <p className="contact-form__feedback" role={save.isError ? 'alert' : 'status'}>
-            {save.isError ? save.error.message : save.isSuccess ? 'Configuração salva.' : 'O dedup entre listas abertas está sempre ligado.'}
-          </p>
+          <div className="settings__actions">
+            <button className="contact-form__submit" type="submit" disabled={save.isPending}>
+              {save.isPending ? 'Salvando…' : 'Salvar'}
+            </button>
+            <p className="contact-form__feedback" role={save.isError ? 'alert' : 'status'}>
+              {save.isError ? save.error.message : save.isSuccess ? 'Configuração salva.' : 'O dedup entre listas abertas está sempre ligado.'}
+            </p>
+          </div>
         </form>
       ) : null}
 
-      <div className="settings__list">
-        <h2 className="settings__legend">Números que pediram para sair</h2>
-        <SearchInput value={search} onSearchChange={(value) => { setSearch(value); setPage(1) }} placeholder="Buscar por telefone ou palavra" label="Buscar supressão" />
+      <section className="settings__list" aria-labelledby="settings-suppressed">
+        <h2 id="settings-suppressed" className="settings__legend">Números que pediram para sair</h2>
+        <div className="settings__search">
+          <SearchInput value={search} onSearchChange={(value) => { setSearch(value); setPage(1) }} placeholder="Buscar por telefone ou palavra" label="Buscar supressão" />
+        </div>
         {suppressed.isError ? <p className="contacts__error" role="alert">{suppressed.error.message}</p> : null}
         {remove.isError ? <p className="contacts__error" role="alert">{remove.error.message}</p> : null}
         {suppressed.isSuccess && items.length === 0 ? (
@@ -202,7 +231,7 @@ export function SettingsPane() {
           <DataTable caption="Números suprimidos" columns={columns} rows={items} getRowKey={(row) => row.id} isBusy={suppressed.isFetching} />
         ) : null}
         <Pagination page={page} perPage={SUPPRESSION_PER_PAGE} total={suppressed.data?.total ?? 0} label="Paginação da supressão" onPageChange={setPage} />
-      </div>
+      </section>
     </section>
   )
 }

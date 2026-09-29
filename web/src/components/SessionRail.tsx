@@ -4,6 +4,7 @@ import { NewSessionForm } from './NewSessionForm'
 import { SessionRailItem } from './SessionRailItem'
 
 const RAIL_VIEWS: { view: PanelView; label: string }[] = [
+  { view: 'dashboard', label: 'Painel' },
   { view: 'contacts', label: 'Contatos' },
   { view: 'templates', label: 'Mensagens' },
   { view: 'broadcasts', label: 'Transmissão' },

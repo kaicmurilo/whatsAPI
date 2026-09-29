@@ -1,5 +1,6 @@
 import { useChats, useStartSession } from '../hooks/usePanelData'
 import { CHATS_PER_PAGE } from '../lib/panelApi'
+import { whatsappIdentity } from '../lib/sessionLabel'
 import type { ChatListPaneProps } from '../types/components'
 import { ChatRow } from './ChatRow'
 import { EmptyState } from './EmptyState'
@@ -14,12 +15,14 @@ export function ChatListPane({ session, selectedChatId, page, search, onSelectCh
 
   const items = chats.data?.items ?? []
   const canRestart = session.status === 'stopped' || session.status === 'disconnected'
+  const identity = whatsappIdentity(session)
 
   return (
     <section className="chats" aria-labelledby="chats-title">
       <header className="chats__header">
         <div className="chats__heading">
-          <h1 id="chats-title" className="chats__title">{session.pushName ?? session.sessionId}</h1>
+          <h1 id="chats-title" className="chats__title">{session.sessionId}</h1>
+          {identity ? <p className="chats__identity">{identity}</p> : null}
           <StatusLamp status={session.status} showLabel />
         </div>
         {canRestart ? (

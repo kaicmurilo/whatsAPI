@@ -1,6 +1,7 @@
 const { Message } = require('whatsapp-web.js')
 const { toMessageRecord, isRecordableMessage } = require('./messageMapper')
 const { saveMessage } = require('./messageRepository')
+const { pickChatTitle } = require('./chatTitle')
 const { publishPanelEvent } = require('./panelEvents')
 
 // ponytail: janela fixa (30 chats × 30 msgs já carregadas pelo WhatsApp Web) — suficiente para o painel
@@ -31,18 +32,28 @@ const readRecentChatsInPage = (chatLimit, messageLimit) => {
       } catch (error) {
         messages = []
       }
-      return { chatId: chat.id._serialized, chatName: chat.formattedTitle || chat.name || null, messages }
+      const metadata = chat.groupMetadata
+      return {
+        chatId: chat.id._serialized,
+        titleCandidates: [
+          chat.formattedTitle || null,
+          chat.name || null,
+          (metadata && metadata.subject) || null
+        ],
+        messages
+      }
     })
 }
 
-// Retorna quantas mensagens eram novas; ON CONFLICT ignora as já salvas (roda a cada reconexão)
+// Mensagens novas entram no banco. As que já existiam só ganham o título, se ainda não tinham.
 const importChat = async (sessionId, client, chat, resolveCanonicalChatId) => {
   const chatId = await resolveCanonicalChatId(chat.chatId)
+  const chatName = pickChatTitle(chatId, ...(chat.titleCandidates || []))
   let inserted = 0
   for (const data of chat.messages) {
     const message = new Message(client, data)
     if (!isRecordableMessage(message)) continue
-    const record = toMessageRecord(sessionId, message, { chatName: chat.chatName, chatId })
+    const record = toMessageRecord(sessionId, message, { chatName, chatId })
     if (record.messageId && await saveMessage(record)) inserted++
   }
   return inserted

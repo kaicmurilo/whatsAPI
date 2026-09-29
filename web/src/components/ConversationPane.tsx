@@ -14,7 +14,7 @@ export function ConversationPane({ session, chatId, onClose }: ConversationPaneP
   const messages = useMessages(session.sessionId, chatId)
   const items = flattenNewestFirst(messages.data?.pages)
   const contactName = messages.data?.pages[0]?.contactName ?? null
-  const whatsappName = items.find((message) => message.chatName)?.chatName ?? null
+  const whatsappName = messages.data?.pages.find((page) => page.chatName)?.chatName ?? null
   const isGroup = isGroupChat(chatId)
   const isEmpty = messages.isSuccess && items.length === 0
 

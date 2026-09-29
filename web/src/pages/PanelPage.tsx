@@ -1,5 +1,6 @@
 import { useAuth } from '../auth/useAuth'
 import { BroadcastsPane } from '../components/BroadcastsPane'
+import { DashboardPane } from '../components/DashboardPane'
 import { ChatListPane } from '../components/ChatListPane'
 import { ContactsPane } from '../components/ContactsPane'
 import { ConversationPane } from '../components/ConversationPane'
@@ -77,6 +78,8 @@ export function PanelPage() {
         ) : null}
 
         {view === 'settings' ? <SettingsPane /> : null}
+
+        {view === 'dashboard' ? <DashboardPane sessions={sessionList} /> : null}
 
         {isChatsView && !selectedSession ? (
           <EmptyState title={selection.sessionId ? 'Instância não encontrada' : 'Escolha uma instância'}>

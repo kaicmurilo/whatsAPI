@@ -23,6 +23,7 @@ export const queryKeys = {
   reportOf: (runId: string) => ['broadcast-report', runId] as const,
   reportRecipients: (runId: string, page: number, situation: string) => ['broadcast-report', runId, 'recipients', page, situation] as const,
   settings: ['panel-settings'] as const,
+  metrics: ['panel-metrics'] as const,
   allSuppressed: ['suppression'] as const,
   suppressed: (query: PageQuery) => ['suppression', query] as const,
 }

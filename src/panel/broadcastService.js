@@ -85,7 +85,7 @@ const prepareBroadcast = async (userId, input) => {
 
 const startNow = async (userId, sessionId, input) => {
   const sessionIds = input.sessionIds?.length ? input.sessionIds : [sessionId]
-  const blocker = await findSessionsBlocker(userId, sessionIds, 'all-connected')
+  const blocker = await findSessionsBlocker(userId, sessionIds, 'any-connected')
   if (blocker) return { error: blocker }
   const { prepared, error } = await prepareBroadcast(userId, input)
   if (error) return { error }
@@ -187,8 +187,8 @@ const findRetryBlocker = async (userId, run) => {
 
 /**
  * @param {'all-connected' | 'any-connected' | 'ownership-only'} mode
- * all-connected: envio agora — cada número escolhido está online
- * any-connected: retomar — segue com quem estiver online; desconectada entra no rodízio se voltar
+ * all-connected: cada número escolhido está online
+ * any-connected: envio agora e retomar — segue com quem estiver online; desconectada fica no rodízio e entra quando voltar
  * ownership-only: programar ou trocar instâncias — a conexão é checada na hora de enviar
  */
 const findSessionsBlocker = async (userId, sessionIds, mode) => {

@@ -2,15 +2,15 @@
 
 ## Instâncias
 
-O formulário “Disparar” começa com a instância já aberta no painel (`?session=`), se ela estiver conectada. Senão, com a primeira conectada. Dá para marcar uma, algumas ou todas.
+O formulário “Disparar” começa com a instância já aberta no painel (`?session=`), se ela estiver conectada. Senão, com a primeira conectada. Dá para marcar uma, algumas ou todas. O rótulo é o nome configurado na criação (`sessionId`); nome e número do WhatsApp vêm depois, como detalhe.
 
-Cada contato sai pela próxima instância marcada, em rodízio. Só entram no rodízio instâncias com status `connected` (sessão em QR ou desconectada é ignorada). Se nenhuma estiver conectada, o disparo pausa.
+Cada contato sai pela próxima instância marcada, em rodízio. Instância desconectada (ou em QR) pode ser marcada: fica na lista e só envia quando o status volta a `connected`. Enquanto estiver fora, o rodízio pula para a próxima conectada. Se nenhuma marcada estiver conectada, o disparo pausa.
 
 No histórico, “Editar instâncias” troca o rodízio do que ainda falta enviar (inclusive um disparo em andamento, a partir do próximo contato, e um programado). Programado começa quando todas as marcadas estão conectadas, mesmo que outra lista já esteja enviando por elas.
 
 Fila única de envio (`broadcastLane.js`): um contato por vez em todo o processo, mesmo com várias listas e várias instâncias. Depois de cada envio, o próximo — outra instância ou outra lista — espera o intervalo sorteado de quem acabou de enviar. Instâncias diferentes não disparam juntas. Cada número ainda só volta a enviar depois desse mesmo intervalo. O disparo demora mais de propósito, para reduzir risco de bloqueio.
 
-Envio imediato exige que todas as marcadas estejam conectadas. Programar não: a conexão é conferida no horário.
+Envio imediato exige que pelo menos uma marcada esteja conectada. As desconectadas marcadas entram no rodízio quando voltarem. Programar não exige conexão agora: o horário só dispara quando todas as marcadas estiverem conectadas.
 
 `PUT /panel/broadcasts/:runId/sessions` com `{ sessionIds: string[] }` (1 a 20, dono de cada uma). O `POST` de disparo continua em `/panel/sessions/:sessionId/broadcasts` e o `sessionId` da URL precisa estar em `sessionIds`.
 
@@ -28,7 +28,9 @@ O trilho de instâncias fica na altura da janela. O formulário “Nova instânc
 
 ## Configurações da conta
 
-Tela **Configurações**. A linha nasce na primeira leitura (`panel_user_settings`).
+Tela **Configurações**, na área principal inteira (não na coluna estreita do chat), centralizada com a mesma margem dos dois lados. Opções em cartões: supressão e disparo lado a lado, ritmo na largura toda, lista de números suprimidos abaixo. A linha nasce na primeira leitura (`panel_user_settings`).
+
+Agenda, arquivos, mensagens e transmissão usam a mesma coluna central. No histórico, Relatório, Retomar e Cancelar ficam na mesma linha.
 
 | Opção | Padrão | Efeito |
 |---|---|---|

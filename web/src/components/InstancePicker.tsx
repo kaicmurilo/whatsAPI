@@ -1,12 +1,6 @@
+import { instanceChoiceLabel } from '../lib/sessionLabel'
 import type { WhatsAppSession } from '../types/api'
 import type { InstancePickerProps } from '../types/components'
-
-const labelOf = (session: WhatsAppSession): string => {
-  const name = session.pushName ?? session.sessionId
-  const phone = session.phone ? ` +${session.phone}` : ''
-  const down = session.status === 'connected' ? '' : ' (desconectada)'
-  return `${name}${phone}${down}`
-}
 
 // Uma, algumas ou todas. "Todas" marca só as que podem ser escolhidas neste momento.
 export function InstancePicker({ sessions, selectedIds, onChange, allowDisconnected, isDisabled = false }: InstancePickerProps) {
@@ -49,7 +43,7 @@ export function InstancePicker({ sessions, selectedIds, onChange, allowDisconnec
             disabled={!canSelect(session)}
             onChange={() => toggleOne(session.sessionId)}
           />
-          <span>{labelOf(session)}</span>
+          <span>{instanceChoiceLabel(session)}</span>
         </label>
       ))}
     </fieldset>

@@ -1,5 +1,6 @@
 const { toMessageRecord, isRecordableMessage, resolveChatId } = require('./messageMapper')
 const { saveMessage } = require('./messageRepository')
+const { pickChatTitle, readChatTitleCandidatesInPage } = require('./chatTitle')
 const { noteSuppressionKeyword } = require('./suppressionRepository')
 const { publishPanelEvent, setSessionStatus } = require('./panelEvents')
 const { backfillRecentHistory } = require('./historyBackfill')
@@ -7,13 +8,18 @@ const { createChatIdResolver } = require('./chatIdResolver')
 const { attachDeliveryTracker } = require('./deliveryTracker')
 const { reconcileRecentRuns } = require('./deliveryReconciler')
 
-// getChat() falha para chats @lid no WhatsApp Web atual; o nome cai no último remetente conhecido (SQL)
+// getChat() passa por getChatModel, que no WhatsApp Web atual quebra em grupo.
+// O título é lido direto do Store (formattedTitle / assunto). Sem título, a lista
+// usa o último remetente só em conversa 1:1 — grupo não herda nome de participante.
 const fetchChatName = async (sessionId, message) => {
+  const chatId = resolveChatId(message)
+  const page = message.client?.pupPage
+  if (!page) return null
   try {
-    const chat = await message.getChat()
-    return chat.name || null
+    const candidates = await page.evaluate(readChatTitleCandidatesInPage, chatId)
+    return pickChatTitle(chatId, ...(Array.isArray(candidates) ? candidates : []))
   } catch (error) {
-    console.warn(`[panel] nome do chat indisponível sessão=${sessionId} chat=${resolveChatId(message)}:`, error.message)
+    console.warn(`[panel] nome do chat indisponível sessão=${sessionId} chat=${chatId}:`, error.message)
     return null
   }
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useUpdateRunSessions } from '../hooks/useBroadcasts'
-import type { BroadcastRun, WhatsAppSession } from '../types/api'
+import type { BroadcastRun } from '../types/api'
 import type { RunInstancesEditorProps } from '../types/components'
 import { InstancePicker } from './InstancePicker'
 
@@ -10,14 +10,10 @@ export const sessionIdsOf = (run: BroadcastRun): string[] =>
 const hasSendsAhead = (run: BroadcastRun): boolean =>
   run.status === 'scheduled' || run.status === 'awaiting' || run.total > run.sent
 
-const nameOf = (sessionId: string, sessions: WhatsAppSession[]): string =>
-  sessions.find((session) => session.sessionId === sessionId)?.pushName ?? sessionId
-
-const describeInstances = (sessionIds: string[], sessions: WhatsAppSession[]): string => {
+const describeInstances = (sessionIds: string[]): string => {
   if (sessionIds.length === 0) return 'Nenhuma instância'
-  const names = sessionIds.map((sessionId) => nameOf(sessionId, sessions))
-  if (names.length <= 2) return names.join(', ')
-  return `${names.slice(0, 2).join(', ')} +${names.length - 2}`
+  if (sessionIds.length <= 2) return sessionIds.join(', ')
+  return `${sessionIds.slice(0, 2).join(', ')} +${sessionIds.length - 2}`
 }
 
 const editHint = (run: BroadcastRun): string => {
@@ -35,7 +31,7 @@ export function RunInstancesEditor({ run, sessions }: RunInstancesEditorProps) {
   if (!draft) {
     return (
       <span className="run-content__instances">
-        {describeInstances(current, sessions)}
+        {describeInstances(current)}
         {hasSendsAhead(run) ? <button type="button" className="run-pacing__edit" onClick={() => setDraft(current)}>Editar instâncias</button> : null}
       </span>
     )

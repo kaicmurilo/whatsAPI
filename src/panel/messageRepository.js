@@ -7,7 +7,8 @@ const MESSAGE_COLUMNS = `
   media_filename AS "mediaFilename", sent_at AS "sentAt"
 `
 
-// Retorna o registro salvo, ou null se a mensagem já existia (evento duplicado)
+// Retorna o registro salvo, ou null se a mensagem já existia (evento duplicado).
+// No conflito, preenche chat_name quando o que está gravado é vazio ou só o id do chat.
 const saveMessage = async (record) => {
   const result = await query(
     `INSERT INTO whatsapp_messages
@@ -20,8 +21,28 @@ const saveMessage = async (record) => {
       record.author, record.senderName, record.type, record.body, record.hasMedia,
       record.mediaMimetype, record.mediaFilename, record.sentAt]
   )
-  return result.rows[0] || null
+  if (result.rows[0]) return result.rows[0]
+  if (record.chatName) {
+    await query(
+      `UPDATE whatsapp_messages
+       SET chat_name = $3
+       WHERE session_id = $1 AND message_id = $2
+         AND (
+           chat_name IS NULL OR btrim(chat_name) = ''
+           OR chat_name = chat_id
+           OR chat_name = split_part(chat_id, '@', 1)
+         )`,
+      [record.sessionId, record.messageId, record.chatName]
+    )
+  }
+  return null
 }
+
+const USEFUL_CHAT_NAME = `
+  chat_name IS NOT NULL AND btrim(chat_name) <> ''
+  AND chat_name <> chat_id
+  AND chat_name <> split_part(chat_id, '@', 1)
+`
 
 // Uma linha por chat com a última mensagem + nome da agenda do usuário (se houver).
 // Paginação por página porque a lista é ordenada por atividade.
@@ -29,21 +50,31 @@ const listChats = async (sessionId, userId, { page, perPage, search }) => {
   const result = await query(
     `WITH last_message AS (
        SELECT DISTINCT ON (chat_id)
-         chat_id, chat_name, body, type, from_me, sent_at
+         chat_id, body, type, from_me, sent_at
        FROM whatsapp_messages
        WHERE session_id = $1
        ORDER BY chat_id, sent_at DESC, id DESC
      ),
+     known_name AS (
+       SELECT DISTINCT ON (chat_id)
+         chat_id, chat_name
+       FROM whatsapp_messages
+       WHERE session_id = $1 AND ${USEFUL_CHAT_NAME}
+       ORDER BY chat_id, sent_at DESC, id DESC
+     ),
      named_chat AS (
        SELECT lm.chat_id, lm.body, lm.type, lm.from_me, lm.sent_at, contact.name AS contact_name,
-              -- getChat() falha em chats @lid: sem nome do chat, usa o último remetente conhecido
-              COALESCE(lm.chat_name, (
+              -- Grupo: só o título do grupo. 1:1 sem título: último remetente (getChat falha em @lid).
+              COALESCE(kn.chat_name, (
                 SELECT s.sender_name FROM whatsapp_messages s
-                WHERE s.session_id = $1 AND s.chat_id = lm.chat_id AND s.sender_name IS NOT NULL
+                WHERE s.session_id = $1 AND s.chat_id = lm.chat_id
+                  AND lm.chat_id NOT LIKE '%@g.us'
+                  AND s.sender_name IS NOT NULL
                 ORDER BY s.sent_at DESC
                 LIMIT 1
               )) AS chat_name
        FROM last_message lm
+       LEFT JOIN known_name kn ON kn.chat_id = lm.chat_id
        LEFT JOIN LATERAL (
          SELECT c.name
          FROM panel_contacts c
@@ -121,4 +152,19 @@ const phoneFromChatId = (chatId) => {
   return digits || null
 }
 
-module.exports = { saveMessage, listChats, listMessages, isSessionOwnedBy, hasInboundFromPhone, phoneFromChatId }
+// Último título real do chat. Ignora linha cujo chat_name é só o JID (comum em grupo).
+const latestUsefulChatName = async (sessionId, chatId) => {
+  const result = await query(
+    `SELECT chat_name AS "chatName"
+     FROM whatsapp_messages
+     WHERE session_id = $1 AND chat_id = $2 AND ${USEFUL_CHAT_NAME}
+     ORDER BY sent_at DESC, id DESC
+     LIMIT 1`,
+    [sessionId, chatId]
+  )
+  return result.rows[0]?.chatName ?? null
+}
+
+module.exports = {
+  saveMessage, listChats, listMessages, isSessionOwnedBy, hasInboundFromPhone, phoneFromChatId, latestUsefulChatName
+}

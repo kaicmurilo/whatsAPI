@@ -1,7 +1,10 @@
+import { formatPhone } from '../lib/format'
 import type { SessionRailItemProps } from '../types/components'
 import { StatusLamp } from './StatusLamp'
 
 export function SessionRailItem({ session, isSelected, onSelect }: SessionRailItemProps) {
+  const phone = session.phone ? formatPhone(session.phone) : null
+
   return (
     <li>
       <button
@@ -12,8 +15,9 @@ export function SessionRailItem({ session, isSelected, onSelect }: SessionRailIt
       >
         <StatusLamp status={session.status} />
         <span className="rail-item__text">
-          <span className="rail-item__name">{session.pushName ?? session.sessionId}</span>
-          <span className="rail-item__meta">{session.phone ? `+${session.phone}` : session.sessionId}</span>
+          <span className="rail-item__name">{session.sessionId}</span>
+          {session.pushName ? <span className="rail-item__meta">{session.pushName}</span> : null}
+          {phone ? <span className="rail-item__meta">{phone}</span> : null}
         </span>
       </button>
     </li>

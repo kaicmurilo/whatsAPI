@@ -26,7 +26,7 @@ const TABLE_PARAMS = {
 
 export type TableKey = keyof typeof TABLE_PARAMS
 
-const PANEL_VIEWS = ['chats', 'contacts', 'templates', 'broadcasts', 'files', 'settings'] as const
+const PANEL_VIEWS = ['chats', 'contacts', 'templates', 'broadcasts', 'files', 'settings', 'dashboard'] as const
 export type PanelView = (typeof PANEL_VIEWS)[number]
 
 export interface TableState {

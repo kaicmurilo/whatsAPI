@@ -49,6 +49,8 @@ export interface MessagePage {
   items: StoredMessage[]
   nextBeforeId: string | null
   contactName: string | null
+  // Título do WhatsApp já filtrado (não é o JID cru). Independente da página carregada.
+  chatName: string | null
 }
 
 export interface Contact {
@@ -283,4 +285,49 @@ export interface SuppressedNumber {
   phone: string
   keyword: string
   requestedAt: string
+}
+
+export type MetricPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'last30' | 'all'
+
+export interface MetricBucket {
+  sent: number
+  delivered: number
+  read: number
+  played: number
+  replied: number
+  uniquePhones: number
+  failed: number
+  suppressed: number
+  optOuts: number
+  campaigns: number
+}
+
+export interface InstanceMetricSlice {
+  sent: number
+  delivered: number
+  read: number
+  replied: number
+}
+
+export interface InstanceMetrics {
+  sessionId: string
+  periods: Record<MetricPeriod, InstanceMetricSlice>
+}
+
+export interface DailyMetric {
+  day: string
+  sent: number
+  delivered: number
+  read: number
+  replied: number
+}
+
+export interface DashboardMetrics {
+  timeZone: string
+  replyWindowDays: number
+  generatedAt: string
+  periods: Record<MetricPeriod, MetricBucket>
+  instances: InstanceMetrics[]
+  daily: DailyMetric[]
+  snapshot: { running: number; paused: number; scheduled: number }
 }

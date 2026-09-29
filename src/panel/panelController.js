@@ -1,7 +1,7 @@
 const AuthService = require('../auth/authService')
 const { sessions } = require('../sessions')
 const { sendErrorResponse } = require('../utils')
-const { listChats, listMessages, isSessionOwnedBy } = require('./messageRepository')
+const { listChats, listMessages, isSessionOwnedBy, latestUsefulChatName } = require('./messageRepository')
 const { findContactNameForChat } = require('./contactRepository')
 const { getSessionStatus, subscribePanelEvents } = require('./panelEvents')
 const { CHAT_ID_PATTERN, parseBoundedInt, parsePagination, isValidPagination } = require('./validators')
@@ -50,11 +50,12 @@ const getMessages = async (req, res) => {
     return sendErrorResponse(res, 422, 'Parâmetros inválidos')
   }
   try {
-    const [page, contactName] = await Promise.all([
+    const [page, contactName, chatName] = await Promise.all([
       listMessages(sessionId, chatId, { beforeId, limit }),
-      findContactNameForChat(req.user.user_id, chatId)
+      findContactNameForChat(req.user.user_id, chatId),
+      latestUsefulChatName(sessionId, chatId)
     ])
-    res.json({ success: true, data: { ...page, contactName } })
+    res.json({ success: true, data: { ...page, contactName, chatName } })
   } catch (error) {
     console.error(`[panel] falha ao listar mensagens sessão=${sessionId} chat=${chatId}:`, error)
     sendErrorResponse(res, 500, 'Erro ao listar mensagens')

@@ -13,6 +13,7 @@ const broadcastReportController = require('./broadcastReportController')
 const templateController = require('./templateController')
 const settingsController = require('./settingsController')
 const suppressionController = require('./suppressionController')
+const metricsController = require('./metricsController')
 
 const ONE_MINUTE_MS = 60 * 1000
 
@@ -75,7 +76,9 @@ panelRouter.put('/templates/:templateId', templateController.saveTemplate)
 panelRouter.delete('/templates/:templateId', templateController.removeTemplate)
 
 const settingsRateLimiter = perUserLimiter(30, 'Muitas alterações de configuração. Aguarde um minuto.')
+const metricsRateLimiter = perUserLimiter(20, 'Muitas consultas de métricas. Aguarde um minuto.')
 
+panelRouter.get('/metrics', metricsRateLimiter, metricsController.getMetrics)
 panelRouter.get('/settings', settingsController.getPanelSettings)
 panelRouter.put('/settings', settingsRateLimiter, settingsController.updatePanelSettings)
 panelRouter.get('/suppression', suppressionController.getSuppressed)

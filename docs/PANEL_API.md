@@ -10,12 +10,14 @@ Listagens paginadas aceitam `page` e `perPage` e devolvem `{ items, total }`.
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/panel/sessions` | Instâncias do usuário com status |
-| GET | `/panel/sessions/:sessionId/chats` | Conversas salvas |
-| GET | `/panel/sessions/:sessionId/chats/:chatId/messages` | Mensagens de uma conversa |
+| GET | `/panel/sessions` | Instâncias do usuário com status. O nome no painel é o `sessionId` definido na criação; `pushName` e `phone` aparecem só como detalhe, cada um na sua linha, sem reticências |
+| GET | `/panel/sessions/:sessionId/chats` | Conversas salvas. O nome do grupo é o título do WhatsApp, não o do último participante. |
+| GET | `/panel/sessions/:sessionId/chats/:chatId/messages` | Mensagens de uma conversa. `chatName` é o último título real do chat (vazio se só havia o JID). |
 | POST | `/panel/sessions/:sessionId/chats/:chatId/messages` | Envia texto/anexo (instância conectada; rate limit) |
 | GET | `/panel/sessions/:sessionId/numbers/:phone` | Resolve se o número tem WhatsApp |
 | GET | `/panel/stream` | Eventos em tempo real (SSE): mensagens, status, progresso de disparo |
+
+O nome do grupo não vem de `message.getChat()`: no WhatsApp Web atual esse caminho quebra ao serializar o grupo e gravava vazio (a lista então mostrava o JID, ou o nome de um participante). O título é lido do Store (`formattedTitle`, ou o assunto em `groupMetadata.subject` quando o título é só o id). A lista usa o último título real do chat, não o `chat_name` da última mensagem. Conversa 1:1 sem título continua caindo no último remetente. Na reconexão, mensagens que já existiam e estavam sem nome (ou só com o JID) recebem o título; isso não republica a mensagem.
 
 ## Agenda, arquivos e modelos
 
@@ -50,7 +52,11 @@ Corpo de criar/editar modelo:
 | POST | `/panel/broadcast-lists/import` | Importa linhas de planilha (`{ fileName, rows }`; o nome do arquivo vira o nome da lista) |
 | GET · PUT · DELETE | `/panel/broadcast-lists/:listId` | Detalhe / edita / remove lista |
 
-A planilha é lida no navegador. Três formatos:
+A planilha é lida no navegador. A interface mostra o nome e o tamanho do arquivo, quantas linhas saíram da leitura e o resultado (ou o erro do servidor). Se a leitura passar de 30 segundos, ela é cancelada e o botão volta a aceitar outro arquivo.
+
+Abas cuja XML descompactada passa de 512 KB são descompactadas num Web Worker (`blob:`). O CSP do painel precisa de `worker-src 'self' blob:`. Sem isso o worker não devolve a planilha, o botão permanece em “Lendo planilha…” e a importação seguinte não começa. Planilhas menores descompactam na thread principal e não dependem do worker.
+
+Três formatos:
 
 - Lista simples: colunas de nome e telefone detectadas pelo conteúdo (`Nome | Cidade | (67) 99999-9999`), com ou sem cabeçalho. Telefone nacional brasileiro ganha o `55`.
 - Exportação de contatos: cabeçalho com `country_code` e `phone_number` (e `saved_name` / `public_name`). O telefone já vem com DDI e é guardado assim. O nome é o `saved_name`, ou o `public_name` quando o salvo está vazio.
@@ -85,6 +91,14 @@ Cada palavra é um termo só, sem espaço, até 32 caracteres, no máximo 10. Co
 
 No relatório, destinatário também pode ficar `suppressed`, `duplicate` ou `replied` (não entra em enviado nem em falha).
 
+## Painel de métricas
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/panel/metrics` | Totais de transmissão por período e por instância. Rate limit: 20/min por usuário, além do limite global |
+
+O comportamento (o que entra em enviada, entrega, leitura e resposta) está em `docs/DASHBOARD.md`.
+
 ## Disparos
 
 | Método | Rota | Descrição |
@@ -115,7 +129,7 @@ No relatório, destinatário também pode ficar `suppressed`, `duplicate` ou `re
 ```
 
 - Conteúdo: `templateId` **ou** `text` e/ou `fileId` (nunca os dois; `templateId` vazio é recusado com 422).
-- `sessionIds`: uma, algumas ou todas as instâncias. O `sessionId` da URL precisa estar na lista. Cada contato sai pela próxima instância conectada.
+- `sessionIds`: uma, algumas ou todas as instâncias, inclusive desconectadas. O `sessionId` da URL precisa estar na lista. Cada contato sai pela próxima instância conectada; desconectada fica no rodízio e só envia quando voltar. Envio imediato exige ao menos uma conectada. Programado só começa quando todas as marcadas estão conectadas.
 - Várias listas podem usar as mesmas instâncias ao mesmo tempo. Cada instância envia um contato por vez e alterna a lista, respeitando o intervalo de quem acabou de enviar.
 - Se o modelo tem variações, cada contato recebe uma versão em rodízio (texto principal, depois as variações), pela posição na lista. Sem variações, o texto é o mesmo para todos.
 - `pacing` opcional (padrão 20–45 s, ordem aleatória); limites de 3 a 600 s.

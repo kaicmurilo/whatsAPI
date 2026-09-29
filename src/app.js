@@ -45,7 +45,10 @@ app.use(helmet({
       connectSrc: [
         "'self'",
         "blob:"
-      ]
+      ],
+      // fflate descompacta em Web Worker (blob:) abas maiores que 512 KB.
+      // Sem blob: o worker nasce e não responde: a UI fica em "Lendo planilha…" e não aceita outro arquivo.
+      workerSrc: ["'self'", "blob:"]
     }
   },
   hsts: {

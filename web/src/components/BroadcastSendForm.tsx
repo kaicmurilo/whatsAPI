@@ -36,9 +36,8 @@ interface BlockerInput {
 
 function describeBlocker({ sessionIds, sessions, requireConnected, hasList, hasContent, pacing, whenMode, scheduleValue }: BlockerInput): string | null {
   if (sessionIds.length === 0) return 'Escolha ao menos uma instância.'
-  if (requireConnected && sessionIds.some((sessionId) => sessions.find((session) => session.sessionId === sessionId)?.status !== 'connected')) {
-    return 'Todas as instâncias selecionadas precisam estar conectadas.'
-  }
+  const anyConnected = sessionIds.some((sessionId) => sessions.find((session) => session.sessionId === sessionId)?.status === 'connected')
+  if (requireConnected && !anyConnected) return 'Nenhuma das instâncias selecionadas está conectada.'
   if (!hasList) return 'Escolha a lista.'
   if (!hasContent) return 'Escolha uma mensagem salva ou escreva a mensagem.'
   if (!isValidPacing(pacing)) return 'Intervalo inválido: use segundos inteiros de 3 a 600, mínimo ≤ máximo.'
@@ -73,11 +72,8 @@ export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendF
   const listOptions = lists.data?.items ?? []
   const chosenList = listOptions.find((list) => list.id === listId) ?? null
   const hasContent = contentMode === 'template' ? chosenTemplate !== null : text.trim().length > 0 || file !== null
-  const sendingIds = isScheduling
-    ? sessionIds
-    : sessionIds.filter((sessionId) => sessions.find((session) => session.sessionId === sessionId)?.status === 'connected')
   const blocker = describeBlocker({
-    sessionIds: sendingIds,
+    sessionIds,
     sessions,
     requireConnected: !isScheduling,
     hasList: chosenList !== null,
@@ -89,13 +85,14 @@ export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendF
   const estimate = chosenList && isValidPacing(pacing) ? `Tempo estimado: ~${estimateDurationMinutes(chosenList.memberCount, pacing)} min.` : ''
 
   const send = () => {
-    if (blocker || sendingIds.length === 0 || !chosenList) return
+    if (blocker || sessionIds.length === 0 || !chosenList) return
     const scheduledAt = isScheduling ? localInputToIso(scheduleValue) ?? undefined : undefined
+    const connectedId = sessionIds.find((sessionId) => sessions.find((session) => session.sessionId === sessionId)?.status === 'connected')
     const input: BroadcastInput = contentMode === 'template' && chosenTemplate
-      ? { listId: chosenList.id, pacing, scheduledAt, sessionIds: sendingIds, templateId: chosenTemplate.id }
-      : { listId: chosenList.id, pacing, scheduledAt, sessionIds: sendingIds, text: text.trim(), fileId: file?.id ?? null }
+      ? { listId: chosenList.id, pacing, scheduledAt, sessionIds, templateId: chosenTemplate.id }
+      : { listId: chosenList.id, pacing, scheduledAt, sessionIds, text: text.trim(), fileId: file?.id ?? null }
     startBroadcast.mutate(
-      { sessionId: sendingIds[0], input },
+      { sessionId: connectedId ?? sessionIds[0], input },
       {
         onSuccess: () => {
           setText('')
@@ -110,9 +107,9 @@ export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendF
       <h2 id="broadcast-send-title" className="broadcasts__section-title">Disparar</h2>
       <InstancePicker
         sessions={sessions}
-        selectedIds={sendingIds}
+        selectedIds={sessionIds}
         onChange={setChosenSessionIds}
-        allowDisconnected={isScheduling}
+        allowDisconnected
         isDisabled={startBroadcast.isPending}
       />
 
@@ -193,7 +190,7 @@ export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendF
       ) : null}
 
       <p className="broadcast-send__note">
-        Fila única: um contato por vez, no intervalo sorteado. Várias instâncias ou várias listas não disparam juntas — a próxima só sai depois da espera. Dá para abortar no histórico. {estimate}
+        Fila única: um contato por vez, no intervalo sorteado. Várias instâncias ou várias listas não disparam juntas — a próxima só sai depois da espera. Instância desconectada pode ser marcada: fica no rodízio e só envia quando voltar. Para começar agora, pelo menos uma precisa estar conectada. Dá para abortar no histórico. {estimate}
       </p>
       {blocker ? <p className="broadcast-send__blocker">{blocker}</p> : null}
       {startBroadcast.isError ? <p className="broadcast-send__error" role="alert">{startBroadcast.error.message}</p> : null}
