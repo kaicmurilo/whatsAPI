@@ -4,11 +4,15 @@
 
 O formulário “Disparar” começa com a instância já aberta no painel (`?session=`), se ela estiver conectada. Senão, com a primeira conectada. Dá para marcar uma, algumas ou todas. O rótulo é o nome configurado na criação (`sessionId`); nome e número do WhatsApp vêm depois, como detalhe.
 
-Cada contato sai pela próxima instância marcada, em rodízio. Instância desconectada (ou em QR) pode ser marcada: fica na lista e só envia quando o status volta a `connected`. Enquanto estiver fora, o rodízio pula para a próxima conectada. Se nenhuma marcada estiver conectada, o disparo pausa.
+Cada contato sai pela instância marcada com menos envios no dia (fuso do painel, o mesmo do dashboard). Se duas ou mais empatam, sai pela que enviou há mais tempo; quem nunca enviou vem na frente. A conta é de todos os disparos da conta, não só da lista atual. Instância desconectada (ou em QR) pode ser marcada: fica na lista e só entra quando o status volta a `connected`. Enquanto estiver fora, a escolha pula para a próxima elegível. Se nenhuma marcada estiver conectada, o disparo pausa.
 
 No histórico, “Editar instâncias” troca o rodízio do que ainda falta enviar (inclusive um disparo em andamento, a partir do próximo contato, e um programado). Programado começa quando todas as marcadas estão conectadas, mesmo que outra lista já esteja enviando por elas.
 
-Fila única de envio (`broadcastLane.js`): um contato por vez em todo o processo, mesmo com várias listas e várias instâncias. Depois de cada envio, o próximo — outra instância ou outra lista — espera o intervalo sorteado de quem acabou de enviar. Instâncias diferentes não disparam juntas. Cada número ainda só volta a enviar depois desse mesmo intervalo. O disparo demora mais de propósito, para reduzir risco de bloqueio.
+**Excluir** na lista tira a lista, os contatos dela e os disparos desse histórico. Se algum ainda está enviando, para antes do próximo contato. O painel do dia deixa de contar esses envios.
+
+**Retomar todas**, no histórico, reabre os disparos interrompidos e os pausados à mão (usuário, instância caída ou falhas seguidas). Pausa por horário ou teto diário segue retomando sozinha. **Cancelar** num interrompido encerra sem apagar a lista.
+
+Fila única de envio (`broadcastLane.js`): um contato por vez em todo o processo, mesmo com várias listas e várias instâncias. Depois de cada envio, o próximo — outra instância ou outra lista — espera o intervalo sorteado de quem acabou de enviar. Instâncias diferentes não disparam juntas. Cada número ainda só volta a enviar depois desse mesmo intervalo. O disparo demora mais de propósito, para reduzir risco de bloqueio. Se o banco falha no meio da vez (timeout), a fila é liberada e a tentativa se repete; um erro ali não deixa as outras listas esperando para sempre.
 
 Envio imediato exige que pelo menos uma marcada esteja conectada. As desconectadas marcadas entram no rodízio quando voltarem. Programar não exige conexão agora: o horário só dispara quando todas as marcadas estiverem conectadas.
 

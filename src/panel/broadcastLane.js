@@ -34,7 +34,9 @@ const createLane = () => {
   }
 
   return {
-    ready: () => holder === null && Date.now() >= blockedUntil && waiters.length === 0,
+    snapshot () {
+      return { waiting: waiters.length, busy: holder !== null, blockedUntil }
+    },
     acquire(runId, signal) {
       if (signal?.aborted) return Promise.resolve(false)
       return new Promise((resolve) => {
@@ -76,10 +78,18 @@ const acquireSession = (sessionId, runId, signal) => laneFor(sessionId).acquire(
 
 const releaseSession = (sessionId, delayMs) => laneFor(sessionId).release(delayMs)
 
-const sessionReady = (sessionId) => laneFor(sessionId).ready()
-
 const acquireSendSlot = (runId, signal) => sendSlot.acquire(runId, signal)
 
 const releaseSendSlot = (delayMs) => sendSlot.release(delayMs)
 
-module.exports = { acquireSession, releaseSession, sessionReady, acquireSendSlot, releaseSendSlot }
+const sendQueueSnapshot = () => {
+  const { waiting, busy, blockedUntil } = sendSlot.snapshot()
+  const now = Date.now()
+  return {
+    queued: waiting,
+    sending: busy,
+    nextSendAt: blockedUntil > now ? new Date(blockedUntil).toISOString() : null
+  }
+}
+
+module.exports = { acquireSession, releaseSession, acquireSendSlot, releaseSendSlot, sendQueueSnapshot }

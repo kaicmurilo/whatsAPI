@@ -1,4 +1,5 @@
-import { useBroadcastRuns } from '../hooks/useBroadcasts'
+import { useBroadcastRuns, useResumeAllBroadcasts } from '../hooks/useBroadcasts'
+import { ConfirmButton } from './ConfirmButton'
 import { formatDateTime } from '../lib/format'
 import { formatSchedule } from '../lib/schedule'
 import { TABLE_PER_PAGE } from '../lib/panelApi'
@@ -89,6 +90,26 @@ const buildRunColumns = (
   },
 ]
 
+function ResumeAllButton() {
+  const resumeAll = useResumeAllBroadcasts()
+  const resumed = resumeAll.data?.resumed.length ?? 0
+  const skipped = resumeAll.data?.skipped ?? []
+  return (
+    <div className="broadcasts__header-actions">
+      <ConfirmButton
+        tone="primary"
+        label="Retomar todas"
+        confirmLabel="Retomar interrompidos e pausados?"
+        isPending={resumeAll.isPending}
+        onConfirm={() => resumeAll.mutate()}
+      />
+      {resumeAll.isError ? <span className="run-actions__error" role="alert">{resumeAll.error.message}</span> : null}
+      {resumeAll.isSuccess && resumed === 0 && skipped.length === 0 ? <span className="broadcasts__resume-note">Nenhum disparo para retomar</span> : null}
+      {skipped.length > 0 ? <span className="run-actions__error" role="alert">{skipped.length} não retomado(s): {skipped[0].error}</span> : null}
+    </div>
+  )
+}
+
 export function BroadcastRunsSection({ sessions, page, openReportId, onPageChange, onOpenReport }: BroadcastRunsSectionProps) {
   const runs = useBroadcastRuns(page)
   const items = runs.data?.items ?? []
@@ -96,7 +117,10 @@ export function BroadcastRunsSection({ sessions, page, openReportId, onPageChang
 
   return (
     <section className="broadcasts__section" aria-labelledby="runs-title">
-      <h2 id="runs-title" className="broadcasts__section-title">Histórico</h2>
+      <header className="broadcasts__section-header">
+        <h2 id="runs-title" className="broadcasts__section-title">Histórico</h2>
+        <ResumeAllButton />
+      </header>
       {runs.isError ? <EmptyState title="Não foi possível carregar o histórico">{runs.error.message}</EmptyState> : null}
       {runs.isSuccess && items.length === 0 ? <EmptyState title="Nenhum disparo ainda" /> : null}
       {items.length > 0 ? <DataTable caption="Histórico de disparos" columns={columns} rows={items} getRowKey={getRunKey} isBusy={runs.isFetching} /> : null}

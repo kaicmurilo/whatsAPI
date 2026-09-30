@@ -84,6 +84,10 @@ panelRouter.put('/settings', settingsRateLimiter, settingsController.updatePanel
 panelRouter.get('/suppression', suppressionController.getSuppressed)
 panelRouter.delete('/suppression/:suppressionId', settingsRateLimiter, suppressionController.deleteSuppressed)
 
+const queuePollLimiter = perUserLimiter(40, 'Muitas consultas da fila. Aguarde um minuto.')
+
+panelRouter.post('/broadcasts/resume-all', broadcastRateLimiter, broadcastController.resumeAllBroadcasts)
+panelRouter.get('/broadcasts/queue', queuePollLimiter, broadcastController.getSendQueue)
 panelRouter.get('/broadcasts', broadcastController.getRuns)
 panelRouter.get('/broadcasts/:runId', broadcastController.getRun)
 panelRouter.post('/broadcasts/:runId/retry', broadcastRateLimiter, broadcastController.retryBroadcast)

@@ -267,15 +267,45 @@ const cancelScheduledRun = async (runId) => {
   return result.rows[0] || null
 }
 
-// Condicional: não fecha um pausado que acabou de ser retomado (corrida Retomar × Cancelar)
-const cancelPausedRun = async (runId, reason) => {
+// Condicional no status esperado: não fecha um disparo que acabou de voltar a enviar
+const cancelStoppedRun = async (runId, reason, status) => {
   const result = await query(
-    `UPDATE broadcast_runs SET status = 'canceled', error = $2, finished_at = CURRENT_TIMESTAMP
-     WHERE id = $1 AND status = 'paused'
+    `UPDATE broadcast_runs SET status = 'canceled', error = $2, finished_at = CURRENT_TIMESTAMP, pause_code = NULL
+     WHERE id = $1 AND status = $3
      RETURNING ${RUN_COLUMNS}`,
-    [runId, truncateError(reason)]
+    [runId, truncateError(reason), status]
   )
   return result.rows[0] || null
+}
+
+const listRunIdsByList = async (userId, listId) => {
+  const result = await query(
+    'SELECT id FROM broadcast_runs WHERE user_id = $1 AND list_id = $2 ORDER BY id',
+    [userId, listId]
+  )
+  return result.rows.map((row) => row.id)
+}
+
+const deleteRunsByList = async (userId, listId) => {
+  const result = await query(
+    'DELETE FROM broadcast_runs WHERE user_id = $1 AND list_id = $2',
+    [userId, listId]
+  )
+  return result.rowCount
+}
+
+const listManualResumeRunIds = async (userId) => {
+  const result = await query(
+    `SELECT id FROM broadcast_runs
+     WHERE user_id = $1
+       AND (
+         status = 'interrupted'
+         OR (status = 'paused' AND COALESCE(pause_code, '') NOT IN ('quiet', 'cap'))
+       )
+     ORDER BY id`,
+    [userId]
+  )
+  return result.rows.map((row) => row.id)
 }
 
 // Run em awaiting: marca awaiting_reply restantes e encerra
@@ -401,8 +431,24 @@ const claimPausedForResume = (runId) => withTransaction(async (client) => {
   return { run, recipients: recipients.rows }
 })
 
+const countRemainingRecipients = async (userId) => {
+  const result = await query(
+    `SELECT COUNT(*)::int AS remaining
+     FROM broadcast_run_recipients r
+     JOIN broadcast_runs run ON run.id = r.run_id
+     WHERE run.user_id = $1
+       AND run.status IN ('running', 'paused', 'interrupted')
+       AND r.status = 'pending'`,
+    [userId]
+  )
+  return result.rows[0].remaining
+}
+
 module.exports = {
-  cancelPausedRun,
+  cancelStoppedRun,
+  listRunIdsByList,
+  deleteRunsByList,
+  listManualResumeRunIds,
   cancelAwaitingRun,
   updateRunPacing,
   updateRunSessions,
@@ -423,5 +469,6 @@ module.exports = {
   reopenRunForRetry,
   interruptRunningRuns,
   listPolicyPausedRuns,
-  claimPausedForResume
+  claimPausedForResume,
+  countRemainingRecipients
 }

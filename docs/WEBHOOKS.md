@@ -25,6 +25,9 @@ Enviado quando a sessão está totalmente conectada e pronta para uso.
 Acionado ao receber qualquer nova mensagem.
 - **Payload**: Contém o objeto completo da mensagem do `whatsapp-web.js`.
 
+### `message_ack`
+Confirmação de entrega/leitura de uma mensagem enviada.
+
 ### `status`
 Mudanças de estado da conexão (conectando, desconectado, etc).
 

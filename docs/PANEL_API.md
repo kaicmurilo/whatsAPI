@@ -50,7 +50,7 @@ Corpo de criar/editar modelo:
 |--------|------|-----------|
 | GET · POST | `/panel/broadcast-lists` | Lista / cria lista (até 5.000 contatos) |
 | POST | `/panel/broadcast-lists/import` | Importa linhas de planilha (`{ fileName, rows }`; o nome do arquivo vira o nome da lista) |
-| GET · PUT · DELETE | `/panel/broadcast-lists/:listId` | Detalhe / edita / remove lista |
+| GET · PUT · DELETE | `/panel/broadcast-lists/:listId` | Detalhe / edita / remove lista. O DELETE também para os disparos dessa lista (antes do próximo contato) e apaga o histórico deles |
 
 A planilha é lida no navegador. A interface mostra o nome e o tamanho do arquivo, quantas linhas saíram da leitura e o resultado (ou o erro do servidor). Se a leitura passar de 30 segundos, ela é cancelada e o botão volta a aceitar outro arquivo.
 
@@ -107,8 +107,9 @@ O comportamento (o que entra em enviada, entrega, leitura e resposta) está em `
 | GET | `/panel/broadcasts` | Histórico paginado |
 | GET | `/panel/broadcasts/:runId` | Detalhe com destinatários |
 | POST | `/panel/broadcasts/:runId/pause` | Pausa um disparo em andamento (202; para antes do próximo contato) |
+| POST | `/panel/broadcasts/resume-all` | Retoma os disparos interrompidos e os pausados à mão (pausa do usuário, instância caída ou falhas seguidas). Horário e teto diário continuam retomando sozinhos |
 | POST | `/panel/broadcasts/:runId/retry` | Retomar/Reprocessar: envia só para quem não recebeu (202) |
-| POST | `/panel/broadcasts/:runId/cancel` | Cancela programado ou pausado; aborta em andamento (202) |
+| POST | `/panel/broadcasts/:runId/cancel` | Cancela programado, pausado ou interrompido; aborta em andamento (202) |
 | PUT | `/panel/broadcasts/:runId/pacing` | Altera o intervalo (`{ pacing }`); em andamento vale a partir da próxima espera |
 | PUT | `/panel/broadcasts/:runId/sessions` | Troca o rodízio (`{ sessionIds }`, 1 a 20); em andamento vale a partir do próximo contato |
 | GET | `/panel/broadcasts/:runId/report` | Resumo: enviado, entregue, lido, reproduzido |
@@ -129,7 +130,7 @@ O comportamento (o que entra em enviada, entrega, leitura e resposta) está em `
 ```
 
 - Conteúdo: `templateId` **ou** `text` e/ou `fileId` (nunca os dois; `templateId` vazio é recusado com 422).
-- `sessionIds`: uma, algumas ou todas as instâncias, inclusive desconectadas. O `sessionId` da URL precisa estar na lista. Cada contato sai pela próxima instância conectada; desconectada fica no rodízio e só envia quando voltar. Envio imediato exige ao menos uma conectada. Programado só começa quando todas as marcadas estão conectadas.
+- `sessionIds`: uma, algumas ou todas as instâncias, inclusive desconectadas. O `sessionId` da URL precisa estar na lista. Cada contato sai pela instância conectada com menos envios no dia do painel. No empate, sai a que enviou há mais tempo (quem nunca enviou vem primeiro). Desconectada fica na lista e só entra quando voltar. Envio imediato exige ao menos uma conectada. Programado só começa quando todas as marcadas estão conectadas.
 - Várias listas podem usar as mesmas instâncias ao mesmo tempo. Cada instância envia um contato por vez e alterna a lista, respeitando o intervalo de quem acabou de enviar.
 - Se o modelo tem variações, cada contato recebe uma versão em rodízio (texto principal, depois as variações), pela posição na lista. Sem variações, o texto é o mesmo para todos.
 - `pacing` opcional (padrão 20–45 s, ordem aleatória); limites de 3 a 600 s.

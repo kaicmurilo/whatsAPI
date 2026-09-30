@@ -1,5 +1,6 @@
 const { sendErrorResponse } = require('../utils')
-const { listRuns, findRun } = require('./broadcastRunRepository')
+const { listRuns, findRun, countRemainingRecipients } = require('./broadcastRunRepository')
+const { sendQueueSnapshot } = require('./broadcastLane')
 const broadcastService = require('./broadcastService')
 const { parsePacing } = require('./broadcastPacing')
 const { parseSessionIds } = require('./broadcastSessions')
@@ -137,6 +138,29 @@ const updateBroadcastSessions = async (req, res) => {
   }
 }
 
+const resumeAllBroadcasts = async (req, res) => {
+  const userId = req.user.user_id
+  try {
+    const result = await broadcastService.resumeAll(userId)
+    res.json({ success: true, data: result })
+  } catch (error) {
+    console.error(`[panel] falha ao retomar disparos user=${userId}:`, error)
+    sendErrorResponse(res, 500, 'Erro ao retomar disparos')
+  }
+}
+
+const getSendQueue = async (req, res) => {
+  const userId = req.user.user_id
+  try {
+    const queue = sendQueueSnapshot()
+    const remaining = await countRemainingRecipients(userId)
+    res.json({ success: true, data: { ...queue, remaining } })
+  } catch (error) {
+    console.error(`[panel] falha ao ler a fila user=${userId}:`, error)
+    sendErrorResponse(res, 500, 'Erro ao ler a fila de envio')
+  }
+}
+
 const getRuns = async (req, res) => {
   const pagination = parsePagination(req.query, { defaultPerPage: RUNS_DEFAULT_PER_PAGE })
   if (!isValidPagination(pagination)) return sendErrorResponse(res, 422, 'Parâmetros de paginação inválidos')
@@ -161,4 +185,4 @@ const getRun = async (req, res) => {
   }
 }
 
-module.exports = { startBroadcast, retryBroadcast, pauseBroadcast, cancelBroadcast, updateBroadcastPacing, updateBroadcastSessions, getRuns, getRun }
+module.exports = { startBroadcast, retryBroadcast, pauseBroadcast, cancelBroadcast, updateBroadcastPacing, updateBroadcastSessions, resumeAllBroadcasts, getSendQueue, getRuns, getRun }

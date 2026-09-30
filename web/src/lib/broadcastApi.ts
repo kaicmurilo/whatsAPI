@@ -41,6 +41,15 @@ export function startBroadcast(token: string, sessionId: string, input: Broadcas
   return requestData<BroadcastRun>(`${sessionPath(sessionId)}/broadcasts`, { token, method: 'POST', body: input })
 }
 
+export interface ResumeAllResult {
+  resumed: BroadcastRun[]
+  skipped: { id: string, error: string }[]
+}
+
+export function resumeAllBroadcasts(token: string): Promise<ResumeAllResult> {
+  return requestData<ResumeAllResult>('/panel/broadcasts/resume-all', { token, method: 'POST' })
+}
+
 export function fetchBroadcastRuns(token: string, page: number): Promise<BroadcastRunPage> {
   return requestData<BroadcastRunPage>(`/panel/broadcasts?${pageParams({ page, search: '' }, TABLE_PER_PAGE)}`, { token })
 }

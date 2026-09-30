@@ -21,6 +21,23 @@ const countSentToday = async (sessionIds, dayStart, dayEnd) => {
   return new Map(result.rows.map((row) => [row.sessionId, row.total]))
 }
 
+// Envios do dia e o horário do último envio (qualquer dia). Quem nunca enviou não aparece.
+const loadSendBalance = async (sessionIds, dayStart, dayEnd) => {
+  if (sessionIds.length === 0) return new Map()
+  const result = await query(
+    `SELECT sender_session_id AS "sessionId",
+            COUNT(*) FILTER (WHERE sent_at >= $2 AND sent_at < $3)::int AS today,
+            MAX(sent_at) AS "lastSentAt"
+     FROM broadcast_run_recipients
+     WHERE sender_session_id = ANY($1::text[])
+       AND status = 'sent'
+       AND sent_at IS NOT NULL
+     GROUP BY sender_session_id`,
+    [sessionIds, dayStart, dayEnd]
+  )
+  return new Map(result.rows.map((row) => [row.sessionId, { today: row.today, lastSentAt: row.lastSentAt }]))
+}
+
 // Outro disparo da mesma conta, sobreposto no tempo, já mandou para este telefone
 const hasOverlappingSend = async (userId, runId, position, phones, runCreatedAt) => {
   if (phones.length === 0) return false
@@ -74,6 +91,10 @@ const createBroadcastGate = ({ userId, runId, createdAt }) => {
       const settings = await settingsOf()
       if (!settings.dailyCapEnabled) return new Set()
       return sessionsOverCap(sessionIds, await sentToday(sessionIds), settings.dailyCap)
+    },
+    sendLoad: async (sessionIds) => {
+      const { start, end } = zonedDayBounds(new Date(), reportTimeZone)
+      return loadSendBalance(sessionIds, start, end)
     },
     classify: async (recipient) => {
       const settings = await settingsOf()

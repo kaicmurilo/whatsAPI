@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useRequiredToken } from '../auth/useAuth'
 import {
   deleteBroadcastList,
+  resumeAllBroadcasts,
   fetchBroadcastList,
   fetchBroadcastLists,
   fetchBroadcastRuns,
@@ -65,7 +66,20 @@ export function useDeleteBroadcastList() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (listId: string) => deleteBroadcastList(token, listId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.allBroadcastLists }),
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.allBroadcastLists }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.allBroadcastRuns }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.metrics }),
+    ]),
+  })
+}
+
+export function useResumeAllBroadcasts() {
+  const token = useRequiredToken()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => resumeAllBroadcasts(token),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.allBroadcastRuns }),
   })
 }
 

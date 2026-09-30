@@ -247,6 +247,13 @@ export interface ReportRecipient {
 
 export type ReportRecipientPage = Paginated<ReportRecipient>
 
+export interface SendQueueSnapshot {
+  queued: number
+  sending: boolean
+  nextSendAt: string | null
+  remaining: number
+}
+
 export type PanelEvent =
   | { type: 'broadcast_progress'; sessionId: string; run: BroadcastRun }
   | { type: 'broadcast_delivery'; sessionId: string; runId: string }

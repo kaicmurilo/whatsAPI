@@ -119,6 +119,20 @@ const discardFailedClient = (sessionId, client, error) => {
   scheduleInitRetry(sessionId)
 }
 
+// whatsapp-web.js emite authenticated e ready no mesmo callback; erro no meio é engolido e a sessão fica "autenticando"
+const READY_AFTER_AUTH_TIMEOUT_MS = 180000
+
+const watchReadyAfterAuth = (sessionId, client) => {
+  client.once('authenticated', () => {
+    const timer = setTimeout(() => {
+      if (sessions.get(sessionId) !== client) return
+      discardFailedClient(sessionId, client, new Error(`ready não chegou ${READY_AFTER_AUTH_TIMEOUT_MS / 1000}s após autenticar`))
+    }, READY_AFTER_AUTH_TIMEOUT_MS)
+    timer.unref()
+    client.once('ready', () => clearTimeout(timer))
+  })
+}
+
 const destroyWithTimeout = (sessionId, client) => Promise.race([
   client.destroy(),
   new Promise((resolve, reject) => setTimeout(() => reject(new Error('timeout')), SHUTDOWN_DESTROY_TIMEOUT_MS))
@@ -188,6 +202,7 @@ const setupSession = (sessionId) => {
 
     client.initialize().catch(err => discardFailedClient(sessionId, client, err))
     client.once('ready', () => initRetryAttempts.delete(sessionId))
+    watchReadyAfterAuth(sessionId, client)
 
     initializeEvents(client, sessionId)
     attachSessionRecorder(client, sessionId)

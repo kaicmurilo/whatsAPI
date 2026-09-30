@@ -1,6 +1,6 @@
 const { serializeMessageId, serializeWid } = require('./messageMapper')
 const { partsForRecipient } = require('./messageParts')
-const { acquireSession, releaseSession, sessionReady, acquireSendSlot, releaseSendSlot } = require('./broadcastLane')
+const { acquireSession, releaseSession, acquireSendSlot, releaseSendSlot } = require('./broadcastLane')
 const { CAP_PAUSE_ERROR } = require('./sendPolicy')
 
 const MS_PER_SECOND = 1000
@@ -18,6 +18,11 @@ const PAUSE_REASONS = {
 }
 
 const describeError = (error) => (typeof error === 'string' ? error : error?.message || 'erro desconhecido').slice(0, 255)
+
+const isDbTimeout = (error) => {
+  const message = typeof error?.message === 'string' ? error.message : ''
+  return message.includes('timeout') || message.includes('Connection terminated')
+}
 
 const shuffle = (items, random = Math.random) => {
   const shuffled = [...items]
@@ -64,22 +69,33 @@ const holdStop = (sessionIds, failureExcluded, capExcluded, getClient) => {
   return ['paused', reason, code]
 }
 
-const pickSender = (sessionIds, cursor, excluded, getClient, isReady = () => true) => {
-  const count = sessionIds.length
-  if (count === 0) return null
-  const choose = (requireReady) => {
-    for (let attempt = 0; attempt < count; attempt += 1) {
-      const index = (cursor + attempt) % count
-      const sessionId = sessionIds[index]
-      if (excluded.has(sessionId)) continue
-      if (requireReady && !isReady(sessionId)) continue
-      const client = getClient(sessionId)
-      if (client) return { sessionId, client, nextCursor: (index + 1) % count }
-    }
-    return null
+const lastSentMillis = (value) => {
+  if (value === null || value === undefined) return Number.NEGATIVE_INFINITY
+  const millis = new Date(value).getTime()
+  return Number.isNaN(millis) ? Number.NEGATIVE_INFINITY : millis
+}
+
+// Menor quantidade de envios no dia. Empate: quem enviou há mais tempo (nunca enviou vem primeiro).
+const pickByDailyLoad = (sessionIds, excluded, getClient, load = new Map()) => {
+  const eligible = []
+  for (const sessionId of sessionIds) {
+    if (excluded.has(sessionId)) continue
+    const client = getClient(sessionId)
+    if (!client) continue
+    const stats = load.get(sessionId)
+    eligible.push({
+      sessionId,
+      client,
+      today: stats?.today ?? 0,
+      lastSentAt: stats?.lastSentAt ?? null
+    })
   }
-  // Prefere instância livre. Se todas estão na vez de outra lista, espera na próxima do rodízio.
-  return choose(true) ?? choose(false)
+  if (eligible.length === 0) return null
+  eligible.sort((left, right) => {
+    if (left.today !== right.today) return left.today - right.today
+    return lastSentMillis(left.lastSentAt) - lastSentMillis(right.lastSentAt)
+  })
+  return { sessionId: eligible[0].sessionId, client: eligible[0].client }
 }
 
 const pauseWhenNobodyCanSend = (sessionIds, excluded) => (
@@ -105,13 +121,12 @@ const nextFailureStreak = (streak, outcome) => {
 const runBroadcast = async (run, {
   getClient, recordResult, finish, publish,
   partPause = waitOrAbort, random = Math.random,
-  acquireTurn = acquireSession, releaseTurn = releaseSession, isSessionReady = sessionReady,
+  acquireTurn = acquireSession, releaseTurn = releaseSession,
   acquireSlot = acquireSendSlot, releaseSlot = releaseSendSlot,
   gate = null
 }) => {
   const recipients = run.pacing.randomOrder ? shuffle(run.recipients, random) : run.recipients
   let stop = null
-  let cursor = 0
   const excluded = new Set()
   const streaks = new Map()
   if (gate) await gate.ready()
@@ -148,30 +163,31 @@ const runBroadcast = async (run, {
     const attemptLimit = Math.max(sessionIds.length, 1) + 1
     while (!outcome && !stop && attempts < attemptLimit) {
       attempts += 1
-      const capExcluded = gate ? await gate.sessionsOverCap(sessionIds) : new Set()
-      const blocked = new Set([...excluded, ...capExcluded])
       const slot = await acquireSlot(run.id, run.signal)
       if (!slot) {
         stop = stopByUser(run.signal)
         break
       }
-      sender = pickSender(sessionIds, cursor, blocked, getClient, isSessionReady)
-      if (!sender) {
-        releaseSlot(0)
-        stop = holdStop(sessionIds, excluded, capExcluded, getClient)
-        break
-      }
-      cursor = sender.nextCursor
-      const granted = await acquireTurn(sender.sessionId, run.id, run.signal)
-      if (!granted) {
-        releaseSlot(0)
-        stop = stopByUser(run.signal)
-        break
-      }
-      const delayMs = pickDelayMs(run.pacing, random)
-      let delayAfter = delayMs
-      let sessionCapped = false
+      let delayAfter = 0
+      let turnSessionId = null
+      let capExcluded = new Set()
       try {
+        capExcluded = gate ? await gate.sessionsOverCap(sessionIds) : new Set()
+        const blocked = new Set([...excluded, ...capExcluded])
+        const load = gate ? await gate.sendLoad(sessionIds) : new Map()
+        sender = pickByDailyLoad(sessionIds, blocked, getClient, load)
+        if (!sender) {
+          stop = holdStop(sessionIds, excluded, capExcluded, getClient)
+          break
+        }
+        const granted = await acquireTurn(sender.sessionId, run.id, run.signal)
+        if (!granted) {
+          stop = stopByUser(run.signal)
+          break
+        }
+        turnSessionId = sender.sessionId
+        delayAfter = pickDelayMs(run.pacing, random)
+        let sessionCapped = false
         if (gate) {
           const lateWindow = await gate.pauseForWindow(new Date())
           if (lateWindow) {
@@ -196,8 +212,13 @@ const runBroadcast = async (run, {
           )
         }
         if (outcome) await record(recipient.position, outcome, sender.sessionId)
+      } catch (error) {
+        delayAfter = 0
+        const canRetry = isDbTimeout(error) && attempts < attemptLimit
+        console.warn(`[panel] banco indisponível run=${run.id} tentativa=${attempts}: ${describeError(error)}`)
+        if (!canRetry) throw error
       } finally {
-        releaseTurn(sender.sessionId, delayAfter)
+        if (turnSessionId) releaseTurn(turnSessionId, delayAfter)
         releaseSlot(delayAfter)
       }
     }
@@ -213,7 +234,7 @@ const runBroadcast = async (run, {
       excluded.add(sender.sessionId)
       console.warn(`[panel] instância fora do rodízio run=${run.id} sessão=${sender.sessionId}: ${MAX_CONSECUTIVE_FAILURES} falhas seguidas`)
       const moreRecipients = index < recipients.length - 1
-      if (moreRecipients && !pickSender(run.sessionIds, cursor, excluded, getClient)) {
+      if (moreRecipients && !pickByDailyLoad(run.sessionIds, excluded, getClient)) {
         stop = ['paused', PAUSE_REASONS.failureStreak, 'failure']
         break
       }
@@ -255,6 +276,6 @@ const sendToRecipient = async (client, recipient, { parts, trackedPart = 0, pers
 }
 
 module.exports = {
-  runBroadcast, sendToRecipient, pickSender, shuffle, pickDelayMs, waitOrAbort,
+  runBroadcast, sendToRecipient, pickByDailyLoad, shuffle, pickDelayMs, waitOrAbort,
   CANCELED_REASON, PAUSE_REQUEST, MAX_CONSECUTIVE_FAILURES
 }

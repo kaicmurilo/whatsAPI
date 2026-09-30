@@ -78,9 +78,9 @@ function AwaitingActions({ run }: { run: BroadcastRun }) {
 
 function StatusActions({ run }: { run: BroadcastRun }) {
   if (run.status === 'running') return <RunningActions run={run} />
-  if (run.status === 'paused') return <PausedActions run={run} />
+  if (run.status === 'paused' || run.status === 'interrupted') return <PausedActions run={run} />
   if (run.status === 'awaiting') return <AwaitingActions run={run} />
-  return <RetryAction run={run} label={run.status === 'interrupted' ? 'Retomar' : 'Reprocessar'} />
+  return <RetryAction run={run} label="Reprocessar" />
 }
 
 export function BroadcastRunActions({ run, isReportOpen, onOpenReport }: BroadcastRunActionsProps) {

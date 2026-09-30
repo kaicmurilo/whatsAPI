@@ -1,5 +1,5 @@
-import { useState, type CSSProperties } from 'react'
-import { useMetrics } from '../hooks/useMetrics'
+import { useEffect, useState, type CSSProperties } from 'react'
+import { useMetrics, useSendQueue } from '../hooks/useMetrics'
 import { whatsappIdentity } from '../lib/sessionLabel'
 import type { DailyMetric, InstanceMetrics, MetricBucket, MetricPeriod, WhatsAppSession } from '../types/api'
 import type { DataTableColumn } from '../types/components'
@@ -68,6 +68,41 @@ function DailyChart({ days }: { days: DailyMetric[] }) {
   )
 }
 
+function NextSendCountdown({ nextSendAt, sending }: { nextSendAt: string | null; sending: boolean }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+  if (sending && nextSendAt === null) return 'Enviando'
+  if (nextSendAt === null) return '—'
+  const left = Math.max(0, Math.ceil((new Date(nextSendAt).getTime() - now) / 1000))
+  const minutes = Math.floor(left / 60)
+  const seconds = String(left % 60).padStart(2, '0')
+  return `${minutes}:${seconds}`
+}
+
+function SendQueueStrip() {
+  const queue = useSendQueue()
+  const data = queue.data
+  return (
+    <dl className="dash-snapshot" aria-label="Fila de envio">
+      <div>
+        <dt>Próxima mensagem</dt>
+        <dd>{data ? <NextSendCountdown nextSendAt={data.nextSendAt} sending={data.sending} /> : '—'}</dd>
+      </div>
+      <div>
+        <dt>Na fila</dt>
+        <dd>{data ? formatCount(data.queued) : '—'}</dd>
+      </div>
+      <div>
+        <dt>Faltam</dt>
+        <dd>{data ? formatCount(data.remaining) : '—'}</dd>
+      </div>
+    </dl>
+  )
+}
+
 function bucketRates(bucket: MetricBucket) {
   return {
     delivery: rateOf(bucket.delivered, bucket.sent),
@@ -122,6 +157,8 @@ export function DashboardPane({ sessions }: { sessions: WhatsAppSession[] }) {
           {metrics.isFetching ? 'Atualizando…' : 'Atualizar'}
         </button>
       </header>
+
+      <SendQueueStrip />
 
       <dl className="dash-snapshot">
         <div><dt>Em andamento</dt><dd>{formatCount(data.snapshot.running)}</dd></div>

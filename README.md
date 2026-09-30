@@ -1,417 +1,201 @@
-# WhatsApp REST API
+<div align="center">
 
-> Este código é uma melhoria baseada no projeto original disponível em [https://github.com/pedroherpeto/whatsapp-api](https://github.com/pedroherpeto/whatsapp-api).
+# whatsAPI
 
+**API REST e painel web para operar várias contas de WhatsApp: conversas, agenda, modelos e transmissão com relatório de entrega.**
 
-API REST wrapper para a biblioteca [whatsapp-web.js](https://github.com/pedroslopez/whatsapp-web.js), fornecendo uma interface fácil de usar para interagir com a plataforma WhatsApp Web.
-Foi projetada para ser usada como um container Docker, escalável, segura e fácil de integrar com outros projetos não-NodeJs.
+[![Release](https://img.shields.io/github/v/release/kaicmurilo/whatsAPI?color=25D366&label=release)](https://github.com/kaicmurilo/whatsAPI/releases)
+[![Node](https://img.shields.io/badge/node-22-339933?logo=node.js&logoColor=white)](Dockerfile)
+[![Docker](https://img.shields.io/badge/docker-compose-2496ED?logo=docker&logoColor=white)](docker-compose.local.yml)
+[![whatsapp-web.js](https://img.shields.io/badge/whatsapp--web.js-1.34.7-128C7E)](https://github.com/pedroslopez/whatsapp-web.js)
+[![License: MIT](https://img.shields.io/badge/license-MIT-lightgrey)](LICENSE.md)
 
-Este projeto está em desenvolvimento: dê uma estrela, crie issues, funcionalidades.
+[Início rápido](#-início-rápido) · [Painel](#-painel-web) · [Transmissão](#-transmissão) · [API REST](#-api-rest) · [Documentação](#-documentação)
 
-**OBSERVAÇÃO**: Não posso garantir que você não será bloqueado ao usar este método, embora tenha funcionado para mim. O WhatsApp não permite bots ou clientes não oficiais em sua plataforma, então isso não deve ser considerado totalmente seguro.
+</div>
 
-## Índice
+---
 
-[1. Funcionalidades](#funcionalidades)
+> [!WARNING]
+> O WhatsApp não permite clientes não oficiais. Este projeto reduz o risco de bloqueio, mas **não o elimina**. O que mais pesa é quem recebe: contatos que não pediram a mensagem denunciam e bloqueiam.
 
-[2. Painel Web](#painel-web)
+## ✨ Destaques
 
-[3. Sistema de Autenticação](#sistema-de-autenticação)
+| | |
+|---|---|
+| 📱 **Várias contas** | Cada número é uma sessão com QR próprio. Sessões voltam sozinhas depois de um reinício, sem pedir QR de novo. |
+| 💬 **Conversas** | Histórico salvo no Postgres, busca e envio de texto e anexos em tempo real (SSE). |
+| 📣 **Transmissão** | Listas de até 5.000 contatos, importação de `.xlsx`, várias listas e instâncias ao mesmo tempo, envio agora ou programado. |
+| ⚖️ **Carga equilibrada** | Cada contato sai pela instância com **menos envios no dia**. Uma fila única manda uma mensagem por vez no processo inteiro. |
+| 🛡️ **Proteção de número** | Intervalo sorteado, ordem embaralhada, teto diário, janela de horário, supressão e pausa automática ao sinal de bloqueio. |
+| 📊 **Relatórios** | Enviado, entregue, lido e reproduzido por contato, exportação CSV e painel com taxas por período e por instância. |
+| 🔌 **API REST + webhooks** | 90+ endpoints no estilo do whatsapp-web.js, com Swagger em inglês e português. |
 
-[4. Executar Localmente](#executar-localmente)
+## 🚀 Início rápido
 
-[5. Sistema de Cache](#sistema-de-cache)
-
-[6. Testes](#testes)
-
-[7. Documentação](#documentação)
-
-[8. Webhooks](#webhooks)
-
-[9. Deploy em Produção](#deploy-em-produção)
-
-[10. Contribuindo](#contribuindo)
-
-[11. Licença](#licença)
-
-[12. Histórico de Estrelas](#histórico-de-estrelas)
-
-## Funcionalidades
-
-1. API e Callbacks
-
-| Ações                        | Status | Sessões                                | Status | Callbacks                                      | Status |
-| ----------------------------| ------| ----------------------------------------| ------| ----------------------------------------------| ------|
-| Enviar Mensagem de Imagem   | ✅     | Iniciar sessão                         | ✅    | Callback código QR                             | ✅     |
-| Enviar Mensagem de Vídeo    | ✅     | Encerrar sessão                        | ✅    | Callback nova mensagem                         | ✅     |
-| Enviar Mensagem de Áudio    | ✅     | Encerrar sessões inativas              | ✅    | Callback mudança de status                     | ✅     |
-| Enviar Mensagem de Documento| ✅     | Encerrar todas as sessões              | ✅    | Callback anexo de mídia da mensagem            | ✅     |
-| Enviar URL de Arquivo       | ✅     | Healthcheck                            | ✅    |                                                |        |
-| Enviar Mensagem com Botão   | ✅     | Callback de teste local                |        |                                                |        |
-| Enviar Mensagem de Contato  | ✅     |                                        |        |                                                |        |
-| Enviar Mensagem de Lista    | ✅     |                                        |        |                                                |        |
-| Definir Status              | ✅     |                                        |        |                                                |        |
-| Enviar Botão com Mídia      | ✅     |                                        |        |                                                |        |
-| Está no WhatsApp?           | ✅     |                                        |        |                                                |        |
-| Baixar Foto do Perfil       | ✅     |                                        |        |                                                |        |
-| Status do Usuário           | ✅     |                                        |        |                                                |        |
-| Bloquear/Desbloquear Usuário| ✅     |                                        |        |                                                |        |
-| Atualizar Foto do Perfil    | ✅     |                                        |        |                                                |        |
-| Criar Grupo                  | ✅     |                                        |        |                                                |        |
-| Sair do Grupo               | ✅     |                                        |        |                                                |        |
-| Todos os Grupos             | ✅     |                                        |        |                                                |        |
-| Convidar Usuário            | ✅     |                                        |        |                                                |        |
-| Tornar Admin                | ✅     |                                        |        |                                                |        |
-| Remover Admin               | ✅     |                                        |        |                                                |        |
-| Código de Convite do Grupo  | ✅     |                                        |        |                                                |        |
-| Atualizar Participantes     | ✅     |                                        |        |                                                |        |
-| Atualizar Configuração      | ✅     |                                        |        |                                                |        |
-| Atualizar Assunto do Grupo  | ✅     |                                        |        |                                                |        |
-| Atualizar Descrição         | ✅     |                                        |        |                                                |        |
-
-2. Gerencia múltiplas sessões de cliente (dados da sessão salvos localmente), identificadas por ID único
-
-3. Todos os endpoints podem ser protegidos por uma chave de API global
-
-4. Na inicialização do servidor, todas as sessões existentes são restauradas
-
-5. Define mensagens automaticamente como lidas
-
-6. Desabilita qualquer um dos callbacks
-
-7. **Sistema de Cache Inteligente** - Cache Redis para melhorar performance e reduzir requests ao WhatsApp
-
-8. **Sistema de Autenticação Completo** - Gerenciamento de clientes, tokens JWT e controle de acesso
-
-9. **Painel Web** - Instâncias, conversas, agenda, arquivos, listas de transmissão e relatórios ([detalhes](#painel-web))
-
-## Painel Web
-
-Interface web (React + Vite) servida pela própria API em `/app`. Login com o `user_id` + `user_secret` de um usuário criado em `POST /auth/users`.
-
-| Tela | O que faz |
-|------|-----------|
-| **Instâncias** | Lista os números conectados com status ao vivo, cria instância nova e mostra o QR para parear |
-| **Conversas** | Histórico salvo no Postgres (recebidas + enviadas), busca, envio de texto e anexos em tempo real (SSE) |
-| **Contatos** | Agenda interna do painel (não altera a agenda do celular); o nome aparece nas conversas |
-| **Mensagens** | Modelos reutilizáveis: texto, **variações ilimitadas**, até 10 anexos (áudio, vídeo, imagem, documento) em ordem; áudio como mensagem de voz |
-| **Arquivos** | Biblioteca de arquivos reutilizáveis (até 50 MB); vídeo/imagem vão com play/preview até 64 MB |
-| **Transmissão** | Listas de contatos (até 5.000), **importação de planilha .xlsx** (lista simples, exportação de contatos ou de pacientes), disparo com mensagem salva ou avulsa, **uma ou várias instâncias em rodízio**, **várias listas ao mesmo tempo** (a instância alterna os envios), **envio agora ou programado**, intervalo aleatório configurável (editável durante o envio), ordem embaralhada, **pausar/retomar**, pausa automática ao sinal de bloqueio, abortar, reprocessar |
-| **Relatório** | Por disparo: enviado, entregue, lido e reproduzido por contato (tiques do WhatsApp), "Atualizar tiques" + exportação CSV para Excel |
-| **Configurações** | Supressão (palavra, números e data, com remoção), parar quem respondeu, primeiro nome no início do texto, teto diário e horário de envio |
-
-### Rodar com Docker (recomendado)
+Requer Docker. Sobe Postgres, Redis e a API com o painel:
 
 ```bash
+git clone https://github.com/kaicmurilo/whatsAPI.git
+cd whatsAPI
 cp env.example .env              # preencha os segredos (nunca commite o .env)
-npm run local:up                 # sobe Postgres + Redis + API/painel
-# Painel: http://localhost:47321/app
-npm run local:logs               # logs da API
-npm run local:down               # para tudo, mantendo dados e o login do WhatsApp
+npm run local:up                 # sobe tudo
 ```
+
+Abra **http://localhost:47321/app** e entre com o `user_id` + `user_secret` de um usuário criado em `POST /auth/users`.
+
+| Comando | O que faz |
+|---|---|
+| `npm run local:up` | Sobe ou atualiza a stack (rebuild da imagem) |
+| `npm run local:logs` | Logs da API |
+| `npm run local:down` | Para tudo, mantendo dados e o login do WhatsApp |
 
 As portas são altas para não conflitar com outros projetos: painel/API em **47321** e Postgres em **47322** (sobrescreva com `WHATSAPI_LOCAL_PORT` / `WHATSAPI_LOCAL_DB_PORT`). Os containers não sobem sozinhos com o Docker; use `local:up`.
 
-### Desenvolvimento do front
+<details>
+<summary><b>Rodar sem Docker</b></summary>
 
 ```bash
-npm run dev:web                  # Vite em http://localhost:47320/app, proxy para a API em 47321
-npm run build:web                # gera web/dist (o Dockerfile já faz isso no build)
+npm install
+cp .env.example .env
+npm run postgres:start && npm run redis:start && npm run db:init
+npm run start                    # API em http://localhost:3000
 ```
 
-### Variáveis do painel
+Front em desenvolvimento: `npm run dev:web` (Vite em `http://localhost:47320/app`, com proxy para a API em 47321). `npm run build:web` gera `web/dist`; o Dockerfile já faz isso no build.
 
-| Variável | Padrão | Descrição |
-|----------|--------|-----------|
-| `PANEL_MAX_FILE_SIZE` | `50000000` | Limite de upload da biblioteca, em bytes. Separado do `MAX_ATTACHMENT_SIZE` (webhook) |
-| `REPORT_TIMEZONE` | `America/Sao_Paulo` | Fuso dos horários no CSV do relatório |
+</details>
 
-### Transmissão: como o envio funciona
+## 🖥️ Painel web
 
-- Cada contato recebe uma mensagem **individual** (o WhatsApp Web não permite criar listas de transmissão nativas). Até 5.000 contatos por lista.
-- Um contato por vez, esperando um tempo **sorteado** na faixa escolhida (padrão 20–45 s) e em **ordem aleatória**.
-- Dá para marcar **uma, algumas ou todas** as instâncias. Cada contato sai pela próxima instância conectada. No histórico, **Editar instâncias** troca o rodízio do que ainda falta enviar.
-- **Várias listas podem disparar ao mesmo tempo** nas mesmas instâncias. Cada número manda um contato por vez e alterna a lista (um da primeira, espera o intervalo, um da segunda). O ritmo da instância não dobra.
-- Isso reduz, mas **não elimina**, o risco de bloqueio do número. O que mais pesa é quem recebe: contatos que não pediram a mensagem denunciam e bloqueiam.
+Interface React + Vite servida pela própria API em `/app`.
+
+| Tela | O que faz |
+|---|---|
+| **Painel** | Envios, entregas, leituras e respostas por período e por instância. No topo, a fila de envio ao vivo: contagem até a próxima mensagem, quantas listas estão na fila e quantos contatos faltam |
+| **Instâncias** | Números conectados com status ao vivo; cria instância nova e mostra o QR para parear |
+| **Conversas** | Histórico recebido e enviado, busca, envio de texto e anexos |
+| **Contatos** | Agenda interna do painel (não altera a do celular); o nome aparece nas conversas |
+| **Mensagens** | Modelos com texto, variações ilimitadas e até 10 anexos em ordem; áudio como mensagem de voz |
+| **Arquivos** | Biblioteca reutilizável (até 50 MB); vídeo e imagem com preview |
+| **Transmissão** | Listas, importação de planilha, disparo, histórico com pausar, retomar, abortar, reprocessar e **Retomar todas** |
+| **Relatório** | Tiques por contato, **Atualizar tiques** e exportação CSV para Excel |
+| **Configurações** | Supressão, parar quem respondeu, primeiro nome no texto, teto diário e horário de envio |
+
+## 📣 Transmissão
+
+O WhatsApp Web não cria listas de transmissão nativas, então **cada contato recebe uma mensagem individual**.
+
+**Como o envio anda**
+
+1. Os contatos saem **um por vez**, em **ordem aleatória**, com um intervalo **sorteado** na faixa escolhida (padrão 20–45 s, limites 3–600 s).
+2. Cada contato sai pela instância marcada com **menos envios no dia**. Se houver empate, sai a que enviou há mais tempo. A contagem soma todos os disparos da conta.
+3. Uma **fila única** atende o processo inteiro: com várias listas e várias instâncias, nunca saem duas mensagens juntas. Depois de cada envio, o próximo espera o intervalo de quem acabou de enviar.
+4. Instância desconectada pode ficar marcada: ela só entra quando volta. Se nenhuma marcada estiver conectada, o disparo pausa.
 
 **Status e ações no histórico**
 
 | Status | Ações | O que acontece |
-|--------|-------|----------------|
-| **Programado** | Cancelar programação · Editar intervalo · Editar instâncias | Espera o horário. Só começa quando todas as instâncias marcadas estão conectadas |
-| **Enviando** | Pausar · Abortar · Editar intervalo · Editar instâncias | Pausar/Abortar param antes do próximo contato (um envio em curso termina). Intervalo e instâncias novos valem a partir do próximo contato |
-| **Pausado** | Retomar (N) · Cancelar · Editar intervalo · Editar instâncias | Mostra o motivo da pausa |
-| **Interrompido** | Retomar (N) · Editar intervalo · Editar instâncias | O servidor reiniciou durante o envio |
-| **Falhou / Cancelado / Concluído com falhas** | Reprocessar (N) · Editar intervalo · Editar instâncias | — |
+|---|---|---|
+| **Programado** | Cancelar programação · Editar intervalo · Editar instâncias | Espera o horário e só começa com todas as marcadas conectadas |
+| **Enviando** | Pausar · Abortar · Editar intervalo · Editar instâncias | Para antes do próximo contato; um envio em curso termina |
+| **Pausado** | Retomar (N) · Cancelar · Editar | Mostra o motivo da pausa |
+| **Interrompido** | Retomar (N) · Cancelar · Editar | O servidor reiniciou no meio do envio |
+| **Falhou / Cancelado / Concluído com falhas** | Reprocessar (N) · Editar | — |
 
-- **Retomar** e **Reprocessar** enviam só para quem **não recebeu** (falhas + pendentes), pela mesma instância, com a mesma mensagem e o intervalo atual. Quem já recebeu **nunca** recebe de novo (garantido no banco). N = total − enviados.
-- **Pausa automática** (em vez de insistir num número bloqueado):
-  - a instância desconecta no meio do envio;
-  - **3 falhas de envio seguidas** ("Número sem WhatsApp" não conta; um envio com sucesso zera a contagem).
-- **Editar intervalo**: link **Editar** ao lado de "⏱" no histórico (mesmos limites do formulário: 3–600 s). A ordem já sorteada de um envio em andamento não muda.
-- Retomar/Reprocessar exigem a instância conectada. Outra lista já em envio na mesma instância não bloqueia: os contatos alternam.
-- **Supressão, nome, teto e horário** ficam em Configurações. Detalhe em [docs/BROADCAST_SEND.md](docs/BROADCAST_SEND.md).
+- **Retomar todas** reabre de uma vez os interrompidos e os pausados à mão (pelo usuário, por instância caída ou por falhas seguidas). Pausa por horário ou teto diário continua retomando sozinha.
+- **Retomar** e **Reprocessar** enviam só para quem **não recebeu**. Quem já recebeu nunca recebe de novo (garantido no banco).
+- **Pausa automática**: a instância desconecta, ou dá **3 falhas seguidas** ("Número sem WhatsApp" não conta).
+- **Excluir lista** apaga a lista, os contatos e o histórico dela. Se algum disparo estiver enviando, ele para antes do próximo contato.
+- **Programar**: de 1 min a 90 dias à frente. O agendador roda na API a cada 30 s e nunca dispara duas vezes. **Só dispara com a API no ar.**
 
-### Envio programado
+<details>
+<summary><b>Modelos de mensagem</b></summary>
 
-- No formulário de disparo: **Enviar agora | Programar** (data e hora de 1 min a 90 dias à frente). O histórico mostra "Programado para…" com **Cancelar programação**.
-- No horário, usa a lista e a mensagem **como estiverem naquele momento**; lista, modelo ou arquivo apagados antes disso fazem o disparo falhar com o motivo.
-- O agendador roda dentro da API (verifica a cada 30 s) e os programados ficam no Postgres, então sobrevivem a reinícios. Nunca dispara duas vezes (reserva atômica).
-- Não precisa da instância conectada ao programar. No horário, se estiver desconectada, espera até **30 min**; depois disso falha em vez de enviar atrasado. Se outra lista já está enviando nessa instância, o programado começa e alterna os contatos com ela.
-- **Só dispara com a API rodando no horário** (`npm run local:up`; os containers não sobem sozinhos com o Docker).
+- Nome, texto opcional, quantas variações quiser e até 10 anexos da biblioteca, enviados na ordem.
+- Cada contato recebe uma versão em rodízio pela posição na lista: texto principal, variação 1, variação 2… Um retry manda a mesma versão para o mesmo contato.
+- O texto vai como **legenda do primeiro vídeo, imagem ou documento**. Áudio não aceita legenda: modelo só com áudios envia o texto antes.
+- Entre as partes de um contato há uma pausa curta (1,5–4 s); abortar nunca corta um contato no meio.
+- O disparo guarda uma cópia das partes: editar o modelo depois não muda o histórico.
 
-### Mensagens (modelos)
+</details>
 
-- Um modelo tem nome, texto (opcional), **quantas variações de texto quiser** e até 10 anexos da biblioteca, enviados na ordem definida.
-- No disparo, cada contato da lista recebe uma versão em rodízio: o texto principal, depois a variação 1, a variação 2, e volta ao início. A posição na lista define a versão, então um retry manda o mesmo texto para o mesmo contato. Sem variações, todo mundo recebe o mesmo texto.
-- O **texto vai como legenda do primeiro vídeo, imagem ou documento** (chega numa mensagem só). Áudio não aceita legenda no WhatsApp: modelo só com áudios envia o texto antes, separado.
-- Áudio pode ir como **mensagem de voz** (aparece como gravado na hora; `.ogg` funciona melhor).
-- Entre as partes de um mesmo contato há uma pausa curta (1,5–4 s); abortar nunca corta um contato no meio.
-- O disparo guarda uma cópia das partes: editar/excluir o modelo depois não muda o histórico nem o reprocessamento. Arquivo usado em modelo não pode ser excluído da biblioteca.
+<details>
+<summary><b>Importar lista de planilha (.xlsx)</b></summary>
 
-### Importar lista de planilha (.xlsx)
+O nome do arquivo vira o nome da lista (`INTERIOR.xlsx` → **INTERIOR**). Formatos aceitos:
 
-- Em **Transmissão → Importar planilha**. O nome do arquivo vira o nome da lista (`INTERIOR.xlsx` → **INTERIOR**; se já existir, "INTERIOR (2)").
-- Três formatos:
-  - **Lista simples:** colunas de nome e telefone detectadas pelo conteúdo, com ou sem cabeçalho. Telefone nacional recebe o código **55**. Célula com dois números separados por `/` ou vírgula gera dois contatos.
-  - **Exportação de contatos** (cabeçalho com `country_code`, `phone_number`, `saved_name`, `public_name`): o telefone já vem com DDI e é guardado assim. O nome é o salvo na agenda, ou o nome público do WhatsApp se o salvo estiver vazio. Sem nenhum dos dois, entra como **Sem nome**.
-  - **Exportação de pacientes** (cabeçalho com `Nome Completo` e `Celulares` ou `Telefones`, mesmo depois de um bloco de título): o nome é o completo, depois o social, depois o apelido. Celular e telefone fixo entram os dois. Telefone nacional recebe o **55**.
-- Número repetido no arquivo entra uma vez.
-- Contato que já está na agenda (inclusive com/sem o 9º dígito) é **reaproveitado**, sem alterar o nome. Linhas sem telefone válido aparecem no resumo com o motivo.
-- A planilha é lida no navegador; o servidor recebe só texto e faz a validação. Tudo numa transação.
+- **Lista simples**: colunas de nome e telefone detectadas pelo conteúdo, com ou sem cabeçalho. Telefone nacional recebe o **55**; `/` ou vírgula na célula geram dois contatos.
+- **Exportação de contatos** (`country_code`, `phone_number`, `saved_name`, `public_name`): nome salvo, ou nome público, ou **Sem nome**.
+- **Exportação de pacientes** (`Nome Completo` + `Celulares` ou `Telefones`): celular e fixo entram os dois.
 
-### Relatório: entregue, lido e reproduzido
+Números repetidos entram uma vez; contato que já está na agenda é reaproveitado (inclusive com ou sem o 9º dígito). A planilha é lida no navegador e o servidor valida tudo numa transação.
+
+</details>
+
+<details>
+<summary><b>Relatório: entregue, lido e reproduzido</b></summary>
 
 - Os tiques são casados pela chave estável da mensagem (o WhatsApp alterna entre id por telefone e por LID).
-- Tiques que chegam com a instância desligada são recuperados ao reconectar (disparos dos últimos 7 dias) ou no botão **Atualizar tiques**, que consulta os "Dados da mensagem" do WhatsApp com o horário real (só leitura).
+- Tiques que chegam com a instância desligada são recuperados ao reconectar (disparos dos últimos 7 dias) ou em **Atualizar tiques**.
 - "Lido" só aparece para quem mantém a confirmação de leitura ligada; "reproduzido" vem principalmente de áudio de voz.
 
-### Notas técnicas
+</details>
 
-- `patches/whatsapp-web.js+1.34.7.patch` corrige o envio de mídia quebrado desde o WhatsApp Web 2.3000.10477 ([PR upstream #201923](https://github.com/wwebjs/whatsapp-web.js/pull/201923)). É aplicado no `postinstall` e no build do Docker; remova quando sair versão oficial com a correção.
-- Chats identificados por `@lid` são convertidos para `telefone@c.us` quando o WhatsApp informa o número, para casar com a agenda.
-- Travas órfãs do Chromium são limpas ao abrir a sessão, e o desligamento fecha os navegadores — reiniciar o container não pede QR de novo.
-- Erros assíncronos internos do whatsapp-web.js/puppeteer (comuns quando a página do WhatsApp Web recarrega: "Execution context was destroyed", "onQRChangedEvent already exists") são logados com `[process]` e **não derrubam mais o processo** — antes o Node 22 encerrava a API e todas as instâncias/disparos caíam juntos.
-- Sessão que falha ao abrir tenta de novo sozinha em 10 s, 30 s e 60 s (não recria sessão excluída). O motivo de cada desconexão vai para o log: `[session] desconectada sessão=… motivo=LOGOUT` (aparelho desvinculado pelo WhatsApp), `CONFLICT` etc.
-- Rotas internas do painel: [docs/PANEL_API.md](docs/PANEL_API.md).
+Regras completas em [docs/BROADCAST_SEND.md](docs/BROADCAST_SEND.md).
 
-## Sistema de Autenticação
+## 🔌 API REST
 
-O projeto agora inclui um sistema completo de autenticação e autorização:
-
-### 🎯 Características
-
-- **Gerenciamento de Clientes**: Criação, atualização e remoção de clientes
-- **Autenticação JWT**: Tokens de acesso e renovação seguros
-- **Controle de Escopo**: Permissões granulares por endpoint
-- **Banco PostgreSQL**: Armazenamento seguro de dados
-- **Segurança**: Criptografia de senhas e validação de tokens
-
-### 🚀 Início Rápido
+A API pública segue a [whatsapp-web.js](https://docs.wwebjs.dev/): sessões, mensagens (texto, mídia, contato, localização), grupos, perfil e status.
 
 ```bash
-# 1. Iniciar PostgreSQL
-npm run postgres:start
+# Inicia a sessão e pega o QR em PNG
+curl -H "x-api-key: $API_KEY" http://localhost:3000/session/start/DEMO
+curl -H "x-api-key: $API_KEY" http://localhost:3000/session/qr/DEMO/image -o qr.png
 
-# 2. Inicializar banco de dados
-npm run db:init
-
-# 3. Criar cliente
-curl -X POST http://localhost:3000/auth/clients \
-  -H "Content-Type: application/json" \
-  -d '{
-    "client_name": "Meu App",
-    "description": "Aplicação de teste"
-  }'
-
-# 4. Autenticar e obter token
-curl -X POST http://localhost:3000/auth/authenticate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "client_id": "SEU_CLIENT_ID",
-    "client_secret": "SEU_CLIENT_SECRET",
-    "scope": "read write"
-  }'
+# Envia uma mensagem
+curl -X POST http://localhost:3000/client/sendMessage/DEMO \
+  -H "x-api-key: $API_KEY" -H "Content-Type: application/json" \
+  -d '{ "chatId": "5511999999999@c.us", "contentType": "string", "content": "Olá!" }'
 ```
 
-### 📚 Documentação Completa
+- **Swagger**: `http://localhost:3000/api-docs` (desligue com `ENABLE_SWAGGER_ENDPOINT=false`), em [inglês](swagger.json) e [português](swagger-pt.json).
+- **Autenticação**: chave global `x-api-key` e JWT por cliente, com escopo e dono da sessão ([docs/AUTH_SYSTEM.md](docs/AUTH_SYSTEM.md)).
+- **Webhooks**: eventos (`qr`, `ready`, `message`, `message_ack`, `status`, `media`) vão para `BASE_WEBHOOK_URL`. Para trocar o destino de uma sessão, use `<SESSIONID>_WEBHOOK_URL`; `DISABLED_CALLBACKS` desliga eventos ([docs/WEBHOOKS.md](docs/WEBHOOKS.md)).
+- **Cache Redis** para contatos, chats e fotos ([docs/CACHE_SYSTEM.md](docs/CACHE_SYSTEM.md)).
 
-Para mais detalhes sobre o sistema de autenticação, consulte:
-- [Documentação Completa do Sistema de Autenticação](docs/AUTH_SYSTEM.md)
+## ⚙️ Configuração
 
-## Executar Localmente
+Todas as variáveis estão em [`env.example`](env.example). As principais:
 
-1. Clone o repositório:
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `API_KEY` | — | Protege os endpoints REST (obrigatória em produção) |
+| `JWT_SECRET` | — | Assina os tokens do painel e dos clientes |
+| `BASE_WEBHOOK_URL` | — | Destino dos webhooks |
+| `REPORT_TIMEZONE` | `America/Sao_Paulo` | Fuso do dia no painel, no teto diário e no CSV |
+| `PANEL_MAX_FILE_SIZE` | `50000000` | Limite de upload da biblioteca, em bytes |
+| `RECOVER_SESSIONS` | `false` | Reabre o navegador se a página do WhatsApp fechar |
+| `ENABLE_SWAGGER_ENDPOINT` | `true` | Publica `/api-docs` (desligue em produção se não usar) |
+
+## 🔧 Estabilidade das sessões
+
+- **Reinício sem QR**: o desligamento fecha os navegadores e as travas órfãs do Chromium são limpas ao abrir.
+- **Nova tentativa ao abrir**: sessão que falha tenta de novo em 10 s, 30 s e 60 s.
+- **Presa em "autenticando"**: se a sessão autentica e o `ready` não chega em 3 min, o navegador é fechado e reaberto, e o pareamento é mantido.
+- **Motivo da queda no log**: `[session] desconectada sessão=… motivo=LOGOUT` (aparelho desvinculado) ou `CONFLICT` (aberta em outro lugar).
+- **Erros internos não derrubam a API**: falhas assíncronas do puppeteer são logadas com `[process]`.
+- `patches/whatsapp-web.js+1.34.7.patch` corrige o envio de mídia ([PR upstream #201923](https://github.com/wwebjs/whatsapp-web.js/pull/201923)); remova quando sair versão oficial com a correção.
+
+Detalhes em [docs/SESSIONS.md](docs/SESSIONS.md).
+
+## 🧪 Testes
 
 ```bash
-git clone https://github.com/kaicmurilo/whatsAPI.git
-cd whatsapp-api
+npm test
 ```
 
-2. Instale as dependências:
-
-```bash
-npm install
-```
-
-3. Copie o arquivo `.env.example` para `.env` e atualize as variáveis de ambiente necessárias:
-
-```bash
-cp .env.example .env
-```
-
-4. Inicie os serviços necessários:
-
-```bash
-# Iniciar PostgreSQL (para autenticação)
-npm run postgres:start
-
-# Iniciar Redis (para cache)
-npm run redis:start
-
-# Inicializar banco de dados
-npm run db:init
-```
-
-5. Execute a aplicação:
-
-```bash
-npm run start
-```
-
-6. Acesse a API em `http://localhost:3000`
-
-### 🔧 Comandos Úteis
-
-```bash
-# Gerenciar PostgreSQL
-npm run postgres:start    # Iniciar PostgreSQL
-npm run postgres:stop     # Parar PostgreSQL
-npm run postgres:logs     # Ver logs do PostgreSQL
-
-# Gerenciar Redis
-npm run redis:start       # Iniciar Redis
-npm run redis:stop        # Parar Redis
-npm run redis:logs        # Ver logs do Redis
-
-# Gerenciar banco de dados
-npm run db:init           # Inicializar banco
-npm run db:reset          # Reset completo do banco
-
-# Acessar interfaces web
-# PostgreSQL: localhost:5432 (whatsapp_user / your_postgres_password_here)
-# Redis Commander: http://localhost:8081
-```
-
-## Sistema de Cache
-
-A API agora inclui um sistema de cache inteligente usando Redis para melhorar significativamente a performance e reduzir a carga no WhatsApp.
-
-### 🚀 Benefícios do Cache
-
-- **⚡ Performance**: Respostas até 95% mais rápidas
-- **📉 Redução de Requests**: 70-80% menos requests ao WhatsApp
-- **🔄 Estabilidade**: Menos desconexões e timeouts
-- **💾 Eficiência**: Uso otimizado de memória
-
-### 📊 TTLs Configurados
-
-| Tipo de Dado | TTL | Descrição |
-|--------------|-----|-----------|
-| Contatos | 10 min | Lista de contatos |
-| Chats | 5 min | Lista de conversas |
-| Mensagens | 2 min | Mensagens de chat |
-| Fotos de Perfil | 1 hora | Imagens de perfil |
-| QR Code | 1 min | Códigos QR temporários |
-
-### 🛠️ Configuração do Redis
-
-#### 1. Iniciar Redis
-```bash
-# Usando script automatizado
-npm run redis:start
-
-# Ou manualmente
-cd docker-redis
-./start-redis.sh
-```
-
-#### 2. Configurar Variáveis de Ambiente
-```bash
-# Copie env.example para .env
-cp env.example .env
-
-# Configure as variáveis do Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=your_redis_password_here
-```
-
-#### 3. Verificar Status
-```bash
-# Status do cache
-curl http://localhost:3000/cache/status
-
-# Health check com info do cache
-curl http://localhost:3000/ping
-```
-
-### 📈 Endpoints de Cache
-
-| Endpoint | Método | Descrição |
-|----------|--------|-----------|
-| `/cache/status` | GET | Status do sistema de cache |
-| `/cache/clear` | POST | Limpar todo o cache |
-
-### 🧪 Testando o Cache
-
-```bash
-# Executar testes de performance
-npm run test:cache
-
-# Ver logs do Redis
-npm run redis:logs
-
-# Parar Redis
-npm run redis:stop
-```
-
-### 🔄 Invalidação Automática
-
-O cache é automaticamente invalidado quando:
-- **Nova mensagem** chega
-- **Mensagem é criada** pelo usuário
-- **Sessão é terminada**
-- **TTL expira**
-
-### 📚 Documentação Completa
-
-Para informações detalhadas sobre configuração, troubleshooting e otimização, consulte:
-- [📖 Documentação do Redis](docker-redis/README.md)
-- [🔧 Scripts de Teste](scripts/test-cache.js)
-- [⚙️ Configurações](docker-redis/redis.conf)
-
-### 🎯 Exemplo de Uso
-
-```javascript
-// Primeira requisição (lenta - busca do WhatsApp)
-const contacts1 = await fetch('/client/getContacts/session1')
-// Tempo: ~2000ms
-
-// Segunda requisição (rápida - busca do cache)
-const contacts2 = await fetch('/client/getContacts/session1')
-// Tempo: ~50ms (95% mais rápido!)
-```
-
-## Testes
-
-Execute a suíte de testes com o seguinte comando:
-
-```bash
-npm run test
-```
-
-Testes de integração do painel rodam contra um **Postgres real e descartável** (criam e apagam dados):
+Os testes de integração do painel rodam contra um **Postgres real e descartável**:
 
 ```bash
 docker run --rm -d --name wa-it-pg -p 55432:5432 -e POSTGRES_DB=whatsapp_auth -e POSTGRES_USER=whatsapp_user \
@@ -421,418 +205,30 @@ PANEL_DB_TEST=1 POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=55432 POSTGRES_PASSWORD=x 
 docker rm -f wa-it-pg
 ```
 
-`tests/api.test.js` abre sessões reais do WhatsApp e fica fora dessa execução. Nunca teste rotas de envio contra listas reais: use uma lista descartável só com um número impossível (ex.: `551100000000`).
+`tests/api.test.js` abre sessões reais do WhatsApp e fica fora dessa execução. Nunca teste rotas de envio contra listas reais: use uma lista só com um número impossível (ex.: `551100000000`).
 
-### 🗄️ Validação de Banco de Dados
+## 📚 Documentação
 
-A aplicação inclui validação automática do banco de dados PostgreSQL:
+| Tema | Documento |
+|---|---|
+| Rotas internas do painel (`/panel`) | [PANEL_API.md](docs/PANEL_API.md) |
+| Regras de disparo e fila de envio | [BROADCAST_SEND.md](docs/BROADCAST_SEND.md) |
+| Métricas do painel | [DASHBOARD.md](docs/DASHBOARD.md) |
+| Sessões e recuperação | [SESSIONS.md](docs/SESSIONS.md) |
+| Autenticação e clientes | [AUTH_SYSTEM.md](docs/AUTH_SYSTEM.md) · [ADMIN_API.md](docs/ADMIN_API.md) |
+| Webhooks | [WEBHOOKS.md](docs/WEBHOOKS.md) |
+| Cache | [CACHE_SYSTEM.md](docs/CACHE_SYSTEM.md) |
+| Arquitetura e código | [ARCHITECTURE.md](docs/ARCHITECTURE.md) · [CODE_STRUCTURE.md](docs/CODE_STRUCTURE.md) |
+| Diagnóstico de QR | [QR_TROUBLESHOOTING.md](docs/QR_TROUBLESHOOTING.md) |
 
-#### Teste de Validação
-```bash
-npm run test:database
-```
+O histórico de versões está em [Releases](https://github.com/kaicmurilo/whatsAPI/releases).
 
-#### Validação Automática
-- ✅ Verificação de conexão na inicialização
-- ✅ Teste de credenciais e permissões
-- ✅ Endpoint de status: `GET /database/status`
-- ✅ Logs detalhados de diagnóstico
+## 🏭 Produção
 
-#### Scripts Disponíveis
-```bash
-# Teste de validação do banco
-npm run test:database
+- `docker-compose.yml` da raiz é o deploy de produção (Swarm + Traefik); o local é `docker-compose.local.yml`.
+- Defina `API_KEY` e `JWT_SECRET` fortes e desligue `ENABLE_LOCAL_CALLBACK_EXAMPLE`.
+- Sem controle das sessões, chame `GET /session/terminateInactive` periodicamente para liberar recursos.
 
-# Teste de cenários de validação (estrutura, dados, índices)
-npm run test:database-scenarios
+---
 
-# Teste de autenticação
-npm run test:auth
-
-# Teste de propriedade de sessão
-npm run test:session-ownership
-
-# Teste de admin master
-npm run test:admin-master
-```
-
-Para mais detalhes, consulte a [documentação de validação de banco](docs/DATABASE_VALIDATION.md).
-
-### 🧹 Código Limpo
-
-A aplicação segue princípios de código limpo e responsabilidade única:
-
-- ✅ **Separação de responsabilidades** em serviços dedicados
-- ✅ **AppInitializer**: Gerencia inicialização de todos os serviços
-- ✅ **AppCleanup**: Gerencia encerramento limpo da aplicação
-- ✅ **app.js simplificado**: Foco apenas na configuração do Express
-
-Para mais detalhes, consulte a [documentação de estrutura de código](docs/CODE_STRUCTURE.md).
-
-## Documentação
-
-A documentação da API está disponível em **inglês** e **português**:
-
-### 📖 Documentação Online
-- **Inglês**: [`swagger.json`](https://raw.githubusercontent.com/kaicmurilo/whatsAPI/master/swagger.json)
-- **Português**: [`swagger-pt.json`](https://raw.githubusercontent.com/kaicmurilo/whatsAPI/master/swagger-pt.json)
-
-### 🗂️ Painel e internos
-O Swagger cobre a API pública. O painel e o funcionamento interno estão em `docs/`:
-- [API do painel (`/panel`)](docs/PANEL_API.md) · [Disparos de transmissão](docs/BROADCAST_SEND.md)
-- [Sessões e recuperação](docs/SESSIONS.md) · [Arquitetura](docs/ARCHITECTURE.md) · [Estrutura de código](docs/CODE_STRUCTURE.md)
-
-### 🔧 Visualizar Documentação
-- **Swagger Editor**: [Visualizar em inglês](https://editor.swagger.io/?url=https://raw.githubusercontent.com/kaicmurilo/whatsAPI/master/swagger.json)
-- **Local**: Acesse `http://localhost:3000/api-docs` (requer `ENABLE_SWAGGER_ENDPOINT=true`)
-
-### 📝 Gerar Documentação
-
-```bash
-# Gerar documentação em inglês
-npm run swagger
-
-# Sincronizar documentação em português
-npm run swagger:sync-pt
-```
-
-### 🌐 Seleção de Idioma
-A documentação local (`/api-docs`) permite escolher entre:
-- 🇺🇸 **Inglês** (`/api-docs/en`)
-- 🇧🇷 **Português** (`/api-docs/pt`)
-
-### 📚 Recursos
-- **92+ endpoints** documentados
-- **Exemplos práticos** para cada endpoint
-- **Schemas completos** de request/response
-- **Autenticação** via API Key
-- **Webhooks** e callbacks
-
-Esta documentação é direta se você estiver familiarizado com a biblioteca [whatsapp-web.js](https://docs.wwebjs.dev/).
-
-Por padrão, todos os eventos de callback são entregues ao webhook definido com a variável de ambiente `BASE_WEBHOOK_URL`.
-Isso pode ser substituído definindo a variável de ambiente `*_WEBHOOK_URL`, onde `*` é seu sessionId.
-Por exemplo, se você tiver o sessionId definido como `DEMO`, a variável de ambiente deve ser `DEMO_WEBHOOK_URL`.
-
-Definindo a variável de ambiente `DISABLED_CALLBACKS` você pode especificar quais eventos você **não** está disposto a receber no seu webhook.
-
-### Escaneando código QR
-
-Para validar uma nova instância do WhatsApp Web, você precisa escanear o código QR usando seu telefone celular. A documentação oficial pode ser encontrada na página (https://faq.whatsapp.com/1079327266110265/?cms_platform=android). O próprio serviço entrega o conteúdo do código QR como um evento de webhook ou você pode usar os endpoints REST (`/session/qr/:sessionId` ou `/session/qr/:sessionId/image` para obter o código QR como uma imagem png).
-
-## Webhooks
-
-Os webhooks permitem que você receba notificações em tempo real sobre eventos do WhatsApp, como novas mensagens, mudanças de status e códigos QR. Esta funcionalidade é essencial para criar aplicações reativas que respondem automaticamente aos eventos do WhatsApp.
-
-### Configuração de Webhooks
-
-#### Variáveis de Ambiente
-
-- `BASE_WEBHOOK_URL`: URL base para todos os webhooks (ex: `https://seu-dominio.com/webhook`)
-- `SESSIONID_WEBHOOK_URL`: URL específica para uma sessão (ex: `DEMO_WEBHOOK_URL=https://seu-dominio.com/webhook/demo`)
-- `DISABLED_CALLBACKS`: Lista de callbacks desabilitados (ex: `qr,status`)
-
-#### Tipos de Eventos Disponíveis
-
-| Evento | Descrição | Payload |
-|--------|-----------|---------|
-| `qr` | Código QR para autenticação | `{ "event": "qr", "sessionId": "session", "data": "qr_code_data" }` |
-| `ready` | Cliente pronto | `{ "event": "ready", "sessionId": "session" }` |
-| `message` | Nova mensagem recebida | `{ "event": "message", "sessionId": "session", "data": { ... } }` |
-| `message_ack` | Confirmação de entrega | `{ "event": "message_ack", "sessionId": "session", "data": { ... } }` |
-| `status` | Mudança de status | `{ "event": "status", "sessionId": "session", "data": { ... } }` |
-| `media` | Mídia anexada | `{ "event": "media", "sessionId": "session", "data": { ... } }` |
-
-### Exemplos de Implementação
-
-#### Python (Flask)
-
-```python
-from flask import Flask, request, jsonify
-import requests
-import json
-
-app = Flask(__name__)
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    """Endpoint para receber webhooks do WhatsApp API"""
-    try:
-        data = request.get_json()
-        event = data.get('event')
-        session_id = data.get('sessionId')
-        
-        print(f"Evento recebido: {event} da sessão: {session_id}")
-        
-        if event == 'message':
-            # Processar nova mensagem
-            message_data = data.get('data', {})
-            from_number = message_data.get('from')
-            message_text = message_data.get('body', '')
-            
-            print(f"Mensagem de {from_number}: {message_text}")
-            
-            # Exemplo: responder automaticamente
-            if message_text.lower() == 'oi':
-                send_message(session_id, from_number, "Olá! Como posso ajudar?")
-        
-        elif event == 'qr':
-            # Código QR disponível para escaneamento
-            qr_data = data.get('data')
-            print(f"Código QR para sessão {session_id}: {qr_data}")
-        
-        elif event == 'ready':
-            print(f"Cliente {session_id} está pronto!")
-        
-        return jsonify({"status": "success"}), 200
-    
-    except Exception as e:
-        print(f"Erro ao processar webhook: {e}")
-        return jsonify({"error": str(e)}), 500
-
-def send_message(session_id, to_number, message):
-    """Enviar mensagem via WhatsApp API"""
-    api_url = f"http://localhost:3000/client/sendText/{session_id}"
-    payload = {
-        "number": to_number,
-        "text": message
-    }
-    
-    try:
-        response = requests.post(api_url, json=payload)
-        return response.json()
-    except Exception as e:
-        print(f"Erro ao enviar mensagem: {e}")
-        return None
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
-```
-
-#### Node.js (Express)
-
-```javascript
-const express = require('express');
-const axios = require('axios');
-const app = express();
-
-app.use(express.json());
-
-// Endpoint para receber webhooks
-app.post('/webhook', async (req, res) => {
-    try {
-        const { event, sessionId, data } = req.body;
-        
-        console.log(`Evento recebido: ${event} da sessão: ${sessionId}`);
-        
-        switch (event) {
-            case 'message':
-                // Processar nova mensagem
-                const fromNumber = data?.from;
-                const messageText = data?.body || '';
-                
-                console.log(`Mensagem de ${fromNumber}: ${messageText}`);
-                
-                // Exemplo: responder automaticamente
-                if (messageText.toLowerCase() === 'oi') {
-                    await sendMessage(sessionId, fromNumber, 'Olá! Como posso ajudar?');
-                }
-                break;
-                
-            case 'qr':
-                // Código QR disponível para escaneamento
-                const qrData = data;
-                console.log(`Código QR para sessão ${sessionId}: ${qrData}`);
-                break;
-                
-            case 'ready':
-                console.log(`Cliente ${sessionId} está pronto!`);
-                break;
-                
-            case 'message_ack':
-                console.log(`Mensagem confirmada: ${data?.id}`);
-                break;
-                
-            case 'status':
-                console.log(`Status alterado: ${data?.status}`);
-                break;
-                
-            default:
-                console.log(`Evento não tratado: ${event}`);
-        }
-        
-        res.json({ status: 'success' });
-        
-    } catch (error) {
-        console.error('Erro ao processar webhook:', error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Função para enviar mensagem
-async function sendMessage(sessionId, toNumber, message) {
-    try {
-        const response = await axios.post(
-            `http://localhost:3000/client/sendText/${sessionId}`,
-            {
-                number: toNumber,
-                text: message
-            }
-        );
-        return response.data;
-    } catch (error) {
-        console.error('Erro ao enviar mensagem:', error);
-        return null;
-    }
-}
-
-// Função para iniciar sessão
-async function startSession(sessionId) {
-    try {
-        const response = await axios.post(
-            `http://localhost:3000/session/start/${sessionId}`
-        );
-        console.log(`Sessão ${sessionId} iniciada`);
-        return response.data;
-    } catch (error) {
-        console.error('Erro ao iniciar sessão:', error);
-        return null;
-    }
-}
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Servidor webhook rodando na porta ${PORT}`);
-    
-    // Iniciar sessão automaticamente
-    startSession('DEMO');
-});
-```
-
-#### Python (FastAPI)
-
-```python
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
-import httpx
-import asyncio
-from typing import Dict, Any
-
-app = FastAPI()
-
-@app.post("/webhook")
-async def webhook_handler(request: Request):
-    """Endpoint para receber webhooks do WhatsApp API"""
-    try:
-        data = await request.json()
-        event = data.get('event')
-        session_id = data.get('sessionId')
-        
-        print(f"Evento recebido: {event} da sessão: {session_id}")
-        
-        if event == 'message':
-            # Processar nova mensagem
-            message_data = data.get('data', {})
-            from_number = message_data.get('from')
-            message_text = message_data.get('body', '')
-            
-            print(f"Mensagem de {from_number}: {message_text}")
-            
-            # Exemplo: responder automaticamente
-            if message_text.lower() == 'oi':
-                await send_message_async(session_id, from_number, "Olá! Como posso ajudar?")
-        
-        elif event == 'qr':
-            qr_data = data.get('data')
-            print(f"Código QR para sessão {session_id}: {qr_data}")
-        
-        elif event == 'ready':
-            print(f"Cliente {session_id} está pronto!")
-        
-        return JSONResponse(content={"status": "success"})
-    
-    except Exception as e:
-        print(f"Erro ao processar webhook: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-async def send_message_async(session_id: str, to_number: str, message: str):
-    """Enviar mensagem via WhatsApp API (assíncrono)"""
-    api_url = f"http://localhost:3000/client/sendText/{session_id}"
-    payload = {
-        "number": to_number,
-        "text": message
-    }
-    
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.post(api_url, json=payload)
-            return response.json()
-        except Exception as e:
-            print(f"Erro ao enviar mensagem: {e}")
-            return None
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=5000)
-```
-
-### Configuração do Docker Compose
-
-Para testar webhooks localmente, você pode usar o seguinte `docker-compose.yml`:
-
-```yaml
-version: '3.8'
-
-services:
-  whatsapp-api:
-    image: chrishubert/whatsapp-web-api
-    ports:
-      - "3000:3000"
-    environment:
-      - BASE_WEBHOOK_URL=http://webhook-server:5000/webhook
-      - ENABLE_SWAGGER_ENDPOINT=true
-    volumes:
-      - ./sessions:/app/sessions
-
-  webhook-server:
-    build: ./webhook-server  # Seu servidor webhook
-    ports:
-      - "5000:5000"
-    environment:
-      - WHATSAPP_API_URL=http://whatsapp-api:3000
-```
-
-### Testando Webhooks
-
-1. **Inicie o servidor webhook** (Python ou Node.js)
-2. **Configure a variável de ambiente** `BASE_WEBHOOK_URL` apontando para seu servidor
-3. **Inicie uma sessão** do WhatsApp
-4. **Envie uma mensagem** para o número conectado
-5. **Verifique os logs** do seu servidor webhook
-
-### Dicas de Produção
-
-- **Use HTTPS** para webhooks em produção
-- **Implemente retry logic** para falhas de entrega
-- **Valide assinaturas** se implementado pela API
-- **Monitore logs** para debugging
-- **Use filas** para processamento assíncrono de mensagens
-
-## Deploy em Produção
-
-- Carregue a imagem docker no docker-compose, ou seu ambiente Kubernetes
-- Desabilite a variável de ambiente `ENABLE_LOCAL_CALLBACK_EXAMPLE`
-- Defina a variável de ambiente `API_KEY` para proteger os endpoints REST
-- Execute periodicamente o endpoint `/api/terminateInactiveSessions` para evitar que sessões inúteis ocupem espaço e recursos (apenas no caso de você não ter controle das sessões)
-
-## Contribuindo
-
-Contribuições são bem-vindas! Por favor, leia o arquivo [CONTRIBUTING.md](./CONTRIBUTING.md) para detalhes sobre como contribuir para este projeto.
-
-## Aviso Legal
-
-Este projeto não é afiliado, associado, autorizado, endossado por, ou de qualquer forma oficialmente conectado com o WhatsApp ou qualquer uma de suas subsidiárias ou afiliadas. O site oficial do WhatsApp pode ser encontrado em https://whatsapp.com. "WhatsApp" bem como nomes relacionados, marcas, emblemas e imagens são marcas registradas de seus respectivos proprietários.
-
-## Licença
-
-Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE.md](./LICENSE.md) para detalhes.
+<sub>Baseado em [pedroherpeto/whatsapp-api](https://github.com/pedroherpeto/whatsapp-api). Não é afiliado, autorizado nem endossado pelo WhatsApp; "WhatsApp" e marcas relacionadas pertencem aos respectivos donos. Licença [MIT](LICENSE.md).</sub>

@@ -1,5 +1,6 @@
 const { sendErrorResponse } = require('../utils')
-const { listBroadcastLists, findBroadcastList, saveBroadcastList, deleteBroadcastList, importBroadcastList } = require('./broadcastListRepository')
+const { listBroadcastLists, findBroadcastList, saveBroadcastList, importBroadcastList } = require('./broadcastListRepository')
+const broadcastService = require('./broadcastService')
 const { buildImportPlan, listNameFromFile } = require('./listImport')
 const { parseId, parsePagination, isValidPagination } = require('./validators')
 
@@ -75,8 +76,8 @@ const removeList = async (req, res) => {
   const listId = parseId(req.params.listId)
   if (listId === null) return sendErrorResponse(res, 422, 'Id de lista inválido')
   try {
-    if (!await deleteBroadcastList(req.user.user_id, listId)) return sendErrorResponse(res, 404, 'Lista não encontrada')
-    console.log(`[panel] lista removida user=${req.user.user_id} id=${listId}`)
+    const result = await broadcastService.discardList(req.user.user_id, listId)
+    if (result.error) return sendErrorResponse(res, ...result.error)
     res.json({ success: true })
   } catch (error) {
     console.error(`[panel] falha ao remover lista user=${req.user.user_id} id=${listId}:`, error)

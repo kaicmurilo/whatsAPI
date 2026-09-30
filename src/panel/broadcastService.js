@@ -1,5 +1,5 @@
 const { sessions, validateSession } = require('../sessions')
-const { findBroadcastList } = require('./broadcastListRepository')
+const { findBroadcastList, deleteBroadcastList } = require('./broadcastListRepository')
 const runs = require('./broadcastRunRepository')
 const { runBroadcast, CANCELED_REASON, PAUSE_REQUEST } = require('./broadcastRunner')
 const { createBroadcastGate, canResumeRun } = require('./broadcastGate')
@@ -261,7 +261,7 @@ const changePacing = async (userId, runId, pacing) => {
 
 /**
  * Troca as instâncias do rodízio. Em andamento: vale a partir do próximo contato.
- * Instância já usada por outra lista entra no rodízio e alterna os envios com ela.
+ * A escolha do próximo envio é quem tem menos mensagens no dia, entre as marcadas.
  */
 const changeSessions = async (userId, runId, sessionIds) => {
   const run = await runs.findRun(userId, runId)
@@ -292,11 +292,11 @@ const cancel = async (userId, runId) => {
     console.log(`[panel] programação cancelada run=${runId} user=${userId}`)
     return { status: 'canceled', run: canceled }
   }
-  if (run.status === 'paused') {
-    const canceled = await runs.cancelPausedRun(runId, CANCELED_REASON)
+  if (run.status === 'paused' || run.status === 'interrupted') {
+    const canceled = await runs.cancelStoppedRun(runId, CANCELED_REASON, run.status)
     if (!canceled) return { error: [409, 'O disparo foi retomado; use Abortar'] }
     publishProgress(run.sessionId, canceled)
-    console.log(`[panel] disparo pausado cancelado run=${runId} user=${userId}`)
+    console.log(`[panel] disparo encerrado run=${runId} status=${run.status} user=${userId}`)
     return { status: 'canceled', run: canceled }
   }
   if (run.status === 'awaiting') {
@@ -318,6 +318,43 @@ const cancel = async (userId, runId) => {
   publishProgress(run.sessionId, finished)
   console.warn(`[panel] disparo órfão cancelado run=${runId} user=${userId}`)
   return { status: 'canceled', run: finished }
+}
+
+// Para o envio antes do próximo contato e apaga a lista com o histórico dela.
+const discardList = async (userId, listId) => {
+  const list = await findBroadcastList(userId, listId)
+  if (!list) return { error: [404, 'Lista não encontrada'] }
+  const runIds = await runs.listRunIdsByList(userId, listId)
+  for (const runId of runIds) {
+    const active = activeRuns.get(String(runId))
+    if (!active) continue
+    active.controller.abort()
+    activeRuns.delete(String(runId))
+  }
+  const removedRuns = await runs.deleteRunsByList(userId, listId)
+  const deleted = await deleteBroadcastList(userId, listId)
+  if (!deleted) return { error: [404, 'Lista não encontrada'] }
+  console.log(`[panel] lista excluída user=${userId} id=${listId} disparos=${removedRuns}`)
+  return { deleted: true }
+}
+
+// Interrompido, pausa do usuário, instância caída ou falhas seguidas. Horário e teto diário retomam sozinhos.
+const resumeAll = async (userId) => {
+  const runIds = await runs.listManualResumeRunIds(userId)
+  const resumed = []
+  const skipped = []
+  for (const runId of runIds) {
+    try {
+      const result = await retry(userId, runId)
+      if (result.error) skipped.push({ id: String(runId), error: result.error[1] })
+      else resumed.push(result.run)
+    } catch (error) {
+      console.error(`[panel] falha ao retomar em lote run=${runId} user=${userId}:`, error)
+      skipped.push({ id: String(runId), error: 'Erro ao retomar' })
+    }
+  }
+  console.log(`[panel] retomar todas user=${userId} retomados=${resumed.length} ignorados=${skipped.length}`)
+  return { resumed, skipped }
 }
 
 const resumePolicyPause = async (run) => {
@@ -353,7 +390,4 @@ const resumePolicyPause = async (run) => {
   }
 }
 
-module.exports = {
-  startNow, schedule, startScheduled, retry, pause, cancel, changePacing, changeSessions,
-  failScheduled, resumePolicyPause
-}
+module.exports = { startNow, schedule, startScheduled, retry, pause, cancel, changePacing, changeSessions, failScheduled, resumePolicyPause, discardList, resumeAll }

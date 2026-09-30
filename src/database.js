@@ -10,7 +10,8 @@ const pool = new Pool({
   password: config.postgresConfig.password,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  // 2s estourava com vários Chromium abertos e travava a fila de disparo
+  connectionTimeoutMillis: 10000,
 })
 
 // Testar conexão

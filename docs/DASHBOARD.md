@@ -4,6 +4,18 @@ Tela **Painel** no menu do painel (`?view=dashboard`). Serve para conferir volum
 
 `GET /panel/metrics` exige o token do painel e só lê dados da própria conta. Limite de 20 consultas por minuto por usuário, além do rate limit global.
 
+## Fila de envio
+
+Faixa no topo da tela, atualizada a cada 3 s (`GET /panel/broadcasts/queue`, 40 consultas por minuto por usuário):
+
+| Campo | O que mostra |
+|---|---|
+| Próxima mensagem | Contagem até o fim do intervalo de quem acabou de enviar; "Enviando" durante um envio |
+| Na fila | Disparos esperando a vez na fila única do processo |
+| Faltam | Contatos pendentes nos disparos da conta que estão enviando, pausados ou interrompidos |
+
+A fila é do processo inteiro (todas as contas), então "Na fila" e "Próxima mensagem" refletem o servidor; "Faltam" é só da sua conta.
+
 ## O que cada número conta
 
 Fuso: `REPORT_TIMEZONE` (padrão `America/Sao_Paulo`). O dia começa à meia-noite local.

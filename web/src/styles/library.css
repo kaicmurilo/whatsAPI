@@ -367,7 +367,8 @@
 
 /* ─── Importar planilha ─────────────────────────────────── */
 
-.broadcasts__header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: flex-start; gap: var(--space-2); }
+.broadcasts__header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--space-2); }
+.broadcasts__resume-note { font-size: var(--text-xs); color: var(--color-muted); }
 .list-import { display: grid; justify-items: end; gap: var(--space-1); width: min(28rem, 100%); }
 .list-import__log {
   justify-self: stretch;

@@ -22,7 +22,13 @@ function BroadcastListRowActions({ list, onEdit }: BroadcastListRowActionsProps)
   return (
     <div className="row-actions">
       <button type="button" className="row-actions__primary" onClick={() => onEdit(list.id)}>Editar</button>
-      <ConfirmButton label="Excluir" confirmLabel="Confirmar exclusão" isPending={deleteList.isPending} onConfirm={() => deleteList.mutate(list.id)} />
+      <ConfirmButton
+        label="Excluir"
+        confirmLabel="Excluir lista e disparos?"
+        isPending={deleteList.isPending}
+        onConfirm={() => deleteList.mutate(list.id)}
+      />
+      {deleteList.isError ? <span className="run-actions__error" role="alert">{deleteList.error.message}</span> : null}
     </div>
   )
 }
