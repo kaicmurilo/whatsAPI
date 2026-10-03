@@ -2,10 +2,13 @@ const { reportTimeZone } = require('../config')
 const { getSettings } = require('./settingsRepository')
 const { phoneForms, findSuppression, hasReplySince } = require('./suppressionRepository')
 const { query } = require('../database')
+const { isRecipientRemoved } = require('./broadcastQueueRepository')
 const {
   QUIET_PAUSE_ERROR, applyFirstNameToParts, isInsideSendWindow,
   zonedDayBounds, sessionsOverCap, canResumePolicy
 } = require('./sendPolicy')
+
+const REMOVED_ERROR = 'Removido da fila pelo usuário'
 
 const countSentToday = async (sessionIds, dayStart, dayEnd) => {
   if (sessionIds.length === 0) return new Map()
@@ -97,6 +100,8 @@ const createBroadcastGate = ({ userId, runId, createdAt }) => {
       return loadSendBalance(sessionIds, start, end)
     },
     classify: async (recipient) => {
+      // Removido no menu Fila enquanto o disparo rodava: a lista em memória ainda o tem
+      if (await isRecipientRemoved(runId, recipient.position)) return { status: 'removed', error: REMOVED_ERROR }
       const settings = await settingsOf()
       const phones = phoneForms(recipient.phone)
       if (settings.suppressionEnabled) {

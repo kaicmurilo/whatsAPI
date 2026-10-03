@@ -13,7 +13,7 @@ const PARAM = {
   reportSituation: 'repsit',
 } as const
 
-const REPORT_SITUATIONS: ReportSituation[] = ['all', 'pending', 'awaiting_reply', 'suppressed', 'duplicate', 'replied', 'sent', 'delivered', 'read', 'failed']
+const REPORT_SITUATIONS: ReportSituation[] = ['all', 'pending', 'awaiting_reply', 'suppressed', 'duplicate', 'replied', 'sent', 'delivered', 'read', 'failed', 'removed']
 
 // Cada tabela paginada tem página e busca próprias na URL
 const TABLE_PARAMS = {
@@ -22,11 +22,12 @@ const TABLE_PARAMS = {
   files: { page: 'fpage', search: 'fq' },
   runs: { page: 'rpage', search: 'rq' },
   templates: { page: 'tpage', search: 'tq' },
+  queue: { page: 'qpage', search: 'qq' },
 } as const
 
 export type TableKey = keyof typeof TABLE_PARAMS
 
-const PANEL_VIEWS = ['chats', 'contacts', 'templates', 'broadcasts', 'files', 'settings', 'dashboard'] as const
+const PANEL_VIEWS = ['chats', 'contacts', 'templates', 'broadcasts', 'files', 'settings', 'dashboard', 'telegram', 'queue'] as const
 export type PanelView = (typeof PANEL_VIEWS)[number]
 
 export interface TableState {
@@ -114,6 +115,13 @@ export function usePanelSearchParams() {
     for (const key of [PARAM.view, PARAM.chat, PARAM.page, PARAM.search]) next.delete(key)
   }), [update])
 
+  // Bot do Telegram não tem conversas: abre o painel do bot
+  const openTelegramInstance = useCallback((instanceId: string) => update((next) => {
+    next.set(PARAM.session, instanceId)
+    next.set(PARAM.view, 'telegram')
+    for (const key of [PARAM.chat, PARAM.page, PARAM.search]) next.delete(key)
+  }), [update])
+
   const selectChat = useCallback((chatId: string | null) => update((next) => {
     if (chatId) next.set(PARAM.chat, chatId)
     else next.delete(PARAM.chat)
@@ -162,6 +170,7 @@ export function usePanelSearchParams() {
   return {
     selection,
     selectSession,
+    openTelegramInstance,
     selectChat,
     openChat,
     setView,

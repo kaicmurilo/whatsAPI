@@ -11,6 +11,7 @@ Listagens paginadas aceitam `page` e `perPage` e devolvem `{ items, total }`.
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/panel/sessions` | Instâncias do usuário com status. O nome no painel é o `sessionId` definido na criação; `pushName` e `phone` aparecem só como detalhe, cada um na sua linha, sem reticências |
+| DELETE | `/panel/sessions/:sessionId` | Remove a instância do WhatsApp: logout, apaga a sessão e as mensagens salvas, e tira do rodízio dos disparos abertos. Rate limit: 10/min |
 | GET | `/panel/sessions/:sessionId/chats` | Conversas salvas. O nome do grupo é o título do WhatsApp, não o do último participante. |
 | GET | `/panel/sessions/:sessionId/chats/:chatId/messages` | Mensagens de uma conversa. `chatName` é o último título real do chat (vazio se só havia o JID). |
 | POST | `/panel/sessions/:sessionId/chats/:chatId/messages` | Envia texto/anexo (instância conectada; rate limit) |
@@ -25,10 +26,28 @@ O nome do grupo não vem de `message.getChat()`: no WhatsApp Web atual esse cami
 |--------|------|-----------|
 | GET · POST | `/panel/contacts` | Lista / cria ou atualiza contato |
 | DELETE | `/panel/contacts/:contactId` | Remove contato |
+| POST | `/panel/contacts/whatsapp-sync` | Salva contatos na conta do WhatsApp das instâncias escolhidas, em segundo plano (202). 409 se já houver uma rodando ou nenhuma instância escolhida estiver conectada. 5 por minuto |
+| GET | `/panel/contacts/whatsapp-sync` | Progresso da última sincronização da conta (`null` se não houve). 40 por minuto |
 | GET · POST | `/panel/files` | Lista / envia arquivo (corpo binário, até `PANEL_MAX_FILE_SIZE`) |
 | DELETE | `/panel/files/:fileId` | Remove arquivo (409 se usado em modelo) |
 | GET · POST | `/panel/templates` | Lista / cria modelo (texto, variações e até 10 anexos) |
 | GET · PUT · DELETE | `/panel/templates/:templateId` | Detalhe / edita / remove modelo |
+
+Corpo da sincronização com o WhatsApp (ids escolhidos, **ou** `all` com a busca da tabela):
+
+```json
+{ "sessionIds": ["minha-instancia"], "contactIds": ["12", "15"], "syncToPhone": false }
+{ "sessionIds": ["minha-instancia", "outra-instancia"], "all": true, "search": "ana", "syncToPhone": true }
+```
+
+- Cada contato é salvo em todas as instâncias escolhidas com `saveOrEditAddressbookContact` (o mesmo "Salvar contato" do WhatsApp Web). O nome vira primeiro nome + sobrenome pelo primeiro espaço.
+- `syncToPhone: true` também manda o contato para a agenda do celular. Padrão: desligado.
+- Um trabalhador por instância, em paralelo: cada instância salva um contato por vez, com pausa de 1 a 3 s (o ritmo por conta não muda; o tempo total cai). Até 5.000 contatos por vez; `all` pega os primeiros 5.000 em ordem alfabética.
+- Antes de começar, cada instância lê numa consulta só os contatos que a conta já tem salvos e pula esses (inclusive com ou sem o 9º dígito); `skipped` conta os pulados. Se a leitura falhar, salva todos.
+- `total` é contatos × instâncias (um salvamento por contato em cada instância).
+- Instância que cai no meio para só o trabalhador dela: o que faltava nela conta como falha e o `error` diz qual caiu (`lostSessions`). Se todas caírem, o status é `stopped`. Falha num contato não interrompe os demais.
+- Na última rodada real (4.507 contatos, 2 instâncias, agenda do celular ligada) as duas instâncias levaram LOGOUT do WhatsApp no meio. Não dá para afirmar que foi a sincronização, mas prefira listas menores e deixe a agenda do celular desligada.
+- O progresso fica em memória: some se a API reiniciar. Rodar de novo salva os mesmos contatos outra vez (a função é "salvar ou editar").
 
 Corpo de criar/editar modelo:
 
@@ -70,6 +89,12 @@ Três formatos:
 | PUT | `/panel/settings` | Substitui a configuração. Rate limit: 30/min por usuário |
 | GET | `/panel/suppression` | Números que pediram para sair (`page`, `perPage`, `search`) |
 | DELETE | `/panel/suppression/:suppressionId` | Tira o número da supressão. Não apaga o contato da agenda |
+| GET | `/panel/telegram/instances` | Instâncias do Telegram: bots (`kind: "bot"`, `sessionId: "telegram:<id>"`, `linkedContacts`) e contas (`kind: "account"`, `sessionId: "tguser:<id>"`, `phone`). Token e sessão nunca voltam |
+| POST | `/panel/telegram/bots` | Cria a instância (`{ token }` do @BotFather): valida com `getMe`, remove webhook, salva e liga o polling (201). Bot de outra conta: 409. Rate limit: 10/min por usuário |
+| DELETE | `/panel/telegram/bots/:botId` | Remove a instância e os vínculos dela (contatos da agenda ficam) |
+| POST | `/panel/telegram/accounts` | Login de conta, passo 1: `{ phone, apiId, apiHash }` (my.telegram.org). O Telegram manda o código; resposta `{ loginId }` (202). Rate limit: 5/min |
+| POST | `/panel/telegram/accounts/login/:loginId` | Passo 2/3: `{ code }` e, se pedir, `{ password }` (duas etapas). Resposta `{ needs: "code" \| "password" }` ou `{ instance }` (201). Login pendente vale 10 min |
+| DELETE | `/panel/telegram/accounts/:accountId` | Remove a conta e encerra a sessão no Telegram |
 
 Padrão ao criar a linha: supressão **ligada** com `SAIR`, `PARAR`, `REMOVER`, `STOP`. Parar quem respondeu, nome no início, teto diário e horário de envio começam **desligados**. Teto padrão 80 (mínimo 20, máximo 400). Janela padrão `08:00`–`20:00` (fuso `REPORT_TIMEZONE`, padrão `America/Sao_Paulo`).
 
@@ -104,7 +129,10 @@ O comportamento (o que entra em enviada, entrega, leitura e resposta) está em `
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | POST | `/panel/sessions/:sessionId/broadcasts` | Dispara agora (202) ou programa com `scheduledAt` (201) |
+| POST | `/panel/broadcasts` | Mesmo corpo, sem instância na URL: só para `"channel": "telegram"` |
 | GET | `/panel/broadcasts` | Histórico paginado |
+| GET | `/panel/broadcasts/queue/recipients` | Menu Fila: contatos pendentes dos disparos abertos (rodando, pausados, interrompidos), na ordem de envio (`page`, `perPage`, `search` por nome/telefone) |
+| DELETE | `/panel/broadcasts/:runId/recipients/:position` | Tira o contato da fila (status `removed`, situação "Removido" no relatório). Vale na hora, mesmo com o disparo rodando; retomar não traz de volta. 404 se já foi enviado |
 | GET | `/panel/broadcasts/:runId` | Detalhe com destinatários |
 | POST | `/panel/broadcasts/:runId/pause` | Pausa um disparo em andamento (202; para antes do próximo contato) |
 | POST | `/panel/broadcasts/resume-all` | Retoma os disparos interrompidos e os pausados à mão (pausa do usuário, instância caída ou falhas seguidas). Horário e teto diário continuam retomando sozinhos |
@@ -115,7 +143,7 @@ O comportamento (o que entra em enviada, entrega, leitura e resposta) está em `
 | GET | `/panel/broadcasts/:runId/report` | Resumo: enviado, entregue, lido, reproduzido |
 | GET | `/panel/broadcasts/:runId/report/recipients` | Destinatários do relatório (filtro `situation`) |
 | GET | `/panel/broadcasts/:runId/report.csv` | Exporta CSV |
-| POST | `/panel/broadcasts/:runId/report/refresh` | Atualiza tiques consultando o WhatsApp (só leitura) |
+| POST | `/panel/broadcasts/:runId/report/refresh` | Atualiza tiques consultando o WhatsApp (só leitura). Telegram: 422 |
 
 ### Corpo do disparo
 
@@ -129,6 +157,7 @@ O comportamento (o que entra em enviada, entrega, leitura e resposta) está em `
 }
 ```
 
+- `channel` opcional: `"whatsapp"` (padrão) ou `"telegram"`. No Telegram, `sessionIds` são bots (`"telegram:<id>"`) e/ou contas (`"tguser:<id>"`), com as mesmas regras de conectado/rodízio; misturar canais é recusado. Veja “Telegram” em `docs/BROADCAST_SEND.md`.
 - Conteúdo: `templateId` **ou** `text` e/ou `fileId` (nunca os dois; `templateId` vazio é recusado com 422).
 - `sessionIds`: uma, algumas ou todas as instâncias, inclusive desconectadas. O `sessionId` da URL precisa estar na lista. Cada contato sai pela instância conectada com menos envios no dia do painel. No empate, sai a que enviou há mais tempo (quem nunca enviou vem primeiro). Desconectada fica na lista e só entra quando voltar. Envio imediato exige ao menos uma conectada. Programado só começa quando todas as marcadas estão conectadas.
 - Várias listas podem usar as mesmas instâncias ao mesmo tempo. Cada instância envia um contato por vez e alterna a lista, respeitando o intervalo de quem acabou de enviar.

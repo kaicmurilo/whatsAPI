@@ -1,5 +1,6 @@
 const AuthService = require('../auth/authService')
 const { sessions } = require('../sessions')
+const { removeWhatsAppInstance } = require('./sessionRemoval')
 const { sendErrorResponse } = require('../utils')
 const { listChats, listMessages, isSessionOwnedBy, latestUsefulChatName } = require('./messageRepository')
 const { findContactNameForChat } = require('./contactRepository')
@@ -90,7 +91,8 @@ const streamEvents = (req, res) => {
 
   const forward = async (event) => {
     try {
-      if (await isOwnSession(event.sessionId)) {
+      // Disparo carrega o dono: o do Telegram não tem instância do WhatsApp para checar
+      if (event.run?.userId === userId || await isOwnSession(event.sessionId)) {
         res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
       }
     } catch (error) {
@@ -106,4 +108,18 @@ const streamEvents = (req, res) => {
   })
 }
 
-module.exports = { getSessions, getChats, getMessages, streamEvents }
+const deleteSession = async (req, res) => {
+  const userId = req.user.user_id
+  const { sessionId } = req.params
+  try {
+    const result = await removeWhatsAppInstance(userId, sessionId)
+    if (!result) return sendErrorResponse(res, 404, 'Instância não encontrada')
+    console.log(`[panel] instância removida sessão=${sessionId} disparos=${result.removedFromRuns} user=${userId}`)
+    res.json({ success: true, data: result })
+  } catch (error) {
+    console.error(`[panel] falha ao remover instância sessão=${sessionId} user=${userId}:`, error)
+    sendErrorResponse(res, 500, 'Erro ao remover a instância')
+  }
+}
+
+module.exports = { getSessions, getChats, getMessages, streamEvents, deleteSession }

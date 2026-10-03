@@ -61,6 +61,42 @@ export interface Contact {
   updatedAt: string
 }
 
+export interface ContactSyncInput {
+  sessionIds: string[]
+  syncToPhone: boolean
+  // Ids escolhidos um a um, ou all + search para todos que casam com a busca da tabela
+  contactIds?: string[]
+  all?: boolean
+  search?: string
+}
+
+export type ContactSyncStatus = 'running' | 'done' | 'stopped' | 'failed'
+
+export interface ContactSyncError {
+  name: string
+  sessionId: string
+  error: string
+}
+
+export interface ContactSyncJob {
+  status: ContactSyncStatus
+  sessionIds: string[]
+  syncToPhone: boolean
+  // contacts × instâncias = total de salvamentos
+  contacts: number
+  total: number
+  processed: number
+  saved: number
+  // Já estavam salvos na conta: pulados sem chamar o WhatsApp
+  skipped: number
+  failed: number
+  lostSessions: string[]
+  errors: ContactSyncError[]
+  error: string | null
+  startedAt: string
+  finishedAt: string | null
+}
+
 export interface Paginated<T> {
   items: T[]
   total: number
@@ -125,10 +161,14 @@ export interface BroadcastListInput {
   contactIds: string[]
 }
 
+// Canal do disparo: WhatsApp (instâncias) ou Telegram (bot do usuário)
+export type BroadcastChannel = 'whatsapp' | 'telegram'
+
 export type BroadcastRunStatus = 'scheduled' | 'running' | 'paused' | 'awaiting' | 'done' | 'failed' | 'interrupted' | 'canceled'
 
 export interface BroadcastRun {
   id: string
+  channel: BroadcastChannel
   sessionId: string
   // Instâncias do rodízio. A primeira é sessionId.
   sessionIds: string[]
@@ -165,7 +205,7 @@ export interface BroadcastPacing {
 
 // Conteúdo do disparo: modelo salvo OU texto/arquivo avulso
 // Conteúdo do disparo: modelo salvo OU texto/arquivo avulso; scheduledAt (ISO) programa em vez de enviar agora
-export type BroadcastInput = { listId: string; pacing: BroadcastPacing; scheduledAt?: string; sessionIds: string[] } & (
+export type BroadcastInput = { listId: string; channel: BroadcastChannel; pacing: BroadcastPacing; scheduledAt?: string; sessionIds: string[] } & (
   | { templateId: string }
   | { text: string; fileId: string | null }
 )
@@ -211,11 +251,12 @@ export interface OutgoingMessage {
   fileId: string | null
 }
 
-export type ReportSituation = 'all' | 'pending' | 'awaiting_reply' | 'suppressed' | 'duplicate' | 'replied' | 'sent' | 'delivered' | 'read' | 'failed'
+export type ReportSituation = 'all' | 'pending' | 'awaiting_reply' | 'suppressed' | 'duplicate' | 'replied' | 'removed' | 'sent' | 'delivered' | 'read' | 'failed'
 export type RecipientSituation = Exclude<ReportSituation, 'all'>
 
 export interface BroadcastReportSummary {
   id: string
+  channel: BroadcastChannel
   sessionId: string
   listName: string
   text: string | null
@@ -246,6 +287,19 @@ export interface ReportRecipient {
 }
 
 export type ReportRecipientPage = Paginated<ReportRecipient>
+
+// Contato pendente de um disparo aberto (menu Fila)
+export interface QueuedRecipient {
+  runId: string
+  position: number
+  name: string
+  phone: string
+  listName: string
+  channel: BroadcastChannel
+  runStatus: BroadcastRunStatus
+}
+
+export type QueuedRecipientPage = Paginated<QueuedRecipient>
 
 export interface SendQueueSnapshot {
   queued: number
@@ -286,6 +340,25 @@ export interface PanelSettings {
   quietStart: string
   quietEnd: string
 }
+
+// Instância que envia disparo: número do WhatsApp ou bot do Telegram. label substitui o id na tela.
+export type SenderInstance = Pick<WhatsAppSession, 'sessionId' | 'status' | 'phone' | 'pushName'> & { label?: string }
+
+// Instância do Telegram: bot ("telegram:<id>", fala com quem abriu o bot) ou conta de usuário ("tguser:<id>", envia por telefone).
+// Token e sessão nunca voltam para o navegador.
+export interface TelegramInstance extends SenderInstance {
+  kind: 'bot' | 'account'
+  label: string
+  // Só bot: @username e contatos que abriram o bot e compartilharam o telefone
+  username?: string
+  linkedContacts: number | null
+  // Só conta: em pausa pelo limite do Telegram até esta hora (fora do rodízio de todos os disparos)
+  cooldownUntil?: string | null
+  createdAt: string
+}
+
+// Login da conta: o Telegram pede o código e, se houver verificação em duas etapas, a senha
+export type TelegramLoginStep = { needs: 'code' | 'password' } | { instance: TelegramInstance }
 
 export interface SuppressedNumber {
   id: string

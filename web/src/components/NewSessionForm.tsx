@@ -1,45 +1,40 @@
-import { useState, type FormEvent } from 'react'
-import { useStartSession } from '../hooks/usePanelData'
-import { SESSION_ID_PATTERN } from '../lib/sessionStatus'
+import { useState } from 'react'
 import type { NewSessionFormProps } from '../types/components'
+import { NewTelegramAccountForm } from './NewTelegramAccountForm'
+import { NewTelegramBotForm } from './NewTelegramBotForm'
+import { NewWhatsAppSessionForm } from './NewWhatsAppSessionForm'
 
-export function NewSessionForm({ onCreated }: NewSessionFormProps) {
-  const [sessionId, setSessionId] = useState('')
-  const startSession = useStartSession()
-  const isValid = SESSION_ID_PATTERN.test(sessionId)
+type InstanceKind = 'whatsapp' | 'telegram-bot' | 'telegram-account'
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!isValid) return
-    startSession.mutate(sessionId, {
-      onSuccess: () => {
-        onCreated(sessionId)
-        setSessionId('')
-      },
-    })
-  }
+const KINDS: { kind: InstanceKind; label: string }[] = [
+  { kind: 'whatsapp', label: 'WhatsApp' },
+  { kind: 'telegram-bot', label: 'TG bot' },
+  { kind: 'telegram-account', label: 'TG conta' },
+]
 
+// Instância nova: número do WhatsApp (QR), bot do Telegram (token) ou conta do Telegram (login por código)
+export function NewSessionForm({ onCreated, onTelegramCreated }: NewSessionFormProps) {
+  const [kind, setKind] = useState<InstanceKind>('whatsapp')
   return (
-    <form className="new-session" onSubmit={handleSubmit}>
-      <label className="new-session__label" htmlFor="new-session-id">Nova instância</label>
-      <div className="new-session__row">
-        <input
-          id="new-session-id"
-          className="new-session__input"
-          value={sessionId}
-          onChange={(event) => setSessionId(event.target.value.trim())}
-          placeholder="ex: loja-centro-01"
-          autoComplete="off"
-          spellCheck={false}
-          aria-describedby="new-session-hint"
-        />
-        <button type="submit" className="new-session__submit" disabled={!isValid || startSession.isPending}>
-          {startSession.isPending ? '…' : 'Criar'}
-        </button>
+    <div className="new-session">
+      <span className="new-session__label">Nova instância</span>
+      <div className="new-session__kinds" role="radiogroup" aria-label="Tipo da instância">
+        {KINDS.map((option) => (
+          <button
+            key={option.kind}
+            type="button"
+            role="radio"
+            aria-checked={kind === option.kind}
+            className="new-session__kind"
+            onClick={() => setKind(option.kind)}
+          >
+            {option.label}
+          </button>
+        ))}
       </div>
-      <p id="new-session-hint" className="new-session__hint" role={startSession.isError ? 'alert' : undefined}>
-        {startSession.isError ? startSession.error.message : '10–100 caracteres: letras, números, - e _'}
-      </p>
-    </form>
+      {kind === 'whatsapp' ? <NewWhatsAppSessionForm onCreated={onCreated} /> : null}
+      {kind === 'telegram-bot' ? <NewTelegramBotForm onCreated={onTelegramCreated} /> : null}
+      {kind === 'telegram-account' ? <NewTelegramAccountForm onCreated={onTelegramCreated} /> : null}
+    </div>
   )
 }

@@ -7,9 +7,10 @@ import { EmptyState } from './EmptyState'
 import { NewChatForm } from './NewChatForm'
 import { Pagination } from './Pagination'
 import { SearchInput } from './SearchInput'
+import { RemoveInstanceButton } from './RemoveInstanceButton'
 import { StatusLamp } from './StatusLamp'
 
-export function ChatListPane({ session, selectedChatId, page, search, onSelectChat, onPageChange, onSearchChange }: ChatListPaneProps) {
+export function ChatListPane({ session, selectedChatId, page, search, onSelectChat, onPageChange, onSearchChange, onRemoved }: ChatListPaneProps) {
   const chats = useChats(session.sessionId, { page, search })
   const startSession = useStartSession()
 
@@ -30,6 +31,7 @@ export function ChatListPane({ session, selectedChatId, page, search, onSelectCh
             Reconectar
           </button>
         ) : null}
+        <RemoveInstanceButton sessionId={session.sessionId} onRemoved={onRemoved} />
         <NewChatForm sessionId={session.sessionId} isConnected={session.status === 'connected'} onOpenChat={onSelectChat} />
         <SearchInput value={search} onSearchChange={onSearchChange} placeholder="Buscar por nome ou número" label="Buscar conversas" />
       </header>

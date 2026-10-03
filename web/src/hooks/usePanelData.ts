@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRequiredToken } from '../auth/useAuth'
-import { fetchChats, fetchMessages, fetchSessions, startSession, type ChatQuery } from '../lib/panelApi'
+import { deleteSession, fetchChats, fetchMessages, fetchSessions, startSession, type ChatQuery } from '../lib/panelApi'
 import { queryKeys } from '../lib/queryKeys'
 
 export function useSessions() {
@@ -29,6 +29,15 @@ export function useMessages(sessionId: string | null, chatId: string | null) {
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextBeforeId,
     enabled: sessionId !== null && chatId !== null,
+  })
+}
+
+export function useDeleteSession() {
+  const token = useRequiredToken()
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (sessionId: string) => deleteSession(token, sessionId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.sessions }),
   })
 }
 

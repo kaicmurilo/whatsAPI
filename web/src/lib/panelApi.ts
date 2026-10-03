@@ -1,4 +1,4 @@
-import type { AuthTokens, ChatPage, Contact, ContactInput, ContactPage, MessagePage, OutgoingMessage, WhatsAppSession } from '../types/api'
+import type { AuthTokens, ChatPage, Contact, ContactInput, ContactPage, ContactSyncInput, ContactSyncJob, MessagePage, OutgoingMessage, WhatsAppSession } from '../types/api'
 import { requestData, requestRaw } from './apiClient'
 
 export const CHATS_PER_PAGE = 20
@@ -65,10 +65,23 @@ export async function deleteContact(token: string, contactId: string): Promise<v
   await requestRaw(`/panel/contacts/${encodeURIComponent(contactId)}`, { token, method: 'DELETE' })
 }
 
+export function startContactSync(token: string, input: ContactSyncInput): Promise<ContactSyncJob> {
+  return requestData<ContactSyncJob>('/panel/contacts/whatsapp-sync', { token, method: 'POST', body: input })
+}
+
+export function fetchContactSync(token: string): Promise<ContactSyncJob | null> {
+  return requestData<ContactSyncJob | null>('/panel/contacts/whatsapp-sync', { token })
+}
+
 export function fetchMessages(token: string, sessionId: string, chatId: string, beforeId: string | null): Promise<MessagePage> {
   const params = new URLSearchParams({ limit: String(MESSAGES_PER_PAGE) })
   if (beforeId) params.set('beforeId', beforeId)
   return requestData<MessagePage>(`${sessionPath(sessionId)}/chats/${encodeURIComponent(chatId)}/messages?${params}`, { token })
+}
+
+// Remove a instância: logout no WhatsApp, apaga a sessão e as mensagens salvas
+export async function deleteSession(token: string, sessionId: string): Promise<void> {
+  await requestRaw(sessionPath(sessionId), { token, method: 'DELETE' })
 }
 
 export async function startSession(token: string, sessionId: string): Promise<void> {

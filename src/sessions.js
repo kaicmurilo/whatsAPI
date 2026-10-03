@@ -5,7 +5,11 @@ const { baseWebhookURL, sessionFolderPath, maxAttachmentSize, setMessagesAsSeen,
 const { triggerWebhook, waitForNestedObject, checkIfEventisEnabled } = require('./utils')
 const { cacheHelpers } = require('./utils/cache')
 const { attachSessionRecorder } = require('./panel/sessionRecorder')
+const { setSessionStatus } = require('./panel/panelEvents')
 const { clearStaleProfileLocks } = require('./utils/browserProfileLocks')
+const { installPuppeteerErrorLogger } = require('./utils/puppeteerErrorLogger')
+
+installPuppeteerErrorLogger()
 // getChat() quebra no WhatsApp Web atual (erro minificado "r"); o id do chat sai direto de from/to
 const { resolveChatId } = require('./panel/messageMapper')
 
@@ -80,16 +84,27 @@ const restoreSessions = () => {
   }
 }
 
-// Evita que o auto-recover (RECOVER_SESSIONS) reabra o navegador que estamos fechando de propósito
+// Handler de "navegador morreu" por client, para remover só o nosso (o puppeteer também escuta 'disconnected')
+const browserExitHandlers = new WeakMap()
+
+// Evita que o auto-recover (RECOVER_SESSIONS) e o watch do navegador reabram o que fechamos de propósito
+// Clients que estamos fechando de propósito: o navegador sair não é crash
+const closingClients = new WeakSet()
+
 const detachRecoveryListeners = (client) => {
+  closingClients.add(client)
   client.pupPage?.removeAllListeners('close')
   client.pupPage?.removeAllListeners('error')
+  const onBrowserExit = browserExitHandlers.get(client)
+  if (onBrowserExit) client.pupBrowser?.off('disconnected', onBrowserExit)
 }
 
 const SHUTDOWN_DESTROY_TIMEOUT_MS = 15000
 
 // Falha ao abrir costuma ser passageira (página do WhatsApp recarregou durante a injeção): tenta de novo com espera
-const INIT_RETRY_DELAYS_MS = [10000, 30000, 60000]
+// Travar entre authenticated e ready (bug da lib, sem correção upstream) costuma passar em 1–3 reaberturas,
+// mas algumas contas travam várias vezes seguidas: tenta por ~25 min antes de desistir
+const INIT_RETRY_DELAYS_MS = [10000, 30000, 60000, 120000, 120000, 300000, 300000, 600000]
 const initRetryAttempts = new Map()
 
 const scheduleInitRetry = (sessionId) => {
@@ -109,27 +124,89 @@ const scheduleInitRetry = (sessionId) => {
   }, delay).unref()
 }
 
+// Reabrir com o Chromium antigo vivo põe dois processos no mesmo perfil e pode corromper o pareamento
+const BROWSER_EXIT_WAIT_MS = 30000
+
+const waitForProcessExit = (child, timeoutMs) => new Promise((resolve) => {
+  if (!child || child.exitCode !== null || child.signalCode !== null) return resolve(true)
+  const timer = setTimeout(() => resolve(false), timeoutMs)
+  child.once('exit', () => {
+    clearTimeout(timer)
+    resolve(true)
+  })
+})
+
+// Espera o Chromium sair sozinho (é quando ele grava o pareamento); matar é o último recurso
+const closeBrowserFully = async (sessionId, client) => {
+  await destroyWithTimeout(sessionId, client) // navegador pode nem ter aberto
+  const browserProcess = client.pupBrowser?.process?.()
+  if (await waitForProcessExit(browserProcess, BROWSER_EXIT_WAIT_MS)) return
+  console.warn(`[session] navegador não saiu em ${BROWSER_EXIT_WAIT_MS / 1000}s, encerrando à força sessão=${sessionId}`)
+  browserProcess.kill('SIGKILL')
+}
+
 // Client que não inicializou sai do Map: senão o painel fica em "iniciando" para sempre e /session/start dá 422
 const discardFailedClient = (sessionId, client, error) => {
+  // Fechamento intencional (desligar, encerrar) derruba o initialize() pendente: não é falha, não reabre
+  if (closingClients.has(client)) return
   console.error(`[session] falha ao inicializar sessão=${sessionId}:`, error.message)
   if (sessions.get(sessionId) !== client) return
   sessions.delete(sessionId)
   detachRecoveryListeners(client)
-  client.destroy().catch(() => {}) // navegador pode nem ter aberto
-  scheduleInitRetry(sessionId)
+  setSessionStatus(sessionId, 'disconnected')
+  closeBrowserFully(sessionId, client).finally(() => scheduleInitRetry(sessionId))
 }
 
-// whatsapp-web.js emite authenticated e ready no mesmo callback; erro no meio é engolido e a sessão fica "autenticando"
+// Chromium que morre sozinho (falta de memória, crash) deixa o client no Map sem navegador: sessão presa
+const BROWSER_START_WAIT_MS = 120000
+
+const watchBrowserExit = (sessionId, client) => {
+  waitForNestedObject(client, 'pupBrowser', BROWSER_START_WAIT_MS).then(() => {
+    const onBrowserExit = () => {
+      client.pupBrowser.off('disconnected', onBrowserExit)
+      if (closingClients.has(client) || sessions.get(sessionId) !== client) return
+      discardFailedClient(sessionId, client, new Error('o navegador fechou sozinho'))
+    }
+    browserExitHandlers.set(client, onBrowserExit)
+    // on (não once): o once do puppeteer embrulha a função e o off com a referência original não a remove
+    client.pupBrowser.on('disconnected', onBrowserExit)
+  }).catch(() => {}) // não abriu: initialize() rejeita e o discard cuida
+}
+
+// Rede de proteção: a causa conhecida (troca de alvo da página no meio da inicialização) está corrigida no
+// patch do whatsapp-web.js; se outra coisa travar entre authenticated e ready, reabre depois de 3 min
 const READY_AFTER_AUTH_TIMEOUT_MS = 180000
+
+const PAGE_PROBE_TIMEOUT_MS = 5000
+
+// Estado da página na hora da trava, pelo próprio client da lib: conectada? sincronizada? quantas funções expostas?
+const probeStuckPage = (client) => Promise.race([
+  Promise.resolve().then(() => client.pupPage.evaluate(() => {
+    const socket = window.require('WAWebSocketModel').Socket
+    const exposed = Object.keys(window).filter((key) => /^on[A-Z]\w*(Event|Call|Reaction)$/.test(key) && typeof window[key] === 'function')
+    return `página responde; estado=${socket.state} sincronizado=${socket.hasSynced === true} funcoesExpostas=${exposed.length}`
+  })),
+  new Promise((resolve) => setTimeout(() => resolve(`página NÃO respondeu ao client em ${PAGE_PROBE_TIMEOUT_MS / 1000}s`), PAGE_PROBE_TIMEOUT_MS))
+]).catch((error) => `erro ao consultar a página: ${error.message}`)
 
 const watchReadyAfterAuth = (sessionId, client) => {
   client.once('authenticated', () => {
-    const timer = setTimeout(() => {
+    // O erro que impede o ready volta para a página como rejeição sem tratamento: loga só nessa janela
+    const logPageError = (error) => console.warn(`[session] erro na página entre authenticated e ready sessão=${sessionId}: ${error.message}`)
+    client.pupPage?.on('pageerror', logPageError)
+    const stopWatching = () => {
+      clearTimeout(timer)
+      client.pupPage?.off('pageerror', logPageError)
+    }
+    const timer = setTimeout(async () => {
+      stopWatching()
+      if (sessions.get(sessionId) !== client) return
+      console.warn(`[session] diagnóstico da trava sessão=${sessionId}: ${await probeStuckPage(client)}`)
       if (sessions.get(sessionId) !== client) return
       discardFailedClient(sessionId, client, new Error(`ready não chegou ${READY_AFTER_AUTH_TIMEOUT_MS / 1000}s após autenticar`))
     }, READY_AFTER_AUTH_TIMEOUT_MS)
     timer.unref()
-    client.once('ready', () => clearTimeout(timer))
+    client.once('ready', stopWatching)
   })
 }
 
@@ -171,7 +248,12 @@ const setupSession = (sessionId) => {
       puppeteer: {
         executablePath: process.env.CHROME_BIN || null,
         // headless: false,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage']
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+        // O puppeteer mata o Chrome com SIGKILL ao receber o sinal, antes do closeAllSessions fechar com calma:
+        // o pareamento não era gravado e contas pediam QR depois de reiniciar. O desligamento é do AppCleanup.
+        handleSIGINT: false,
+        handleSIGTERM: false,
+        handleSIGHUP: false
       },
       userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36',
       authStrategy: localAuth
@@ -203,6 +285,7 @@ const setupSession = (sessionId) => {
     client.initialize().catch(err => discardFailedClient(sessionId, client, err))
     client.once('ready', () => initRetryAttempts.delete(sessionId))
     watchReadyAfterAuth(sessionId, client)
+    watchBrowserExit(sessionId, client)
 
     initializeEvents(client, sessionId)
     attachSessionRecorder(client, sessionId)
@@ -435,8 +518,7 @@ const deleteSession = async (sessionId, validation) => {
     if (!client) {
       return
     }
-    client.pupPage.removeAllListeners('close')
-    client.pupPage.removeAllListeners('error')
+    detachRecoveryListeners(client)
     if (validation.success) {
       // Client Connected, request logout
       console.log(`Logging out session ${sessionId}`)

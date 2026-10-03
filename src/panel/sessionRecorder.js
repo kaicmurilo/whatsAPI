@@ -48,6 +48,16 @@ const recordMessage = async (sessionId, message, resolveCanonicalChatId) => {
   }
 }
 
+// A lib emite ready em qualquer mudança de hasSynced, inclusive quando volta a false.
+// Se a página não responder, confia na lib: melhor um ready falso do que perder uma conexão real.
+const hasSynced = async (client) => {
+  try {
+    return await client.pupPage.evaluate(() => window.require('WAWebSocketModel').Socket.hasSynced === true)
+  } catch {
+    return true
+  }
+}
+
 /**
  * Liga persistência de mensagens e status da instância a um client.
  * Independe de DISABLED_CALLBACKS: desligar o webhook não pode desligar o histórico.
@@ -57,7 +67,12 @@ const attachSessionRecorder = (client, sessionId) => {
   setSessionStatus(sessionId, 'starting')
   client.on('qr', () => setSessionStatus(sessionId, 'qr'))
   client.on('authenticated', () => setSessionStatus(sessionId, 'authenticated'))
-  client.on('ready', () => {
+  client.on('ready', async () => {
+    // Depois de LOGOUT a página volta ao QR e a lib emite ready de novo: não é conexão
+    if (!(await hasSynced(client))) {
+      console.warn(`[session] ready ignorado sessão=${sessionId}: WhatsApp não está sincronizado (provável LOGOUT)`)
+      return
+    }
     setSessionStatus(sessionId, 'connected')
     // fire-and-forget em sequência (mesmo navegador): conversas recentes, depois tiques perdidos das transmissões
     backfillRecentHistory(sessionId, client, resolveCanonicalChatId)

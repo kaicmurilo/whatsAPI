@@ -1,10 +1,10 @@
 import { instanceChoiceLabel } from '../lib/sessionLabel'
-import type { WhatsAppSession } from '../types/api'
+import type { SenderInstance } from '../types/api'
 import type { InstancePickerProps } from '../types/components'
 
 // Uma, algumas ou todas. "Todas" marca só as que podem ser escolhidas neste momento.
-export function InstancePicker({ sessions, selectedIds, onChange, allowDisconnected, isDisabled = false }: InstancePickerProps) {
-  const canSelect = (session: WhatsAppSession): boolean => allowDisconnected || session.status === 'connected'
+export function InstancePicker({ sessions, selectedIds, onChange, allowDisconnected, isDisabled = false, legend = 'Instâncias que enviam' }: InstancePickerProps) {
+  const canSelect = (session: SenderInstance): boolean => allowDisconnected || session.status === 'connected'
   const selectableIds = sessions.filter(canSelect).map((session) => session.sessionId)
   const selectedSelectable = selectableIds.filter((sessionId) => selectedIds.includes(sessionId))
   const allSelected = selectableIds.length > 0 && selectedSelectable.length === selectableIds.length
@@ -22,7 +22,7 @@ export function InstancePicker({ sessions, selectedIds, onChange, allowDisconnec
 
   return (
     <fieldset className="instance-picker" disabled={isDisabled}>
-      <legend className="field__label">Instâncias que enviam</legend>
+      <legend className="field__label">{legend}</legend>
       <label className="instance-picker__option">
         <input
           type="checkbox"

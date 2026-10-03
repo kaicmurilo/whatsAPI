@@ -1,4 +1,3 @@
-const { sessions, validateSession } = require('../sessions')
 const { findBroadcastList, deleteBroadcastList } = require('./broadcastListRepository')
 const runs = require('./broadcastRunRepository')
 const { runBroadcast, CANCELED_REASON, PAUSE_REQUEST } = require('./broadcastRunner')
@@ -6,9 +5,10 @@ const { createBroadcastGate, canResumeRun } = require('./broadcastGate')
 const { findTemplate } = require('./templateRepository')
 const { findOwnedFile } = require('./fileRepository')
 const { partsFromTemplate, partsFromAdHoc, partsOfRun, trackedPartIndex, loadRuntimeParts } = require('./messageParts')
-const { publishPanelEvent, getSessionStatus } = require('./panelEvents')
+const { publishPanelEvent } = require('./panelEvents')
 const { pacingOfRun } = require('./broadcastPacing')
-const { sessionsOf, listOwnedSessionIds } = require('./broadcastSessions')
+const { sessionsOf } = require('./broadcastSessions')
+const { channelNamed, getConnectedClient } = require('./broadcastChannels')
 
 const activeRuns = new Map()
 
@@ -16,13 +16,7 @@ const publishProgress = (sessionId, run) => {
   if (run) publishPanelEvent({ type: 'broadcast_progress', sessionId, run })
 }
 
-// Só usa instância realmente conectada (evita tentar enviar em sessão no QR / desconectada)
-const getConnectedClient = (sessionId) => {
-  if (getSessionStatus(sessionId) !== 'connected') return null
-  return sessions.get(sessionId) || null
-}
-
-const executeInBackground = ({ sessionIds, run, recipients, storedParts, runtimeParts, pacing }) => {
+const executeInBackground = ({ channel, sessionIds, run, recipients, storedParts, runtimeParts, pacing }) => {
   const controller = new AbortController()
   const ids = [...sessionIds]
   const runInput = { id: run.id, recipients, parts: runtimeParts, trackedPart: trackedPartIndex(storedParts), pacing, sessionIds: ids, signal: controller.signal }
@@ -32,13 +26,15 @@ const executeInBackground = ({ sessionIds, run, recipients, storedParts, runtime
   const primarySessionId = () => ids[0]
   const gate = createBroadcastGate({ userId: run.userId, runId: run.id, createdAt: run.createdAt })
   runBroadcast(runInput, {
-    getClient: getConnectedClient,
+    getClient: channel.clientGetter(run.userId, ids),
+    deliver: channel.deliver,
+    explainUnavailable: channel.unavailableExplainer(run.userId),
     recordResult: runs.recordRecipientResult,
     finish: runs.finishRun,
     publish: (progress) => publishProgress(primarySessionId(), progress),
     gate
   })
-    .then(() => console.log(`[panel] disparo concluído run=${run.id} sessões=${ids.join(',')} destinatários=${recipients.length} em ${Date.now() - startedAt}ms`))
+    .then(() => console.log(`[panel] disparo concluído run=${run.id} canal=${channel.name} sessões=${ids.join(',')} destinatários=${recipients.length} em ${Date.now() - startedAt}ms`))
     .catch((error) => {
       console.error(`[panel] disparo abortado run=${run.id} sessões=${ids.join(',')}:`, error)
       return runs.finishRun(run.id, 'failed', `Erro interno ao registrar o envio: ${error.message}`)
@@ -84,32 +80,39 @@ const prepareBroadcast = async (userId, input) => {
 }
 
 const startNow = async (userId, sessionId, input) => {
+  const channel = channelNamed(input.channel)
   const sessionIds = input.sessionIds?.length ? input.sessionIds : [sessionId]
-  const blocker = await findSessionsBlocker(userId, sessionIds, 'any-connected')
+  const blocker = await channel.findBlocker(userId, sessionIds, 'any-connected')
   if (blocker) return { error: blocker }
   const { prepared, error } = await prepareBroadcast(userId, input)
   if (error) return { error }
+  const audienceBlocker = await channel.findAudienceBlocker(userId, sessionIds, prepared.recipients)
+  if (audienceBlocker) return { error: audienceBlocker }
   const { list, recipients, content, runtimeParts } = prepared
   const { storedParts, ...display } = content
   const run = await runs.createRun(userId, {
-    sessionId: sessionIds[0], sessionIds, listId: list.id, listName: list.name, recipients, pacing: input.pacing, parts: storedParts, ...display
+    sessionId: sessionIds[0], sessionIds, channel: channel.name, listId: list.id, listName: list.name, recipients, pacing: input.pacing, parts: storedParts, ...display
   })
-  console.log(`[panel] disparo iniciado run=${run.id} sessões=${sessionIds.join(',')} lista=${list.id} total=${recipients.length} partes=${storedParts.length} modelo=${display.templateId ?? '-'} intervalo=${input.pacing.minSeconds}-${input.pacing.maxSeconds}s aleatório=${input.pacing.randomOrder} user=${userId}`)
-  executeInBackground({ sessionIds, run, recipients, storedParts, runtimeParts, pacing: input.pacing })
+  console.log(`[panel] disparo iniciado run=${run.id} canal=${channel.name} sessões=${sessionIds.join(',')} lista=${list.id} total=${recipients.length} partes=${storedParts.length} modelo=${display.templateId ?? '-'} intervalo=${input.pacing.minSeconds}-${input.pacing.maxSeconds}s aleatório=${input.pacing.randomOrder} user=${userId}`)
+  executeInBackground({ channel, sessionIds, run, recipients, storedParts, runtimeParts, pacing: input.pacing })
   return { run }
 }
 
 // Valida agora (lista/modelo/arquivo existem) para não descobrir o erro só no horário
 const schedule = async (userId, sessionId, input, scheduledAt) => {
+  const channel = channelNamed(input.channel)
   const sessionIds = input.sessionIds?.length ? input.sessionIds : [sessionId]
-  const blocker = await findSessionsBlocker(userId, sessionIds, 'ownership-only')
+  const blocker = await channel.findBlocker(userId, sessionIds, 'ownership-only')
   if (blocker) return { error: blocker }
   const { prepared, error } = await prepareBroadcast(userId, input)
   if (error) return { error }
+  const audienceBlocker = await channel.findAudienceBlocker(userId, sessionIds, prepared.recipients)
+  if (audienceBlocker) return { error: audienceBlocker }
   const { list, content } = prepared
   const run = await runs.createScheduledRun(userId, {
     sessionId: sessionIds[0],
     sessionIds,
+    channel: channel.name,
     listId: list.id,
     listName: list.name,
     templateId: content.templateId,
@@ -120,7 +123,7 @@ const schedule = async (userId, sessionId, input, scheduledAt) => {
     pacing: input.pacing,
     scheduledAt
   })
-  console.log(`[panel] disparo programado run=${run.id} sessões=${sessionIds.join(',')} lista=${list.id} para=${scheduledAt.toISOString()} modelo=${content.templateId ?? '-'} user=${userId}`)
+  console.log(`[panel] disparo programado run=${run.id} canal=${channel.name} sessões=${sessionIds.join(',')} lista=${list.id} para=${scheduledAt.toISOString()} modelo=${content.templateId ?? '-'} user=${userId}`)
   return { run }
 }
 
@@ -165,7 +168,7 @@ const startScheduled = async (run) => {
     const sessionIds = sessionsOf(claimed)
     console.log(`[panel] disparo programado iniciado run=${run.id} sessões=${sessionIds.join(',')} total=${recipients.length}`)
     publishProgress(sessionIds[0], populated)
-    executeInBackground({ sessionIds, run: populated, recipients, storedParts: content.storedParts, runtimeParts, pacing: pacingOfRun(claimed) })
+    executeInBackground({ channel: channelNamed(claimed.channel), sessionIds, run: populated, recipients, storedParts: content.storedParts, runtimeParts, pacing: pacingOfRun(claimed) })
   } catch (error) {
     console.error(`[panel] falha ao iniciar disparo programado run=${run.id}:`, error)
     await failScheduled(run, `Erro interno ao iniciar no horário: ${error.message}`)
@@ -182,28 +185,7 @@ const findRetryBlocker = async (userId, run) => {
   if (!run.recipients.some((recipient) => resendable.has(recipient.status))) {
     return [422, 'Não há contatos pendentes para reenviar']
   }
-  return findSessionsBlocker(userId, sessionsOf(run), 'any-connected')
-}
-
-/**
- * @param {'all-connected' | 'any-connected' | 'ownership-only'} mode
- * all-connected: cada número escolhido está online
- * any-connected: envio agora e retomar — segue com quem estiver online; desconectada fica no rodízio e entra quando voltar
- * ownership-only: programar ou trocar instâncias — a conexão é checada na hora de enviar
- */
-const findSessionsBlocker = async (userId, sessionIds, mode) => {
-  if (sessionIds.length === 0) return [422, 'Escolha ao menos uma instância']
-  const owned = await listOwnedSessionIds(userId, sessionIds)
-  if (sessionIds.some((sessionId) => !owned.has(sessionId))) return [403, 'Uma das instâncias não pertence a você']
-  if (mode === 'ownership-only') return null
-  let connectedCount = 0
-  for (const sessionId of sessionIds) {
-    const connected = (await validateSession(sessionId)).success
-    if (connected) connectedCount += 1
-    else if (mode === 'all-connected') return [409, 'Todas as instâncias selecionadas precisam estar conectadas']
-  }
-  if (connectedCount === 0) return [409, 'Nenhuma das instâncias selecionadas está conectada']
-  return null
+  return channelNamed(run.channel).findBlocker(userId, sessionsOf(run), 'any-connected')
 }
 
 // Mesmas partes do disparo original, com a mídia carregada da biblioteca
@@ -227,7 +209,7 @@ const retry = async (userId, runId) => {
   if (!reopened) return { error: [409, 'Este disparo ainda está em andamento'] }
   const sessionIds = sessionsOf(reopened.run)
   console.log(`[panel] disparo reprocessado run=${runId} sessões=${sessionIds.join(',')} pendentes=${reopened.recipients.length} user=${userId}`)
-  executeInBackground({ sessionIds, run: reopened.run, recipients: reopened.recipients, storedParts, runtimeParts, pacing: pacingOfRun(run) })
+  executeInBackground({ channel: channelNamed(run.channel), sessionIds, run: reopened.run, recipients: reopened.recipients, storedParts, runtimeParts, pacing: pacingOfRun(run) })
   publishProgress(sessionIds[0], reopened.run)
   return { run: reopened.run }
 }
@@ -266,7 +248,7 @@ const changePacing = async (userId, runId, pacing) => {
 const changeSessions = async (userId, runId, sessionIds) => {
   const run = await runs.findRun(userId, runId)
   if (!run) return { error: [404, 'Disparo não encontrado'] }
-  const blocker = await findSessionsBlocker(userId, sessionIds, 'ownership-only')
+  const blocker = await channelNamed(run.channel).findBlocker(userId, sessionIds, 'ownership-only')
   if (blocker) return { error: blocker }
   const updated = await runs.updateRunSessions(runId, sessionIds)
   if (!updated) return { error: [404, 'Disparo não encontrado'] }
@@ -361,11 +343,8 @@ const resumePolicyPause = async (run) => {
   if (activeRuns.has(String(run.id))) return
   if (!(await canResumeRun(run, new Date()))) return
   const sessionIds = sessionsOf(run)
-  let connected = false
-  for (const sessionId of sessionIds) {
-    if ((await validateSession(sessionId)).success) connected = true
-  }
-  if (!connected) return
+  const channel = channelNamed(run.channel)
+  if (!(await channel.isReady(run.userId, sessionIds))) return
   const claimed = await runs.claimPausedForResume(run.id)
   if (!claimed) return
   if (claimed.recipients.length === 0) {
@@ -381,7 +360,7 @@ const resumePolicyPause = async (run) => {
     }
     console.log(`[panel] disparo retomado pela política run=${run.id} pendentes=${claimed.recipients.length}`)
     executeInBackground({
-      sessionIds, run: claimed.run, recipients: claimed.recipients, storedParts, runtimeParts, pacing: pacingOfRun(claimed.run)
+      channel, sessionIds, run: claimed.run, recipients: claimed.recipients, storedParts, runtimeParts, pacing: pacingOfRun(claimed.run)
     })
     publishProgress(sessionIds[0], claimed.run)
   } catch (error) {
@@ -390,4 +369,4 @@ const resumePolicyPause = async (run) => {
   }
 }
 
-module.exports = { startNow, schedule, startScheduled, retry, pause, cancel, changePacing, changeSessions, failScheduled, resumePolicyPause, discardList, resumeAll }
+module.exports = { startNow, schedule, startScheduled, retry, pause, cancel, changePacing, changeSessions, failScheduled, resumePolicyPause, discardList, resumeAll, getConnectedClient }

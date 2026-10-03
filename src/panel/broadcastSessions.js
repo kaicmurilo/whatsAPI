@@ -2,6 +2,18 @@ const { query } = require('../database')
 
 const MAX_SESSIONS = 20
 const SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{10,100}$/
+// Bot do Telegram como instância: "telegram:<id do bot>". ":" nunca aparece em id de sessão do WhatsApp.
+const TELEGRAM_INSTANCE_PATTERN = /^telegram:(\d{1,20})$/
+
+// Conta de usuário do Telegram como instância: "tguser:<id do usuário no Telegram>"
+const TELEGRAM_ACCOUNT_PATTERN = /^tguser:(\d{1,20})$/
+
+const telegramInstanceId = (botId) => `telegram:${botId}`
+const botIdOfInstance = (instanceId) => TELEGRAM_INSTANCE_PATTERN.exec(String(instanceId))?.[1] ?? null
+const accountInstanceId = (accountId) => `tguser:${accountId}`
+const accountIdOfInstance = (instanceId) => TELEGRAM_ACCOUNT_PATTERN.exec(String(instanceId))?.[1] ?? null
+const isValidInstanceId = (value) => typeof value === 'string' &&
+  (SESSION_ID_PATTERN.test(value) || TELEGRAM_INSTANCE_PATTERN.test(value) || TELEGRAM_ACCOUNT_PATTERN.test(value))
 
 /**
  * Lista de instâncias do disparo. Ausente → a instância da URL (disparos de um número só).
@@ -13,7 +25,7 @@ const parseSessionIds = (value, fallbackSessionId) => {
   if (raw.length > MAX_SESSIONS) return { error: `No máximo ${MAX_SESSIONS} instâncias por disparo` }
   const sessionIds = []
   for (const item of raw) {
-    if (typeof item !== 'string' || !SESSION_ID_PATTERN.test(item)) return { error: 'Instância inválida' }
+    if (!isValidInstanceId(item)) return { error: 'Instância inválida' }
     if (!sessionIds.includes(item)) sessionIds.push(item)
   }
   return { sessionIds }
@@ -33,4 +45,4 @@ const listOwnedSessionIds = async (userId, sessionIds) => {
   return new Set(result.rows.map((row) => row.session_id))
 }
 
-module.exports = { parseSessionIds, sessionsOf, listOwnedSessionIds, MAX_SESSIONS }
+module.exports = { parseSessionIds, sessionsOf, listOwnedSessionIds, telegramInstanceId, botIdOfInstance, accountInstanceId, accountIdOfInstance, MAX_SESSIONS }

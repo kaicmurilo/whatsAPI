@@ -3,6 +3,7 @@ const { sessions, validateSession } = require('../sessions')
 const { reconcileRunDeliveries } = require('./deliveryReconciler')
 const { isSessionOwnedBy } = require('./messageRepository')
 const { publishPanelEvent } = require('./panelEvents')
+const { TELEGRAM } = require('./broadcastChannels')
 const { sendErrorResponse } = require('../utils')
 const { findReportSummary, listReportRecipients, listAllReportRecipients, isKnownSituation } = require('./broadcastReportRepository')
 const { buildReportCsv, reportFileName } = require('./reportCsv')
@@ -74,6 +75,7 @@ const refreshReport = async (req, res) => {
   try {
     const summary = await loadOwnedSummary(req, res)
     if (!summary) return
+    if (summary.channel === TELEGRAM) return sendErrorResponse(res, 422, 'O Telegram não informa entrega nem leitura para bots')
     if (!await isSessionOwnedBy(summary.sessionId, userId)) return sendErrorResponse(res, 403, 'A instância deste disparo não pertence a você')
     if (!(await validateSession(summary.sessionId)).success) return sendErrorResponse(res, 409, 'Conecte a instância do disparo para consultar os tiques')
     const result = await reconcileRunDeliveries(sessions.get(summary.sessionId), summary.id)

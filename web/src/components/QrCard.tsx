@@ -1,9 +1,10 @@
 import { useQrImageUrl } from '../hooks/useQrImageUrl'
 import { awaitsQrScan } from '../lib/sessionStatus'
 import type { QrCardProps } from '../types/components'
+import { RemoveInstanceButton } from './RemoveInstanceButton'
 import { StatusLamp } from './StatusLamp'
 
-export function QrCard({ session }: QrCardProps) {
+export function QrCard({ session, onRemoved }: QrCardProps) {
   const qrUrl = useQrImageUrl(session.sessionId, awaitsQrScan(session.status))
 
   return (
@@ -18,6 +19,7 @@ export function QrCard({ session }: QrCardProps) {
         <li>Aparelhos conectados → Conectar um aparelho</li>
         <li>Aponte a câmera para este código</li>
       </ol>
+      <RemoveInstanceButton sessionId={session.sessionId} onRemoved={onRemoved} />
     </section>
   )
 }

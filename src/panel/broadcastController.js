@@ -5,6 +5,7 @@ const broadcastService = require('./broadcastService')
 const { parsePacing } = require('./broadcastPacing')
 const { parseSessionIds } = require('./broadcastSessions')
 const { parseScheduledAt } = require('./broadcastSchedule')
+const { parseChannel, TELEGRAM } = require('./broadcastChannels')
 const { parseId, parsePagination, isValidPagination } = require('./validators')
 
 const MAX_TEXT_LENGTH = 4096
@@ -32,6 +33,8 @@ const parseContent = (body) => {
 const parseBroadcastInput = (body) => {
   const listId = parseId(body?.listId === undefined ? undefined : String(body.listId))
   if (listId === null) return { error: 'Escolha uma lista de transmissão' }
+  const { channel, error: channelError } = parseChannel(body?.channel)
+  if (channelError) return { error: channelError }
   const { content, error } = parseContent(body)
   if (error) return { error }
   const { pacing, error: pacingError } = parsePacing(body?.pacing)
@@ -40,16 +43,16 @@ const parseBroadcastInput = (body) => {
   if (scheduleError) return { error: scheduleError }
   const { sessionIds, error: sessionsError } = parseSessionIds(body?.sessionIds, body?.sessionId)
   if (sessionsError) return { error: sessionsError }
-  return { input: { listId, pacing, sessionIds, ...content }, scheduledAt }
+  return { input: { listId, channel, pacing, sessionIds, ...content }, scheduledAt }
 }
 
-// Com scheduledAt → programa; sem → dispara agora
+// Com scheduledAt → programa; sem → dispara agora. Sem instância na URL (POST /broadcasts): só Telegram.
 const startBroadcast = async (req, res) => {
   const { sessionId } = req.params
   const userId = req.user.user_id
   const { input, scheduledAt, error } = parseBroadcastInput({ ...req.body, sessionId })
   if (error) return sendErrorResponse(res, 422, error)
-  if (!input.sessionIds.includes(sessionId)) return sendErrorResponse(res, 422, 'A instância da requisição precisa estar entre as selecionadas')
+  if (input.channel !== TELEGRAM && !input.sessionIds.includes(sessionId)) return sendErrorResponse(res, 422, 'A instância da requisição precisa estar entre as selecionadas')
   try {
     const result = scheduledAt
       ? await broadcastService.schedule(userId, sessionId, input, scheduledAt)

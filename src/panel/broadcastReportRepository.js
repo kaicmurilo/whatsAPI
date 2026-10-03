@@ -8,6 +8,7 @@ const SITUATION_SQL = `CASE
   WHEN status = 'suppressed' THEN 'suppressed'
   WHEN status = 'duplicate' THEN 'duplicate'
   WHEN status = 'replied' THEN 'replied'
+  WHEN status = 'removed' THEN 'removed'
   WHEN read_at IS NOT NULL THEN 'read'
   WHEN delivered_at IS NOT NULL THEN 'delivered'
   ELSE 'sent' END`
@@ -19,6 +20,7 @@ const SITUATION_FILTERS = {
   suppressed: "status = 'suppressed'",
   duplicate: "status = 'duplicate'",
   replied: "status = 'replied'",
+  removed: "status = 'removed'",
   sent: "status = 'sent'",
   delivered: 'delivered_at IS NOT NULL',
   read: 'read_at IS NOT NULL',
@@ -30,7 +32,7 @@ const RECIPIENT_COLUMNS = `position, name, phone, ${SITUATION_SQL} AS situation,
 
 const findReportSummary = async (userId, runId) => {
   const result = await query(
-    `SELECT r.id, r.session_id AS "sessionId", r.list_name AS "listName", r.text, r.file_name AS "fileName",
+    `SELECT r.id, r.session_id AS "sessionId", r.channel, r.list_name AS "listName", r.text, r.file_name AS "fileName",
             r.status, r.total, r.sent, r.failed, r.error, r.created_at AS "createdAt", r.finished_at AS "finishedAt",
             COUNT(*) FILTER (WHERE rr.status = 'awaiting_reply')::int AS awaiting,
             COUNT(*) FILTER (WHERE rr.delivered_at IS NOT NULL)::int AS delivered,

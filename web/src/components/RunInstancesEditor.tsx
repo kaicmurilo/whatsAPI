@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useUpdateRunSessions } from '../hooks/useBroadcasts'
-import type { BroadcastRun } from '../types/api'
+import { instanceTitle } from '../lib/sessionLabel'
+import type { BroadcastRun, SenderInstance } from '../types/api'
 import type { RunInstancesEditorProps } from '../types/components'
 import { InstancePicker } from './InstancePicker'
 
@@ -10,10 +11,15 @@ export const sessionIdsOf = (run: BroadcastRun): string[] =>
 const hasSendsAhead = (run: BroadcastRun): boolean =>
   run.status === 'scheduled' || run.status === 'awaiting' || run.total > run.sent
 
-const describeInstances = (sessionIds: string[]): string => {
-  if (sessionIds.length === 0) return 'Nenhuma instância'
-  if (sessionIds.length <= 2) return sessionIds.join(', ')
-  return `${sessionIds.slice(0, 2).join(', ')} +${sessionIds.length - 2}`
+// Bot aparece como @username; id sem instância conhecida (removida) aparece cru
+const describeInstances = (sessionIds: string[], sessions: SenderInstance[]): string => {
+  const titles = sessionIds.map((sessionId) => {
+    const session = sessions.find((candidate) => candidate.sessionId === sessionId)
+    return session ? instanceTitle(session) : sessionId
+  })
+  if (titles.length === 0) return 'Nenhuma instância'
+  if (titles.length <= 2) return titles.join(', ')
+  return `${titles.slice(0, 2).join(', ')} +${titles.length - 2}`
 }
 
 const editHint = (run: BroadcastRun): string => {
@@ -31,7 +37,7 @@ export function RunInstancesEditor({ run, sessions }: RunInstancesEditorProps) {
   if (!draft) {
     return (
       <span className="run-content__instances">
-        {describeInstances(current)}
+        {describeInstances(current, sessions)}
         {hasSendsAhead(run) ? <button type="button" className="run-pacing__edit" onClick={() => setDraft(current)}>Editar instâncias</button> : null}
       </span>
     )

@@ -4,23 +4,25 @@ const { messageKeyFromId } = require('./messageMapper')
 const RUN_COLUMNS = `id, session_id AS "sessionId", session_ids AS "sessionIds", list_id AS "listId", list_name AS "listName", text,
   file_id AS "fileId", file_name AS "fileName", status, total, sent, failed, error,
   delay_min_seconds AS "delayMinSeconds", delay_max_seconds AS "delayMaxSeconds", random_order AS "randomOrder",
-  template_id AS "templateId", template_name AS "templateName", parts, scheduled_at AS "scheduledAt", user_id AS "userId",
+  template_id AS "templateId", template_name AS "templateName", parts, scheduled_at AS "scheduledAt", user_id AS "userId", channel,
   created_at AS "createdAt", finished_at AS "finishedAt"`
 
 const MAX_ERROR_LENGTH = 255
+// Pausas que o agendador retoma sozinho: horário, teto diário e conta do Telegram limitada (cooldown)
+const AUTO_RESUME_PAUSE_CODES = ['quiet', 'cap', 'cooldown']
 const truncateError = (error) => (error ? String(error).slice(0, MAX_ERROR_LENGTH) : null)
 
 const createRun = (userId, {
-  sessionId, sessionIds = [sessionId], listId, listName, text, fileId, fileName, recipients, pacing, templateId = null, templateName = null, parts = null
+  sessionId, sessionIds = [sessionId], channel = 'whatsapp', listId, listName, text, fileId, fileName, recipients, pacing, templateId = null, templateName = null, parts = null
 }) => withTransaction(async (client) => {
   const ids = sessionIds.length > 0 ? sessionIds : [sessionId]
   const runResult = await client.query(
     `INSERT INTO broadcast_runs (user_id, session_id, session_ids, list_id, list_name, text, file_id, file_name, total,
-                                 delay_min_seconds, delay_max_seconds, random_order, template_id, template_name, parts)
-     VALUES ($1, $2, $3::text[], $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb)
+                                 delay_min_seconds, delay_max_seconds, random_order, template_id, template_name, parts, channel)
+     VALUES ($1, $2, $3::text[], $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16)
      RETURNING ${RUN_COLUMNS}`,
     [userId, ids[0], ids, listId, listName, text, fileId, fileName, recipients.length,
-      pacing.minSeconds, pacing.maxSeconds, pacing.randomOrder, templateId, templateName, parts ? JSON.stringify(parts) : null]
+      pacing.minSeconds, pacing.maxSeconds, pacing.randomOrder, templateId, templateName, parts ? JSON.stringify(parts) : null, channel]
   )
   const run = runResult.rows[0]
   await client.query(
@@ -38,7 +40,9 @@ const createRun = (userId, {
  * `isSent` vai como parâmetro próprio: reusar o $ do status em comparação fazia o Postgres
  * deduzir tipos diferentes (varchar × text) e abortar o disparo.
  */
-const SKIP_STATUSES = new Set(['suppressed', 'duplicate', 'replied'])
+// pending = adiado (remetente limitado no meio do contato): volta para a fila, sem contar como falha
+// removed = tirado da fila pelo usuário (menu Fila)
+const SKIP_STATUSES = new Set(['suppressed', 'duplicate', 'replied', 'pending', 'removed'])
 
 const recordRecipientResult = async (runId, position, {
   status, error = null, messageId = null, greetingSessionId = null, senderSessionId = null
@@ -209,15 +213,15 @@ const interruptRunningRuns = async () => {
  * Disparo programado: guarda só o que foi escolhido (lista, modelo ou texto/arquivo, ritmo, horário).
  * Destinatários e partes são montados no horário, com a lista e a mensagem como estiverem.
  */
-const createScheduledRun = async (userId, { sessionId, sessionIds = [sessionId], listId, listName, templateId, templateName, text, fileId, fileName, pacing, scheduledAt }) => {
+const createScheduledRun = async (userId, { sessionId, sessionIds = [sessionId], channel = 'whatsapp', listId, listName, templateId, templateName, text, fileId, fileName, pacing, scheduledAt }) => {
   const ids = sessionIds.length > 0 ? sessionIds : [sessionId]
   const result = await query(
     `INSERT INTO broadcast_runs (user_id, session_id, session_ids, list_id, list_name, template_id, template_name, text, file_id, file_name,
-                                 total, status, scheduled_at, delay_min_seconds, delay_max_seconds, random_order)
-     VALUES ($1, $2, $3::text[], $4, $5, $6, $7, $8, $9, $10, 0, 'scheduled', $11, $12, $13, $14)
+                                 total, status, scheduled_at, delay_min_seconds, delay_max_seconds, random_order, channel)
+     VALUES ($1, $2, $3::text[], $4, $5, $6, $7, $8, $9, $10, 0, 'scheduled', $11, $12, $13, $14, $15)
      RETURNING ${RUN_COLUMNS}`,
     [userId, ids[0], ids, listId, listName, templateId, templateName, text, fileId, fileName, scheduledAt,
-      pacing.minSeconds, pacing.maxSeconds, pacing.randomOrder]
+      pacing.minSeconds, pacing.maxSeconds, pacing.randomOrder, channel]
   )
   return result.rows[0]
 }
@@ -300,10 +304,10 @@ const listManualResumeRunIds = async (userId) => {
      WHERE user_id = $1
        AND (
          status = 'interrupted'
-         OR (status = 'paused' AND COALESCE(pause_code, '') NOT IN ('quiet', 'cap'))
+         OR (status = 'paused' AND NOT (COALESCE(pause_code, '') = ANY($2::text[])))
        )
      ORDER BY id`,
-    [userId]
+    [userId, AUTO_RESUME_PAUSE_CODES]
   )
   return result.rows.map((row) => row.id)
 }
@@ -394,8 +398,9 @@ const listDueAwaitingRecipients = async (before) => {
 const listPolicyPausedRuns = async () => {
   const result = await query(
     `SELECT ${RUN_COLUMNS} FROM broadcast_runs
-     WHERE status = 'paused' AND pause_code IN ('quiet', 'cap')
-     ORDER BY id`
+     WHERE status = 'paused' AND pause_code = ANY($1::text[])
+     ORDER BY id`,
+    [AUTO_RESUME_PAUSE_CODES]
   )
   return result.rows
 }
@@ -405,9 +410,9 @@ const claimPausedForResume = (runId) => withTransaction(async (client) => {
   const runResult = await client.query(
     `UPDATE broadcast_runs
      SET status = 'running', error = NULL, pause_code = NULL, finished_at = NULL
-     WHERE id = $1 AND status = 'paused' AND pause_code IN ('quiet', 'cap')
+     WHERE id = $1 AND status = 'paused' AND pause_code = ANY($2::text[])
      RETURNING ${RUN_COLUMNS}`,
-    [runId]
+    [runId, AUTO_RESUME_PAUSE_CODES]
   )
   const run = runResult.rows[0]
   if (!run) return null

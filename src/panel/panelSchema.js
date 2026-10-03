@@ -227,6 +227,62 @@ const ensureSettingsTables = async () => {
   await query('CREATE INDEX IF NOT EXISTS idx_suppressed_numbers_alt ON suppressed_numbers(user_id, phone_alt)')
 }
 
+// Telegram (Bot API): cada bot é uma instância (id = número antes do ":" no token, o mesmo do getMe).
+// Chat privado tem o id do usuário, igual em todos os bots — mas um bot só fala com quem deu /start nele (telegram_bot_contacts).
+const ensureTelegramTables = async () => {
+  await query('ALTER TABLE panel_contacts ADD COLUMN IF NOT EXISTS telegram_chat_id BIGINT')
+  await query("ALTER TABLE broadcast_runs ADD COLUMN IF NOT EXISTS channel VARCHAR(20) NOT NULL DEFAULT 'whatsapp'")
+  await query(`
+    CREATE TABLE IF NOT EXISTS telegram_bots (
+      id BIGINT PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      username VARCHAR(64) NOT NULL,
+      token TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+  await query('CREATE INDEX IF NOT EXISTS idx_telegram_bots_user ON telegram_bots(user_id)')
+  await query(`
+    CREATE TABLE IF NOT EXISTS telegram_bot_contacts (
+      bot_id BIGINT NOT NULL REFERENCES telegram_bots(id) ON DELETE CASCADE,
+      contact_id BIGINT NOT NULL REFERENCES panel_contacts(id) ON DELETE CASCADE,
+      PRIMARY KEY (bot_id, contact_id)
+    )
+  `)
+  // Conta de usuário do Telegram (MTProto): envia por telefone. session = StringSession — acesso total à conta, nunca sai do servidor
+  await query(`
+    CREATE TABLE IF NOT EXISTS telegram_accounts (
+      id BIGINT PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      phone VARCHAR(20) NOT NULL,
+      label VARCHAR(100) NOT NULL,
+      api_id INTEGER NOT NULL,
+      api_hash VARCHAR(64) NOT NULL,
+      session TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+  await query('CREATE INDEX IF NOT EXISTS idx_telegram_accounts_user ON telegram_accounts(user_id)')
+  // Limite do Telegram (busca por telefone, PEER_FLOOD, FLOOD_WAIT) vale para a conta inteira: ela descansa até aqui
+  await query('ALTER TABLE telegram_accounts ADD COLUMN IF NOT EXISTS cooldown_until TIMESTAMPTZ')
+  // Primeira versão guardava um bot só por usuário nas configurações: migra uma vez e tira as colunas
+  await query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'panel_user_settings' AND column_name = 'telegram_bot_token') THEN
+        INSERT INTO telegram_bots (id, user_id, username, token)
+          SELECT split_part(telegram_bot_token, ':', 1)::bigint, user_id, COALESCE(telegram_bot_username, 'bot'), telegram_bot_token
+          FROM panel_user_settings WHERE telegram_bot_token IS NOT NULL
+          ON CONFLICT (id) DO NOTHING;
+        INSERT INTO telegram_bot_contacts (bot_id, contact_id)
+          SELECT b.id, c.id FROM panel_contacts c JOIN telegram_bots b ON b.user_id = c.user_id
+          WHERE c.telegram_chat_id IS NOT NULL
+          ON CONFLICT DO NOTHING;
+        ALTER TABLE panel_user_settings DROP COLUMN telegram_bot_token, DROP COLUMN IF EXISTS telegram_bot_username;
+      END IF;
+    END $$
+  `)
+}
+
 // Idempotente: roda a cada boot porque o init.sql só executa em volume novo do Postgres
 const ensurePanelSchema = async () => {
   await ensureMessagesTable()
@@ -235,6 +291,7 @@ const ensurePanelSchema = async () => {
   await ensureBroadcastTables()
   await ensureTemplateTables()
   await ensureSettingsTables()
+  await ensureTelegramTables()
 }
 
 module.exports = { ensurePanelSchema }

@@ -4,6 +4,8 @@ const { restoreSessions } = require('../sessions')
 const { ensurePanelSchema } = require('../panel/panelSchema')
 const { interruptRunningRuns } = require('../panel/broadcastRunRepository')
 const { startBroadcastScheduler } = require('../panel/broadcastScheduler')
+const { startTelegramBots } = require('../panel/telegramBots')
+const { startTelegramAccounts } = require('../panel/telegramAccounts')
 
 class AppInitializer {
   constructor() {
@@ -104,6 +106,8 @@ class AppInitializer {
       await this.initializeRedis()
       this.restoreSessions()
       startBroadcastScheduler()
+      await startTelegramBots().catch((error) => console.error('❌ Falha ao ligar bots do Telegram:', error.message))
+      await startTelegramAccounts().catch((error) => console.error('❌ Falha ao conectar contas do Telegram:', error.message))
       this.showServicesStatus()
     } catch (error) {
       console.error('❌ Erro ao inicializar aplicação:', error.message)

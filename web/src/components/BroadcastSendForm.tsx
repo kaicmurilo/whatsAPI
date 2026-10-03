@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useAllBroadcastLists, useStartBroadcast } from '../hooks/useBroadcasts'
 import { useAllTemplates } from '../hooks/useTemplates'
+import { useTelegramInstances } from '../hooks/useTelegramInstances'
 import { DEFAULT_PACING, estimateDurationMinutes, isValidPacing } from '../lib/pacing'
 import { earliestScheduleValue, formatSchedule, isValidScheduleValue, localInputToIso } from '../lib/schedule'
-import type { BroadcastInput, BroadcastPacing, PanelFile, WhatsAppSession } from '../types/api'
+import type { BroadcastChannel, BroadcastInput, BroadcastPacing, PanelFile, SenderInstance } from '../types/api'
 import type { BroadcastSendFormProps } from '../types/components'
+import { ChannelPicker } from './ChannelPicker'
 import { ConfirmButton } from './ConfirmButton'
 import { FilePicker } from './FilePicker'
 import { InstancePicker } from './InstancePicker'
@@ -13,7 +15,7 @@ import { PacingFields } from './PacingFields'
 const MAX_TEXT_LENGTH = 4096
 
 // Começa na instância aberta no painel, se estiver conectada; senão, na primeira conectada
-const pickInitialSessionIds = (sessions: WhatsAppSession[], defaultSessionId: string | null): string[] => {
+const pickInitialSessionIds = (sessions: SenderInstance[], defaultSessionId: string | null): string[] => {
   const preferred = sessions.find((session) => session.sessionId === defaultSessionId)
   if (preferred?.status === 'connected') return [preferred.sessionId]
   const connected = sessions.find((session) => session.status === 'connected')
@@ -23,10 +25,14 @@ const pickInitialSessionIds = (sessions: WhatsAppSession[], defaultSessionId: st
 type ContentMode = 'template' | 'custom'
 type WhenMode = 'now' | 'schedule'
 
-interface BlockerInput {
+interface SenderInput {
+  channel: BroadcastChannel
   sessionIds: string[]
-  sessions: WhatsAppSession[]
+  sessions: SenderInstance[]
   requireConnected: boolean
+}
+
+interface BlockerInput extends SenderInput {
   hasList: boolean
   hasContent: boolean
   pacing: BroadcastPacing
@@ -34,10 +40,18 @@ interface BlockerInput {
   scheduleValue: string
 }
 
-function describeBlocker({ sessionIds, sessions, requireConnected, hasList, hasContent, pacing, whenMode, scheduleValue }: BlockerInput): string | null {
+// Quem envia: ao menos uma instância do canal (conectada, para enviar agora)
+function describeSenderBlocker({ channel, sessionIds, sessions, requireConnected }: SenderInput): string | null {
+  if (channel === 'telegram' && sessions.length === 0) return 'Crie uma instância do Telegram em “Nova instância”.'
   if (sessionIds.length === 0) return 'Escolha ao menos uma instância.'
   const anyConnected = sessionIds.some((sessionId) => sessions.find((session) => session.sessionId === sessionId)?.status === 'connected')
   if (requireConnected && !anyConnected) return 'Nenhuma das instâncias selecionadas está conectada.'
+  return null
+}
+
+function describeBlocker({ hasList, hasContent, pacing, whenMode, scheduleValue, ...sender }: BlockerInput): string | null {
+  const senderBlocker = describeSenderBlocker(sender)
+  if (senderBlocker) return senderBlocker
   if (!hasList) return 'Escolha a lista.'
   if (!hasContent) return 'Escolha uma mensagem salva ou escreva a mensagem.'
   if (!isValidPacing(pacing)) return 'Intervalo inválido: use segundos inteiros de 3 a 600, mínimo ≤ máximo.'
@@ -51,9 +65,23 @@ function submitLabel(memberCount: number | null, scheduleValue: string | null): 
   return memberCount === null ? 'Enviar' : `Enviar para ${memberCount} contatos`
 }
 
+const QUEUE_NOTES: Record<BroadcastChannel, string> = {
+  whatsapp: 'Fila única: um contato por vez, no intervalo sorteado. Várias instâncias ou várias listas não disparam juntas — a próxima só sai depois da espera. Instância desconectada pode ser marcada: fica no rodízio e só envia quando voltar. Para começar agora, pelo menos uma precisa estar conectada. Dá para abortar no histórico.',
+  telegram: 'Um contato por vez, no intervalo sorteado, em rodízio entre as instâncias marcadas. Quem abriu um bot marcado recebe pelo bot; os demais, pela conta marcada (pelo telefone — só acha quem tem Telegram e permite ser achado pelo número). Sem conta marcada, quem não abriu bot fica como “sem Telegram vinculado”. Conta: use intervalo longo, o Telegram limita mensagens a desconhecidos. O Telegram não informa entrega nem leitura.',
+}
+
+const SCHEDULE_NOTES: Record<BroadcastChannel, string> = {
+  whatsapp: 'Usa a lista e a mensagem como estiverem nesse horário. O painel (Docker) precisa estar rodando e todas as instâncias selecionadas conectadas.',
+  telegram: 'Usa a lista e a mensagem como estiverem nesse horário. O painel (Docker) precisa estar rodando e todas as instâncias selecionadas conectadas.',
+}
+
 export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendFormProps) {
-  const [chosenSessionIds, setChosenSessionIds] = useState<string[] | null>(null)
-  const sessionIds = chosenSessionIds ?? pickInitialSessionIds(sessions, defaultSessionId)
+  const [channel, setChannel] = useState<BroadcastChannel>('whatsapp')
+  const telegramInstances = useTelegramInstances().data ?? []
+  // Seleção própria por canal: trocar de canal não perde a escolha do outro
+  const [chosenIds, setChosenIds] = useState<Record<BroadcastChannel, string[] | null>>({ whatsapp: null, telegram: null })
+  const instances: SenderInstance[] = channel === 'telegram' ? telegramInstances : sessions
+  const sessionIds = chosenIds[channel] ?? pickInitialSessionIds(instances, channel === 'whatsapp' ? defaultSessionId : null)
   const [listId, setListId] = useState('')
   const [text, setText] = useState('')
   const [file, setFile] = useState<PanelFile | null>(null)
@@ -73,8 +101,9 @@ export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendF
   const chosenList = listOptions.find((list) => list.id === listId) ?? null
   const hasContent = contentMode === 'template' ? chosenTemplate !== null : text.trim().length > 0 || file !== null
   const blocker = describeBlocker({
+    channel,
     sessionIds,
-    sessions,
+    sessions: instances,
     requireConnected: !isScheduling,
     hasList: chosenList !== null,
     hasContent,
@@ -85,14 +114,16 @@ export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendF
   const estimate = chosenList && isValidPacing(pacing) ? `Tempo estimado: ~${estimateDurationMinutes(chosenList.memberCount, pacing)} min.` : ''
 
   const send = () => {
-    if (blocker || sessionIds.length === 0 || !chosenList) return
+    if (blocker || !chosenList) return
     const scheduledAt = isScheduling ? localInputToIso(scheduleValue) ?? undefined : undefined
     const connectedId = sessionIds.find((sessionId) => sessions.find((session) => session.sessionId === sessionId)?.status === 'connected')
+    const base = { listId: chosenList.id, channel, pacing, scheduledAt, sessionIds }
     const input: BroadcastInput = contentMode === 'template' && chosenTemplate
-      ? { listId: chosenList.id, pacing, scheduledAt, sessionIds, templateId: chosenTemplate.id }
-      : { listId: chosenList.id, pacing, scheduledAt, sessionIds, text: text.trim(), fileId: file?.id ?? null }
+      ? { ...base, templateId: chosenTemplate.id }
+      : { ...base, text: text.trim(), fileId: file?.id ?? null }
     startBroadcast.mutate(
-      { sessionId: connectedId ?? sessionIds[0], input },
+      // Telegram não tem instância do WhatsApp na URL: vai para a rota da conta
+      { sessionId: channel === 'telegram' ? null : connectedId ?? sessionIds[0], input },
       {
         onSuccess: () => {
           setText('')
@@ -105,12 +136,15 @@ export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendF
   return (
     <section className="broadcast-send" aria-labelledby="broadcast-send-title">
       <h2 id="broadcast-send-title" className="broadcasts__section-title">Disparar</h2>
+      <ChannelPicker value={channel} onChange={setChannel} />
       <InstancePicker
-        sessions={sessions}
+        key={channel}
+        sessions={instances}
         selectedIds={sessionIds}
-        onChange={setChosenSessionIds}
+        onChange={(ids) => setChosenIds({ ...chosenIds, [channel]: ids })}
         allowDisconnected
         isDisabled={startBroadcast.isPending}
+        legend={channel === 'telegram' ? 'Instâncias do Telegram que enviam' : undefined}
       />
 
       <label className="field">
@@ -183,15 +217,11 @@ export function BroadcastSendForm({ sessions, defaultSessionId }: BroadcastSendF
             min={earliestScheduleValue()}
             onChange={(event) => setScheduleValue(event.target.value)}
           />
-          <span className="broadcast-send__note">
-            Usa a lista e a mensagem como estiverem nesse horário. O painel (Docker) precisa estar rodando e todas as instâncias selecionadas conectadas.
-          </span>
+          <span className="broadcast-send__note">{SCHEDULE_NOTES[channel]}</span>
         </label>
       ) : null}
 
-      <p className="broadcast-send__note">
-        Fila única: um contato por vez, no intervalo sorteado. Várias instâncias ou várias listas não disparam juntas — a próxima só sai depois da espera. Instância desconectada pode ser marcada: fica no rodízio e só envia quando voltar. Para começar agora, pelo menos uma precisa estar conectada. Dá para abortar no histórico. {estimate}
-      </p>
+      <p className="broadcast-send__note">{QUEUE_NOTES[channel]} {estimate}</p>
       {blocker ? <p className="broadcast-send__blocker">{blocker}</p> : null}
       {startBroadcast.isError ? <p className="broadcast-send__error" role="alert">{startBroadcast.error.message}</p> : null}
       {startBroadcast.isSuccess ? (

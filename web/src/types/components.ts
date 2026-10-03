@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
+import type { BroadcastChannel, SenderInstance, TelegramInstance, ContactSyncJob, BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
 import type { PanelView, ReportState, TableKey, TableState } from '../hooks/usePanelSearchParams'
 
 export interface StatusLampProps {
@@ -9,10 +9,12 @@ export interface StatusLampProps {
 
 export interface SessionRailProps {
   sessions: WhatsAppSession[]
+  telegramInstances: TelegramInstance[]
   isLoading: boolean
   selectedSessionId: string | null
   activeView: PanelView
   onSelect: (sessionId: string) => void
+  onSelectTelegram: (instanceId: string) => void
   onOpenView: (view: PanelView) => void
   onLogout: () => void
 }
@@ -25,10 +27,39 @@ export interface SessionRailItemProps {
 
 export interface NewSessionFormProps {
   onCreated: (sessionId: string) => void
+  onTelegramCreated: (instanceId: string) => void
+}
+
+export interface QueuePaneProps {
+  page: number
+  search: string
+  onPageChange: (page: number) => void
+  onSearchChange: (search: string) => void
+}
+
+export interface RemoveInstanceButtonProps {
+  sessionId: string
+  onRemoved: () => void
+}
+
+export interface InstanceCreateFormProps {
+  onCreated: (instanceId: string) => void
+}
+
+export interface TelegramRailItemProps {
+  instance: TelegramInstance
+  isSelected: boolean
+  onSelect: (instanceId: string) => void
+}
+
+export interface TelegramInstancePaneProps {
+  instance: TelegramInstance | null
+  onRemoved: () => void
 }
 
 export interface QrCardProps {
   session: WhatsAppSession
+  onRemoved: () => void
 }
 
 export interface SearchInputProps {
@@ -46,6 +77,7 @@ export interface ChatListPaneProps {
   onSelectChat: (chatId: string) => void
   onPageChange: (page: number) => void
   onSearchChange: (search: string) => void
+  onRemoved: () => void
 }
 
 export interface NewChatFormProps {
@@ -98,7 +130,7 @@ export interface EmptyStateProps {
 
 export interface DataTableColumn<Row> {
   key: string
-  header: string
+  header: ReactNode
   render: (row: Row) => ReactNode
   align?: 'start' | 'end'
 }
@@ -114,6 +146,8 @@ export interface DataTableProps<Row> {
 export interface ContactsPaneProps {
   // Instância usada para "Conversar"; null quando nenhuma está selecionada
   session: WhatsAppSession | null
+  // Todas as instâncias, para escolher onde salvar na sincronização com o WhatsApp
+  sessions: WhatsAppSession[]
   page: number
   search: string
   onPageChange: (page: number) => void
@@ -192,6 +226,11 @@ export interface ReportSituationFilterProps {
   onChange: (situation: ReportSituation) => void
 }
 
+export interface ChannelPickerProps {
+  value: BroadcastChannel
+  onChange: (channel: BroadcastChannel) => void
+}
+
 export interface BroadcastSendFormProps {
   sessions: WhatsAppSession[]
   defaultSessionId: string | null
@@ -238,16 +277,18 @@ export interface RunPacingEditorProps {
 }
 
 export interface InstancePickerProps {
-  sessions: WhatsAppSession[]
+  sessions: SenderInstance[]
   selectedIds: string[]
   onChange: (sessionIds: string[]) => void
   allowDisconnected: boolean
   isDisabled?: boolean
+  legend?: string
 }
 
 export interface RunInstancesEditorProps {
   run: BroadcastRun
-  sessions: WhatsAppSession[]
+  // Instâncias do canal do disparo (números ou bots)
+  sessions: SenderInstance[]
 }
 
 export interface PacingFieldsProps {
@@ -279,4 +320,27 @@ export interface TemplateEditorLoaderProps {
 export interface TemplateRowActionsProps {
   template: MessageTemplateSummary
   onEdit: (templateId: string) => void
+}
+
+export interface IndeterminateCheckboxProps {
+  checked: boolean
+  indeterminate: boolean
+  label: string
+  onChange: () => void
+}
+
+export type ContactSyncScope = 'selected' | 'all'
+
+export interface ContactSyncPanelProps {
+  sessions: WhatsAppSession[]
+  selectedIds: string[]
+  // Total de contatos que casam com a busca atual da tabela
+  matchingCount: number
+  search: string
+  onClearSelection: () => void
+  onClose: () => void
+}
+
+export interface ContactSyncProgressProps {
+  job: ContactSyncJob
 }

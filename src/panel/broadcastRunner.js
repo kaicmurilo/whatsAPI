@@ -1,5 +1,6 @@
 const { serializeMessageId, serializeWid } = require('./messageMapper')
 const { partsForRecipient } = require('./messageParts')
+const { saveContactBeforeSend } = require('./whatsappContact')
 const { acquireSession, releaseSession, acquireSendSlot, releaseSendSlot } = require('./broadcastLane')
 const { CAP_PAUSE_ERROR } = require('./sendPolicy')
 
@@ -58,7 +59,9 @@ const stopByUser = (signal) => (
     : ['canceled', CANCELED_REASON, null]
 )
 
-const holdStop = (sessionIds, failureExcluded, capExcluded, getClient) => {
+const holdStop = (sessionIds, failureExcluded, capExcluded, getClient, explainUnavailable = null) => {
+  const explained = explainUnavailable ? explainUnavailable(sessionIds) : null
+  if (explained) return ['paused', explained.error, explained.code]
   const connected = sessionIds.filter((sessionId) => getClient(sessionId) && !failureExcluded.has(sessionId))
   const capped = connected.filter((sessionId) => capExcluded.has(sessionId))
   if (connected.length > 0 && capped.length === connected.length) {
@@ -104,9 +107,10 @@ const pauseWhenNobodyCanSend = (sessionIds, excluded) => (
     : PAUSE_REASONS.instanceDown
 )
 
+// Problema do contato (sem conta no canal, bloqueou o bot) não é sinal de bloqueio do remetente
 const nextFailureStreak = (streak, outcome) => {
   if (outcome.status === 'sent') return 0
-  return outcome.error === NO_WHATSAPP_ERROR ? streak : streak + 1
+  return outcome.noAccount ? streak : streak + 1
 }
 
 /**
@@ -123,7 +127,7 @@ const runBroadcast = async (run, {
   partPause = waitOrAbort, random = Math.random,
   acquireTurn = acquireSession, releaseTurn = releaseSession,
   acquireSlot = acquireSendSlot, releaseSlot = releaseSendSlot,
-  gate = null
+  gate = null, deliver = sendToRecipient, explainUnavailable = null
 }) => {
   const recipients = run.pacing.randomOrder ? shuffle(run.recipients, random) : run.recipients
   let stop = null
@@ -134,7 +138,8 @@ const runBroadcast = async (run, {
   const record = async (position, outcome, senderSessionId = null) => {
     publish(await recordResult(run.id, position, {
       ...outcome,
-      senderSessionId: outcome.status === 'sent' ? senderSessionId : null
+      // A entrega pode ter usado outro remetente do disparo (Telegram: bot que o contato abriu)
+      senderSessionId: outcome.status === 'sent' ? (outcome.senderSessionId ?? senderSessionId) : null
     }))
   }
 
@@ -177,7 +182,7 @@ const runBroadcast = async (run, {
         const load = gate ? await gate.sendLoad(sessionIds) : new Map()
         sender = pickByDailyLoad(sessionIds, blocked, getClient, load)
         if (!sender) {
-          stop = holdStop(sessionIds, excluded, capExcluded, getClient)
+          stop = holdStop(sessionIds, excluded, capExcluded, getClient, explainUnavailable)
           break
         }
         const granted = await acquireTurn(sender.sessionId, run.id, run.signal)
@@ -205,7 +210,7 @@ const runBroadcast = async (run, {
           }
         }
         if (!stop && !outcome && !sessionCapped) {
-          outcome = await sendToRecipient(
+          outcome = await deliver(
             sender.client, recipient,
             { parts: run.parts, trackedPart: run.trackedPart ?? 0, personalize: gate ? gate.personalize : null },
             () => partPause(pickDelayMs(PART_PAUSE, random))
@@ -249,15 +254,12 @@ const runBroadcast = async (run, {
 const sendPart = (client, chatId, part) =>
   part.kind === 'text' ? client.sendMessage(chatId, part.text) : client.sendMessage(chatId, part.media, part.options)
 
-const sendToRecipient = async (client, recipient, { parts, trackedPart = 0, personalize = null }, pauseBetweenParts) => {
-  let chatId
-  try {
-    chatId = serializeWid(await client.getNumberId(recipient.phone))
-  } catch (error) {
-    return { status: 'failed', error: describeError(error) }
-  }
-  if (!chatId) return { status: 'failed', error: NO_WHATSAPP_ERROR }
-
+/**
+ * Partes do contato (variação do texto + nome) enviadas em ordem — comum a todos os canais.
+ * @param {(part: object) => Promise<string|null>} sendOne envia uma parte; devolve o id da mensagem (ou null)
+ * Erro com `recipientSide` (contato bloqueou / não existe) vira `noAccount`: não conta como falha seguida do remetente.
+ */
+const deliverParts = async (recipient, { parts, trackedPart = 0, personalize = null }, sendOne, pauseBetweenParts) => {
   let recipientParts = partsForRecipient(parts, recipient.position)
   if (typeof personalize === 'function') recipientParts = await personalize(recipientParts, recipient)
   if (recipientParts.length === 0) return { status: 'failed', error: 'Texto vazio depois de tirar o nome' }
@@ -265,17 +267,43 @@ const sendToRecipient = async (client, recipient, { parts, trackedPart = 0, pers
   for (const [index, part] of recipientParts.entries()) {
     try {
       if (index > 0) await pauseBetweenParts()
-      const sent = await sendPart(client, chatId, part)
-      if (index === trackedPart && sent) messageId = serializeMessageId(sent)
+      const sentId = await sendOne(part)
+      if (index === trackedPart && sentId) messageId = sentId
     } catch (error) {
-      if (index === 0) return { status: 'failed', error: describeError(error) }
+      if (index === 0) return { status: 'failed', error: describeError(error), ...(error?.recipientSide ? { noAccount: true } : {}) }
       return { status: 'sent', messageId, error: describeError(`Parcial: parte ${index + 1} de ${recipientParts.length} falhou: ${error.message}`) }
     }
   }
   return { status: 'sent', messageId }
 }
 
+const sendToRecipient = async (client, recipient, options, pauseBetweenParts) => {
+  let chatId
+  try {
+    chatId = serializeWid(await client.getNumberId(recipient.phone))
+  } catch (error) {
+    return { status: 'failed', error: describeError(error) }
+  }
+  if (!chatId) return { status: 'failed', error: NO_WHATSAPP_ERROR, noAccount: true }
+  // Salvo na agenda da instância antes de mandar; falhar aqui não impede o envio
+  await saveContactBeforeSend(client, chatId.endsWith('@c.us') ? chatId.split('@')[0] : recipient.phone, recipient.name)
+
+  const sendOne = async (part) => {
+    const sent = await sendPart(client, chatId, part)
+    return sent ? serializeMessageId(sent) : null
+  }
+  return deliverParts(recipient, options, sendOne, pauseBetweenParts)
+}
+
 module.exports = {
-  runBroadcast, sendToRecipient, pickByDailyLoad, shuffle, pickDelayMs, waitOrAbort,
-  CANCELED_REASON, PAUSE_REQUEST, MAX_CONSECUTIVE_FAILURES
+  runBroadcast,
+  sendToRecipient,
+  deliverParts,
+  pickByDailyLoad,
+  shuffle,
+  pickDelayMs,
+  waitOrAbort,
+  CANCELED_REASON,
+  PAUSE_REQUEST,
+  MAX_CONSECUTIVE_FAILURES
 }

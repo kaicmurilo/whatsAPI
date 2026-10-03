@@ -26,6 +26,7 @@
 | 📱 **Várias contas** | Cada número é uma sessão com QR próprio. Sessões voltam sozinhas depois de um reinício, sem pedir QR de novo. |
 | 💬 **Conversas** | Histórico salvo no Postgres, busca e envio de texto e anexos em tempo real (SSE). |
 | 📣 **Transmissão** | Listas de até 5.000 contatos, importação de `.xlsx`, várias listas e instâncias ao mesmo tempo, envio agora ou programado. |
+| ✈️ **Telegram** | A mesma lista sai pelo WhatsApp **ou** pelo Telegram: bots (Bot API, para quem abriu o bot) e contas de usuário (envio pelo telefone), como instâncias. |
 | ⚖️ **Carga equilibrada** | Cada contato sai pela instância com **menos envios no dia**. Uma fila única manda uma mensagem por vez no processo inteiro. |
 | 🛡️ **Proteção de número** | Intervalo sorteado, ordem embaralhada, teto diário, janela de horário, supressão e pausa automática ao sinal de bloqueio. |
 | 📊 **Relatórios** | Enviado, entregue, lido e reproduzido por contato, exportação CSV e painel com taxas por período e por instância. |
@@ -73,12 +74,13 @@ Interface React + Vite servida pela própria API em `/app`.
 | Tela | O que faz |
 |---|---|
 | **Painel** | Envios, entregas, leituras e respostas por período e por instância. No topo, a fila de envio ao vivo: contagem até a próxima mensagem, quantas listas estão na fila e quantos contatos faltam |
-| **Instâncias** | Números conectados com status ao vivo; cria instância nova e mostra o QR para parear |
+| **Instâncias** | WhatsApp (QR), **TG bot** (token do @BotFather) e **TG conta** (login por código) com status ao vivo; **Remover instância** desconecta e apaga |
 | **Conversas** | Histórico recebido e enviado, busca, envio de texto e anexos |
-| **Contatos** | Agenda interna do painel (não altera a do celular); o nome aparece nas conversas |
+| **Contatos** | Agenda do painel; o nome aparece nas conversas. **Sincronizar com WhatsApp** salva os contatos (todos ou marcados na tabela) na conta de uma ou mais instâncias, e opcionalmente na agenda do celular |
 | **Mensagens** | Modelos com texto, variações ilimitadas e até 10 anexos em ordem; áudio como mensagem de voz |
 | **Arquivos** | Biblioteca reutilizável (até 50 MB); vídeo e imagem com preview |
-| **Transmissão** | Listas, importação de planilha, disparo, histórico com pausar, retomar, abortar, reprocessar e **Retomar todas** |
+| **Transmissão** | Listas, importação de planilha, disparo por WhatsApp ou Telegram, histórico com pausar, retomar, abortar, reprocessar e **Retomar todas** |
+| **Fila** | Contatos que ainda vão receber, de todos os disparos abertos; **Remover da fila** vale na hora, mesmo com o disparo rodando |
 | **Relatório** | Tiques por contato, **Atualizar tiques** e exportação CSV para Excel |
 | **Configurações** | Supressão, parar quem respondeu, primeiro nome no texto, teto diário e horário de envio |
 
@@ -90,8 +92,9 @@ O WhatsApp Web não cria listas de transmissão nativas, então **cada contato r
 
 1. Os contatos saem **um por vez**, em **ordem aleatória**, com um intervalo **sorteado** na faixa escolhida (padrão 20–45 s, limites 3–600 s).
 2. Cada contato sai pela instância marcada com **menos envios no dia**. Se houver empate, sai a que enviou há mais tempo. A contagem soma todos os disparos da conta.
-3. Uma **fila única** atende o processo inteiro: com várias listas e várias instâncias, nunca saem duas mensagens juntas. Depois de cada envio, o próximo espera o intervalo de quem acabou de enviar.
-4. Instância desconectada pode ficar marcada: ela só entra quando volta. Se nenhuma marcada estiver conectada, o disparo pausa.
+3. Antes de enviar, o contato é **salvo no WhatsApp** da instância que vai mandar (nome da lista). Se salvar falhar, o envio segue.
+4. Uma **fila única** atende o processo inteiro: com várias listas e várias instâncias, nunca saem duas mensagens juntas. Depois de cada envio, o próximo espera o intervalo de quem acabou de enviar.
+5. Instância desconectada pode ficar marcada: ela só entra quando volta. Se nenhuma marcada estiver conectada, o disparo pausa.
 
 **Status e ações no histórico**
 
@@ -142,6 +145,8 @@ Números repetidos entram uma vez; contato que já está na agenda é reaproveit
 
 </details>
 
+**Telegram.** Em "Enviar por", escolha WhatsApp ou Telegram (um canal por disparo). Um **bot** só fala com quem o abriu e compartilhou o telefone (link `t.me/<bot>`). Uma **conta** envia pelo número, mas o Telegram limita buscas de desconhecidos: quando isso acontece, a conta descansa e o disparo retoma sozinho. Por contato, quem abriu um bot marcado recebe pelo bot. Envio em massa por conta vai contra os termos do Telegram.
+
 Regras completas em [docs/BROADCAST_SEND.md](docs/BROADCAST_SEND.md).
 
 ## 🔌 API REST
@@ -180,12 +185,14 @@ Todas as variáveis estão em [`env.example`](env.example). As principais:
 
 ## 🔧 Estabilidade das sessões
 
-- **Reinício sem QR**: o desligamento fecha os navegadores e as travas órfãs do Chromium são limpas ao abrir.
-- **Nova tentativa ao abrir**: sessão que falha tenta de novo em 10 s, 30 s e 60 s.
-- **Presa em "autenticando"**: se a sessão autentica e o `ready` não chega em 3 min, o navegador é fechado e reaberto, e o pareamento é mantido.
+- **Reinício sem QR**: o desligamento fecha os navegadores com calma (o puppeteer não mata mais o Chrome no SIGTERM) e as travas órfãs do Chromium são limpas ao abrir.
+- **Nova tentativa ao abrir**: sessão que falha tenta de novo com espera crescente (10 s até 10 min, 8 tentativas, ~25 min no total).
+- **Presa em "autenticando"**: a causa era um bug do whatsapp-web.js (a troca de alvo da página logo depois de autenticar matava a inicialização em silêncio), corrigido no patch da lib. Como rede de proteção, se o `ready` não chegar em 3 min, o navegador é fechado e reaberto, e o pareamento é mantido.
+- **Navegador que morre sozinho** (falta de memória, crash) é detectado e reaberto; antes a sessão ficava presa e o Iniciar dava 422.
+- **`ready` falso depois de LOGOUT** é ignorado: o painel não marca como conectada uma conta que voltou para o QR.
 - **Motivo da queda no log**: `[session] desconectada sessão=… motivo=LOGOUT` (aparelho desvinculado) ou `CONFLICT` (aberta em outro lugar).
 - **Erros internos não derrubam a API**: falhas assíncronas do puppeteer são logadas com `[process]`.
-- `patches/whatsapp-web.js+1.34.7.patch` corrige o envio de mídia ([PR upstream #201923](https://github.com/wwebjs/whatsapp-web.js/pull/201923)); remova quando sair versão oficial com a correção.
+- `patches/whatsapp-web.js+1.34.7.patch` corrige o envio de mídia ([PR upstream #201923](https://github.com/wwebjs/whatsapp-web.js/pull/201923)) e a sessão presa em "autenticando" depois da troca de alvo da página ([docs/SESSIONS.md](docs/SESSIONS.md)); remova quando sair versão oficial com as correções.
 
 Detalhes em [docs/SESSIONS.md](docs/SESSIONS.md).
 

@@ -8,9 +8,12 @@ import { EmptyState } from '../components/EmptyState'
 import { FilesPane } from '../components/FilesPane'
 import { SettingsPane } from '../components/SettingsPane'
 import { QrCard } from '../components/QrCard'
+import { QueuePane } from '../components/QueuePane'
 import { SessionRail } from '../components/SessionRail'
+import { TelegramInstancePane } from '../components/TelegramInstancePane'
 import { TemplatesPane } from '../components/TemplatesPane'
 import { usePanelPage } from '../hooks/usePanelPage'
+import { useTelegramInstances } from '../hooks/useTelegramInstances'
 
 export function PanelPage() {
   const { logout } = useAuth()
@@ -19,15 +22,18 @@ export function PanelPage() {
   const isChatsView = view === 'chats'
   const showChats = isChatsView && selectedSession !== null && !selectedSession.showQr
   const sessionList = sessions.data ?? []
+  const telegramInstances = useTelegramInstances().data ?? []
 
   return (
     <div className="panel" data-has-chat={showChats && selection.chatId ? 'true' : 'false'}>
       <SessionRail
         sessions={sessionList}
+        telegramInstances={telegramInstances}
         isLoading={sessions.isPending}
         selectedSessionId={selection.sessionId}
         activeView={view}
         onSelect={actions.selectSession}
+        onSelectTelegram={actions.openTelegramInstance}
         onOpenView={actions.setView}
         onLogout={logout}
       />
@@ -36,6 +42,7 @@ export function PanelPage() {
         {view === 'contacts' ? (
           <ContactsPane
             session={selectedSession?.session ?? null}
+            sessions={sessionList}
             page={tables.contacts.page}
             search={tables.contacts.search}
             onPageChange={(page) => actions.setTablePage('contacts', page)}
@@ -77,7 +84,23 @@ export function PanelPage() {
           />
         ) : null}
 
+        {view === 'queue' ? (
+          <QueuePane
+            page={tables.queue.page}
+            search={tables.queue.search}
+            onPageChange={(page) => actions.setTablePage('queue', page)}
+            onSearchChange={(search) => actions.setTableSearch('queue', search)}
+          />
+        ) : null}
+
         {view === 'settings' ? <SettingsPane /> : null}
+
+        {view === 'telegram' ? (
+          <TelegramInstancePane
+            instance={telegramInstances.find((instance) => instance.sessionId === selection.sessionId) ?? null}
+            onRemoved={() => actions.setView('dashboard')}
+          />
+        ) : null}
 
         {view === 'dashboard' ? <DashboardPane sessions={sessionList} /> : null}
 
@@ -87,7 +110,7 @@ export function PanelPage() {
           </EmptyState>
         ) : null}
 
-        {isChatsView && selectedSession?.showQr ? <QrCard session={selectedSession.session} /> : null}
+        {isChatsView && selectedSession?.showQr ? <QrCard session={selectedSession.session} onRemoved={() => actions.setView('dashboard')} /> : null}
 
         {showChats && selectedSession ? (
           <>
@@ -100,6 +123,7 @@ export function PanelPage() {
               onSelectChat={actions.selectChat}
               onPageChange={actions.setPage}
               onSearchChange={actions.setSearch}
+              onRemoved={() => actions.setView('dashboard')}
             />
             {selection.chatId ? (
               <ConversationPane session={selectedSession.session} chatId={selection.chatId} onClose={() => actions.selectChat(null)} />

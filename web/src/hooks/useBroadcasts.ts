@@ -84,7 +84,7 @@ export function useResumeAllBroadcasts() {
 }
 
 interface StartBroadcastInput {
-  sessionId: string
+  sessionId: string | null
   input: BroadcastInput
 }
 

@@ -1,4 +1,5 @@
 import type {
+  QueuedRecipientPage,
   BroadcastInput,
   BroadcastListDetail,
   BroadcastListInput,
@@ -37,8 +38,18 @@ export async function deleteBroadcastList(token: string, listId: string): Promis
   await requestRaw(listPath(listId), { token, method: 'DELETE' })
 }
 
-export function startBroadcast(token: string, sessionId: string, input: BroadcastInput): Promise<BroadcastRun> {
-  return requestData<BroadcastRun>(`${sessionPath(sessionId)}/broadcasts`, { token, method: 'POST', body: input })
+// Sem instância (Telegram): rota da conta
+export function startBroadcast(token: string, sessionId: string | null, input: BroadcastInput): Promise<BroadcastRun> {
+  const path = sessionId ? `${sessionPath(sessionId)}/broadcasts` : '/panel/broadcasts'
+  return requestData<BroadcastRun>(path, { token, method: 'POST', body: input })
+}
+
+export function fetchQueuedRecipients(token: string, query: PageQuery): Promise<QueuedRecipientPage> {
+  return requestData<QueuedRecipientPage>(`/panel/broadcasts/queue/recipients?${pageParams(query, TABLE_PER_PAGE)}`, { token })
+}
+
+export async function removeQueuedRecipient(token: string, runId: string, position: number): Promise<void> {
+  await requestRaw(`/panel/broadcasts/${encodeURIComponent(runId)}/recipients/${position}`, { token, method: 'DELETE' })
 }
 
 export interface ResumeAllResult {

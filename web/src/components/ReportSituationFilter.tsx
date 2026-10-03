@@ -12,6 +12,7 @@ const OPTIONS: { value: ReportSituation; label: string }[] = [
   { value: 'suppressed', label: 'Suprimidos' },
   { value: 'duplicate', label: 'Duplicados' },
   { value: 'replied', label: 'Responderam' },
+  { value: 'removed', label: 'Removidos' },
 ]
 
 export function ReportSituationFilter({ value, onChange }: ReportSituationFilterProps) {

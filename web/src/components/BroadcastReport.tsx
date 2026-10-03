@@ -15,6 +15,7 @@ const SITUATION_LABELS: Record<RecipientSituation, string> = {
   suppressed: 'Suprimido',
   duplicate: 'Duplicado',
   replied: 'Respondeu',
+  removed: 'Removido da fila',
   sent: 'Enviado',
   delivered: 'Entregue',
   read: 'Lido',
@@ -78,9 +79,11 @@ export function BroadcastReport({ runId, page, situation, onClose, onPageChange,
           </p>
         </div>
         <div className="report__actions">
-          <button type="button" className="report__refresh" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
-            {refresh.isPending ? 'Consultando…' : 'Atualizar tiques'}
-          </button>
+          {run.channel === 'telegram' ? null : (
+            <button type="button" className="report__refresh" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
+              {refresh.isPending ? 'Consultando…' : 'Atualizar tiques'}
+            </button>
+          )}
           <button type="button" className="report__download" disabled={download.isPending} onClick={() => download.mutate(runId)}>
             {download.isPending ? 'Gerando…' : 'Baixar CSV'}
           </button>

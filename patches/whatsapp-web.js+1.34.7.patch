@@ -1,3 +1,94 @@
+diff --git a/node_modules/whatsapp-web.js/src/Client.js b/node_modules/whatsapp-web.js/src/Client.js
+index 800109e..649ee9e 100644
+--- a/node_modules/whatsapp-web.js/src/Client.js
++++ b/node_modules/whatsapp-web.js/src/Client.js
+@@ -286,8 +286,11 @@ class Client extends EventEmitter {
+                     state == 'UNPAIRED_IDLE' &&
+                     !pairWithPhoneNumber.phoneNumber
+                 ) {
+-                    // refresh qr code
+-                    window.require('WAWebCmd').Cmd.refreshQR();
++                    // refresh qr code (runs in Node: window only exists in the page)
++                    // Newer WhatsApp Web builds dropped Cmd.refreshQR; the QR refreshes itself there
++                    await this.pupPage.evaluate(() =>
++                        window.require('WAWebCmd').Cmd.refreshQR?.(),
++                    );
+                 }
+             },
+         );
+@@ -296,6 +299,10 @@ class Client extends EventEmitter {
+             this.pupPage,
+             'onAppStateHasSyncedEvent',
+             async () => {
++                // Single flight: inject() may call this again (see below) while a previous
++                // run is still attaching listeners; a second run would register them twice.
++                if (this._syncedChain) return this._syncedChain;
++                this._syncedChain = (async () => {
+                 const authEventPayload =
+                     await this.authStrategy.getAuthEventPayload();
+                 /**
+@@ -308,7 +315,9 @@ class Client extends EventEmitter {
+                     return typeof window.WWebJS !== 'undefined';
+                 });
+ 
+-                if (!injected) {
++                // After a target swap WWebJS survives but a previous run may have died midway
++                // through attachEventListeners ("Target closed"): only a completed run counts.
++                if (!injected || !this._listenersAttached) {
+                     if (
+                         this.options.webVersionCache.type === 'local' &&
+                         this.currentIndexHtml
+@@ -367,6 +376,7 @@ class Client extends EventEmitter {
+                     this.interface = new InterfaceController(this);
+ 
+                     await this.attachEventListeners();
++                    this._listenersAttached = true;
+                 }
+                 /**
+                  * Emitted when the client has initialized and is ready to receive messages.
+@@ -374,6 +384,27 @@ class Client extends EventEmitter {
+                  */
+                 this.emit(Events.READY);
+                 this.authStrategy.afterAuthReady();
++                this._syncedRetries = 0;
++                })().catch((error) => {
++                    // A run that died midway (e.g. "Target closed" while the page target was
++                    // swapped) would leave the client authenticated but never ready: retry it.
++                    this._syncedRetries = (this._syncedRetries || 0) + 1;
++                    if (this._syncedRetries <= 5) {
++                        setTimeout(() => {
++                            this.pupPage
++                                ?.evaluate(() => {
++                                    if (window.require('WAWebSocketModel').Socket.hasSynced === true) {
++                                        window.onAppStateHasSyncedEvent();
++                                    }
++                                })
++                                .catch(() => {});
++                        }, 2000);
++                    }
++                    throw error;
++                }).finally(() => {
++                    this._syncedChain = null;
++                });
++                return this._syncedChain;
+             },
+         );
+         let lastPercent = null;
+@@ -421,6 +452,14 @@ class Client extends EventEmitter {
+                 await window.onLogoutEvent();
+             });
+         });
++        // Re-injection after a navigation/target swap: when WhatsApp finished syncing before the
++        // listener above was registered, change:hasSynced never fires again and ready never comes
++        // (the previous run died with "Target closed"). Run the synced handler now instead.
++        await this.pupPage.evaluate(() => {
++            if (window.require('WAWebSocketModel').Socket.hasSynced === true) {
++                window.onAppStateHasSyncedEvent();
++            }
++        });
+     }
+ 
+     /**
 diff --git a/node_modules/whatsapp-web.js/src/util/Injected/Utils.js b/node_modules/whatsapp-web.js/src/util/Injected/Utils.js
 index 540078a..cd11f3b 100644
 --- a/node_modules/whatsapp-web.js/src/util/Injected/Utils.js
@@ -14,3 +105,24 @@ index 540078a..cd11f3b 100644
          // Bot's won't reply if canonicalUrl is set (linking)
          if (botOptions) {
              delete message.canonicalUrl;
+diff --git a/node_modules/whatsapp-web.js/src/util/Puppeteer.js b/node_modules/whatsapp-web.js/src/util/Puppeteer.js
+index 54df700..34e0c0b 100644
+--- a/node_modules/whatsapp-web.js/src/util/Puppeteer.js
++++ b/node_modules/whatsapp-web.js/src/util/Puppeteer.js
+@@ -17,7 +17,15 @@ async function exposeFunctionIfAbsent(page, name, fn) {
+     if (exist) {
+         return;
+     }
+-    await page.exposeFunction(name, fn);
++    try {
++        await page.exposeFunction(name, fn);
++    } catch (error) {
++        if (!String(error?.message).includes('already exists')) throw error;
++        // Puppeteer still tracks the binding but the page lost it (target swap) or a
++        // concurrent injection registered it: bind again on the current target.
++        await page.removeExposedFunction(name);
++        await page.exposeFunction(name, fn);
++    }
+ }
+ 
+ module.exports = { exposeFunctionIfAbsent };

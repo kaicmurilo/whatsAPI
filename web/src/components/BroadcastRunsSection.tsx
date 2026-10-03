@@ -3,7 +3,8 @@ import { ConfirmButton } from './ConfirmButton'
 import { formatDateTime } from '../lib/format'
 import { formatSchedule } from '../lib/schedule'
 import { TABLE_PER_PAGE } from '../lib/panelApi'
-import type { BroadcastRun, BroadcastRunStatus, WhatsAppSession } from '../types/api'
+import { useTelegramInstances } from '../hooks/useTelegramInstances'
+import type { BroadcastRun, BroadcastRunStatus, TelegramInstance, WhatsAppSession } from '../types/api'
 import type { BroadcastRunsSectionProps, DataTableColumn } from '../types/components'
 import { DataTable } from './DataTable'
 import { EmptyState } from './EmptyState'
@@ -64,6 +65,7 @@ function RunProgress({ run }: { run: BroadcastRun }) {
 
 const buildRunColumns = (
   sessions: WhatsAppSession[],
+  telegramInstances: TelegramInstance[],
   openReportId: string | null,
   onOpenReport: (runId: string) => void,
 ): DataTableColumn<BroadcastRun>[] => [
@@ -75,7 +77,8 @@ const buildRunColumns = (
     render: (run) => (
       <span className="run-content">
         <span className="broadcasts__content">{describeContent(run)}</span>
-        <RunInstancesEditor run={run} sessions={sessions} />
+        {run.channel === 'telegram' ? <span className="broadcasts__mono">✈ Telegram</span> : null}
+        <RunInstancesEditor run={run} sessions={run.channel === 'telegram' ? telegramInstances : sessions} />
         <RunPacingEditor run={run} />
       </span>
     ),
@@ -113,7 +116,8 @@ function ResumeAllButton() {
 export function BroadcastRunsSection({ sessions, page, openReportId, onPageChange, onOpenReport }: BroadcastRunsSectionProps) {
   const runs = useBroadcastRuns(page)
   const items = runs.data?.items ?? []
-  const columns = buildRunColumns(sessions, openReportId, onOpenReport)
+  const telegramInstances = useTelegramInstances().data ?? []
+  const columns = buildRunColumns(sessions, telegramInstances, openReportId, onOpenReport)
 
   return (
     <section className="broadcasts__section" aria-labelledby="runs-title">

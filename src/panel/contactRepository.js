@@ -57,4 +57,19 @@ const findContactNameForChat = async (userId, chatId) => {
   return result.rows[0]?.name || null
 }
 
-module.exports = { listContacts, upsertContact, deleteContact, findContactNameForChat }
+// Para salvar no WhatsApp: os ids escolhidos, ou (contactIds null) todos que casam com a busca da tabela
+const listContactsForSync = async (userId, { contactIds, search, limit }) => {
+  const { namePattern, phonePattern } = buildContactSearch(search)
+  const result = await query(
+    `SELECT id, name, phone FROM panel_contacts
+     WHERE user_id = $1
+       AND ($2::bigint[] IS NULL OR id = ANY($2::bigint[]))
+       AND ($3::text IS NULL OR name ILIKE $3 OR ($4::text IS NOT NULL AND phone LIKE $4))
+     ORDER BY name, id
+     LIMIT $5`,
+    [userId, contactIds, namePattern, phonePattern, limit]
+  )
+  return result.rows
+}
+
+module.exports = { listContacts, upsertContact, deleteContact, findContactNameForChat, listContactsForSync, buildContactSearch }
