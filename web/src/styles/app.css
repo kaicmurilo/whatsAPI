@@ -566,6 +566,8 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .rail__view::after { content: '→'; font-family: var(--font-mono); color: var(--color-rail-muted); }
 .rail__view:hover { background: var(--color-rail-raised); }
 .rail__view[aria-current='page'] { background: var(--color-rail-raised); border-color: var(--color-live); }
+.rail__view--external { color: inherit; text-decoration: none; }
+.rail__view--external::after { content: '↗'; }
 
 /* ─── Agenda ────────────────────────────────────────────── */
 

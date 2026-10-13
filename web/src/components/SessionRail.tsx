@@ -32,6 +32,9 @@ export function SessionRail({
             {label}
           </button>
         ))}
+        <a className="rail__view rail__view--external" href="/api-docs/" target="_blank" rel="noopener noreferrer">
+          API · Swagger
+        </a>
       </div>
 
       {isLoading ? <p className="rail__note">Carregando…</p> : null}
