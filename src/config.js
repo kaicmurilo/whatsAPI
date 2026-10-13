@@ -38,6 +38,10 @@ const jwtRefreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d'
 // Auth Configuration
 const enableAuth = (process.env.ENABLE_AUTH || 'true').toLowerCase() === 'true'
 
+// Sem HTTPS na frente (acesso direto por IP), o upgrade-insecure-requests da CSP faz o navegador
+// pedir os assets em https:// e o painel abre em branco. Desligue com FORCE_HTTPS=false.
+const forceHttps = (process.env.FORCE_HTTPS || 'true').toLowerCase() === 'true'
+
 // Validações de segurança
 if (!jwtSecret) {
   console.error('❌ JWT_SECRET não configurado ou usando valor padrão inseguro')
@@ -76,5 +80,6 @@ module.exports = {
   jwtSecret,
   jwtExpiresIn,
   jwtRefreshExpiresIn,
-  enableAuth
+  enableAuth,
+  forceHttps
 }

@@ -3,7 +3,7 @@ const express = require('express')
 const { routes } = require('./routes')
 const app = express()
 const bodyParser = require('body-parser')
-const { maxAttachmentSize } = require('./config')
+const { maxAttachmentSize, forceHttps } = require('./config')
 const cors = require('cors')
 const helmet = require('helmet')
 
@@ -48,10 +48,11 @@ app.use(helmet({
       ],
       // fflate descompacta em Web Worker (blob:) abas maiores que 512 KB.
       // Sem blob: o worker nasce e não responde: a UI fica em "Lendo planilha…" e não aceita outro arquivo.
-      workerSrc: ["'self'", "blob:"]
+      workerSrc: ["'self'", "blob:"],
+      upgradeInsecureRequests: forceHttps ? [] : null
     }
   },
-  hsts: {
+  hsts: forceHttps && {
     maxAge: 31536000,
     includeSubDomains: true,
     preload: true
