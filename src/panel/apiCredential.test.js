@@ -2,7 +2,7 @@ jest.mock('../database', () => ({ query: jest.fn() }))
 
 const { query } = require('../database')
 const { isApiKey, createApiCredential, findApiCredentialByKey } = require('./apiCredentialRepository')
-const { parseCredentialName, parseCredentialSessionIds, requirePanelLogin, restrictToSessionRoutes } = require('./apiCredentialController')
+const { parseCredentialName, parseCredentialSessionIds, requirePanelLogin, restrictToSessionRoutes, putCredentialSessions } = require('./apiCredentialController')
 const { isSessionAllowed } = require('../auth/credentialScope')
 
 const mockResponse = () => ({ status: jest.fn().mockReturnThis(), json: jest.fn() })
@@ -75,5 +75,42 @@ describe('api credentials', () => {
     restrictToSessionRoutes({ token, path: '/sessions/loja-centro-1/chats' }, mockResponse(), next)
     restrictToSessionRoutes({ token: { scope: 'read write' }, path: '/contacts' }, mockResponse(), next)
     expect(next).toHaveBeenCalledTimes(2)
+  })
+
+  describe('editing the allowed instances', () => {
+    const patch = async (body, credentialId = '7') => {
+      const res = mockResponse()
+      await putCredentialSessions({ params: { credentialId }, body, user: { user_id: 'user-1' } }, res)
+      return res
+    }
+
+    test('restricts to the given instances after checking they are owned', async () => {
+      query
+        .mockResolvedValueOnce({ rows: [{ owned: 2 }] })
+        .mockResolvedValueOnce({ rows: [{ id: 7, sessionIds: ['loja-centro-1', 'loja-norte-22'] }] })
+      const res = await patch({ sessionIds: ['loja-centro-1', 'loja-norte-22', 'loja-centro-1'] })
+      const [sql, params] = query.mock.calls[1]
+      expect(sql).toMatch(/UPDATE api_credentials SET session_ids/)
+      expect(sql).toMatch(/user_id = \$1 AND id = \$2/)
+      expect(params).toEqual(['user-1', 7, ['loja-centro-1', 'loja-norte-22']])
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }))
+    })
+
+    test('null releases every instance without an ownership query', async () => {
+      query.mockResolvedValueOnce({ rows: [{ id: 7, sessionIds: null }] })
+      await patch({ sessionIds: null })
+      expect(query).toHaveBeenCalledTimes(1)
+      expect(query.mock.calls[0][1]).toEqual(['user-1', 7, null])
+    })
+
+    test('rejects missing field, empty list, foreign instance, bad id and unknown credential', async () => {
+      expect((await patch({})).status).toHaveBeenCalledWith(422)
+      expect((await patch({ sessionIds: [] })).status).toHaveBeenCalledWith(422)
+      expect((await patch({ sessionIds: ['x'] }, 'abc')).status).toHaveBeenCalledWith(422)
+      query.mockResolvedValueOnce({ rows: [{ owned: 0 }] })
+      expect((await patch({ sessionIds: ['loja-de-outro-1'] })).status).toHaveBeenCalledWith(422)
+      query.mockResolvedValueOnce({ rows: [] })
+      expect((await patch({ sessionIds: null }, '99')).status).toHaveBeenCalledWith(404)
+    })
   })
 })

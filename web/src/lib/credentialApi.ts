@@ -14,6 +14,10 @@ export async function createCredential(token: string, credential: NewApiCredenti
   return withStringId(await requestData<CreatedApiCredential>('/panel/credentials', { token, method: 'POST', body: credential }))
 }
 
+export async function updateCredentialSessions(token: string, id: string, sessionIds: string[] | null): Promise<ApiCredential> {
+  return withStringId(await requestData<ApiCredential>(`/panel/credentials/${encodeURIComponent(id)}/sessions`, { token, method: 'PUT', body: { sessionIds } }))
+}
+
 export async function revokeCredential(token: string, id: string): Promise<void> {
   await requestRaw(`/panel/credentials/${encodeURIComponent(id)}`, { token, method: 'DELETE' })
 }

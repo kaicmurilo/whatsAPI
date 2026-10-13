@@ -128,6 +128,7 @@ Chave por aplicação para sistemas consumirem a API sem usar `user_id` + `user_
 |---|---|---|
 | GET | `/panel/credentials` | Lista as credenciais (`page`, `perPage`, `search` pelo nome). Nunca devolve a chave |
 | POST | `/panel/credentials` | Cria. Corpo `{ "name": "CRM", "sessionIds": ["loja-centro-1"] }` (nome até 60 caracteres; `sessionIds` opcional). A resposta traz `apiKey` **uma única vez** |
+| PUT | `/panel/credentials/:credentialId/sessions` | Troca as instâncias liberadas sem trocar a chave. Corpo `{ "sessionIds": ["loja-centro-1"] }` ou `{ "sessionIds": null }` para liberar todas. Vale na próxima requisição da aplicação |
 | DELETE | `/panel/credentials/:credentialId` | Revoga. O acesso cai na próxima requisição |
 
 A chave tem o formato `wak_...` e vai no mesmo cabeçalho do token: `Authorization: Bearer wak_...`. Vale em todas as rotas que aceitam o access token, com o escopo `read write` da conta que a criou. O banco guarda só o SHA-256 e os 10 primeiros caracteres (para identificar na lista). `lastUsedAt` é atualizado no máximo uma vez por minuto.

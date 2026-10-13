@@ -6,6 +6,7 @@ import { TABLE_PER_PAGE } from '../lib/panelApi'
 import type { ApiCredential, CreatedApiCredential } from '../types/api'
 import type { CreateApiCredentialFormProps, DataTableColumn, IssuedApiKeyProps, TablePaneProps } from '../types/components'
 import { ConfirmButton } from './ConfirmButton'
+import { CredentialInstancesEditor } from './CredentialInstancesEditor'
 import { InstancePicker } from './InstancePicker'
 import { DataTable } from './DataTable'
 import { EmptyState } from './EmptyState'
@@ -13,8 +14,6 @@ import { Pagination } from './Pagination'
 import { SearchInput } from './SearchInput'
 
 const getCredentialKey = (credential: ApiCredential): string => credential.id
-
-const instancesLabel = (credential: ApiCredential): string => (credential.sessionIds ? credential.sessionIds.join(', ') : 'Todas')
 
 const lastUsedLabel = (credential: ApiCredential): string => (credential.lastUsedAt ? formatDateTime(credential.lastUsedAt) : 'Nunca')
 
@@ -26,7 +25,7 @@ function RevokeCredentialAction({ credential }: { credential: ApiCredential }) {
 const CREDENTIAL_COLUMNS: DataTableColumn<ApiCredential>[] = [
   { key: 'name', header: 'Aplicação', render: (credential) => <span className="files__name">{credential.name}</span> },
   { key: 'prefix', header: 'Chave', render: (credential) => <span className="broadcasts__mono">{credential.tokenPrefix}…</span> },
-  { key: 'instances', header: 'Instâncias', render: (credential) => <span className="files__meta">{instancesLabel(credential)}</span> },
+  { key: 'instances', header: 'Instâncias', render: (credential) => <CredentialInstancesEditor credential={credential} /> },
   { key: 'created', header: 'Criada em', render: (credential) => <span className="files__meta">{formatDateTime(credential.createdAt)}</span> },
   { key: 'used', header: 'Último uso', render: (credential) => <span className="files__meta">{lastUsedLabel(credential)}</span> },
   { key: 'actions', header: 'Ações', align: 'end', render: (credential) => <RevokeCredentialAction credential={credential} /> },

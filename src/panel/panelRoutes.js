@@ -112,6 +112,7 @@ const credentialRateLimiter = perUserLimiter(10, 'Muitas alterações de credenc
 const panelLoginOnly = apiCredentialController.requirePanelLogin
 panelRouter.get('/credentials', panelLoginOnly, apiCredentialController.getApiCredentials)
 panelRouter.post('/credentials', panelLoginOnly, credentialRateLimiter, apiCredentialController.postApiCredential)
+panelRouter.put('/credentials/:credentialId/sessions', panelLoginOnly, credentialRateLimiter, apiCredentialController.putCredentialSessions)
 panelRouter.delete('/credentials/:credentialId', panelLoginOnly, credentialRateLimiter, apiCredentialController.deleteApiCredential)
 panelRouter.get('/suppression', suppressionController.getSuppressed)
 panelRouter.delete('/suppression/:suppressionId', settingsRateLimiter, suppressionController.deleteSuppressed)

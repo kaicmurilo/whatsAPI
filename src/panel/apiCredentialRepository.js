@@ -53,6 +53,15 @@ const countOwnedSessions = async (userId, sessionIds) => {
   return result.rows[0].owned
 }
 
+// null = todas as instâncias. Vale na próxima requisição: a chave é lida do banco a cada chamada.
+const updateApiCredentialSessions = async (userId, id, sessionIds) => {
+  const result = await query(
+    `UPDATE api_credentials SET session_ids = $3 WHERE user_id = $1 AND id = $2 RETURNING ${CREDENTIAL_COLUMNS}`,
+    [userId, id, sessionIds]
+  )
+  return result.rows[0] || null
+}
+
 const revokeApiCredential = async (userId, id) => {
   const result = await query('DELETE FROM api_credentials WHERE user_id = $1 AND id = $2', [userId, id])
   return result.rowCount > 0
@@ -79,4 +88,4 @@ const findApiCredentialByKey = async (apiKey) => {
   return credential
 }
 
-module.exports = { isApiKey, createApiCredential, listApiCredentials, revokeApiCredential, findApiCredentialByKey, countOwnedSessions }
+module.exports = { isApiKey, createApiCredential, listApiCredentials, updateApiCredentialSessions, revokeApiCredential, findApiCredentialByKey, countOwnedSessions }

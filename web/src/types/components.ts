@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { BroadcastChannel, CreatedApiCredential, SenderInstance, TelegramInstance, ContactSyncJob, BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
+import type { ApiCredential, BroadcastChannel, CreatedApiCredential, SenderInstance, TelegramInstance, ContactSyncJob, BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
 import type { PanelView, ReportState, TableKey, TableState } from '../hooks/usePanelSearchParams'
 
 export interface StatusLampProps {
@@ -199,6 +199,10 @@ export interface FilePickerProps {
 export interface IssuedApiKeyProps {
   credential: CreatedApiCredential
   onDismiss: () => void
+}
+
+export interface CredentialInstancesEditorProps {
+  credential: ApiCredential
 }
 
 export interface CreateApiCredentialFormProps {
