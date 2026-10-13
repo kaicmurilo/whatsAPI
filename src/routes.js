@@ -338,6 +338,9 @@ contactRouter.post('/getProfilePicUrl/:sessionId', createContactMiddleware(conta
  * ================
  */
 if (enableSwaggerEndpoint) {
+  // Raiz sem conteúdo próprio: encaminha para a documentação
+  routes.get('/', (req, res) => res.redirect('/api-docs/'))
+
   routes.use('/api-docs', swaggerUi.serve)
   
   // Rota principal - Página de seleção de idioma
