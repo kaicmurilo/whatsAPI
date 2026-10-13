@@ -8,6 +8,7 @@ const middleware = require('./middleware')
 const healthController = require('./controllers/healthController')
 const sessionController = require('./controllers/sessionController')
 const clientController = require('./controllers/clientController')
+const balancedSendController = require('./controllers/balancedSendController')
 const chatController = require('./controllers/chatController')
 const groupChatController = require('./controllers/groupChatController')
 const messageController = require('./controllers/messageController')
@@ -476,6 +477,46 @@ clientRouter.post('/sendMessage/:sessionId',
     }]
   */
   createClientMiddleware(clientController.sendMessage)
+)
+// Envio multi-instância: escolhe a instância com menos envios no dia; checagem de acesso por instância no controller
+clientRouter.post('/sendMessageBalanced',
+  /*
+    #swagger.tags = ['Client']
+    #swagger.summary = 'Send message through the least loaded instance'
+    #swagger.description = 'Sends through the instance in sessionIds that sent the fewest messages today (any origin). Groups (@g.us): only connected instances that are members of the group compete. Contacts: any connected instance. The API key must be allowed for every instance in sessionIds. Body is the same as /client/sendMessage plus sessionIds.'
+    #swagger.requestBody = {
+      required: true,
+      '@content': {
+        "application/json": {
+          schema: {
+            type: 'object',
+            required: ['sessionIds', 'chatId', 'contentType', 'content'],
+            properties: {
+              sessionIds: { type: 'array', items: { type: 'string' }, description: 'Candidate instances (max 20)' },
+              chatId: { type: 'string', description: 'Contact (5511999998888@c.us) or group (1203...@g.us)' },
+              contentType: { type: 'string', description: 'string, MessageMedia, MessageMediaFromURL, Location, Buttons, List, Contact or Poll' },
+              content: { type: 'object', description: 'Same as /client/sendMessage' },
+              options: { type: 'object', description: 'Same as /client/sendMessage' }
+            }
+          },
+          examples: {
+            contato: { value: { sessionIds: ['loja-centro-01', 'loja-norte-022'], chatId: '5511999998888@c.us', contentType: 'string', content: 'Olá!' } },
+            grupo: { value: { sessionIds: ['loja-centro-01', 'loja-norte-022'], chatId: '120363000000000000@g.us', contentType: 'string', content: 'Olá, grupo!' } }
+          }
+        }
+      }
+    }
+    #swagger.responses[200] = { description: 'Sent; sessionId is the instance used', content: { "application/json": { example: { success: true, sessionId: 'loja-norte-022', message: {} } } } }
+    #swagger.responses[403] = { description: 'API key not allowed for one of the instances, or instance not owned' }
+    #swagger.responses[409] = { description: 'None of the instances is connected' }
+    #swagger.responses[422] = { description: 'Invalid body, or no connected instance is a member of the group' }
+    #swagger.security = [{
+          "bearerAuth": []
+    }]
+  */
+  middleware.checkAuthEnabled,
+  middleware.requireActiveUser,
+  balancedSendController.sendMessageBalanced
 )
 clientRouter.post('/sendPresenceAvailable/:sessionId', 
   /*

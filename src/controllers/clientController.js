@@ -3,6 +3,38 @@ const { sessions } = require('../sessions')
 const { sendErrorResponse } = require('../utils')
 const { cacheHelpers } = require('../utils/cache')
 
+const CONTENT_TYPES = ['string', 'MessageMediaFromURL', 'MessageMedia', 'Location', 'Buttons', 'List', 'Contact', 'Poll']
+const INVALID_CONTENT_TYPE = 'contentType invalid, must be string, MessageMedia, MessageMediaFromURL, Location, Buttons, List, Contact or Poll'
+
+/**
+ * Monta o conteúdo que o whatsapp-web.js envia, a partir do contentType da API.
+ * Compartilhado por /sendMessage e /sendMessageBalanced; contentType já validado contra CONTENT_TYPES.
+ */
+const buildMessageContent = async (client, contentType, content, options) => {
+  switch (contentType) {
+    case 'string':
+      if (options && options.media) {
+        const media = options.media
+        options.media = new MessageMedia(media.mimetype, media.data, media.filename = null, media.filesize = null)
+      }
+      return content
+    case 'MessageMediaFromURL':
+      return MessageMedia.fromUrl(content, { unsafeMime: true })
+    case 'MessageMedia':
+      return new MessageMedia(content.mimetype, content.data, content.filename, content.filesize)
+    case 'Location':
+      return new Location(content.latitude, content.longitude, content.description)
+    case 'Buttons':
+      return new Buttons(content.body, content.buttons, content.title, content.footer)
+    case 'List':
+      return new List(content.body, content.buttonText, content.sections, content.title, content.footer)
+    case 'Contact':
+      return client.getContactById(typeof content.contactId === 'number' ? content.contactId + '@c.us' : content.contactId)
+    case 'Poll':
+      return new Poll(content.pollName, content.pollOptions, content.options)
+  }
+}
+
 /**
  * Send a message to a chat using the WhatsApp API
  *
@@ -70,55 +102,8 @@ const sendMessage = async (req, res) => {
   try {
     const { chatId, content, contentType, options } = req.body
     const client = sessions.get(req.params.sessionId)
-
-    let messageOut
-    switch (contentType) {
-      case 'string':
-        if (options && options.media) {
-          const media = options.media
-          options.media = new MessageMedia(media.mimetype, media.data, media.filename = null, media.filesize = null)
-        }
-        messageOut = await client.sendMessage(chatId, content, options)
-        break
-      case 'MessageMediaFromURL': {
-        const messageMediaFromURL = await MessageMedia.fromUrl(content, { unsafeMime: true })
-        messageOut = await client.sendMessage(chatId, messageMediaFromURL, options)
-        break
-      }
-      case 'MessageMedia': {
-        const messageMedia = new MessageMedia(content.mimetype, content.data, content.filename, content.filesize)
-        messageOut = await client.sendMessage(chatId, messageMedia, options)
-        break
-      }
-      case 'Location': {
-        const location = new Location(content.latitude, content.longitude, content.description)
-        messageOut = await client.sendMessage(chatId, location, options)
-        break
-      }
-      case 'Buttons': {
-        const buttons = new Buttons(content.body, content.buttons, content.title, content.footer)
-        messageOut = await client.sendMessage(chatId, buttons, options)
-        break
-      }
-      case 'List': {
-        const list = new List(content.body, content.buttonText, content.sections, content.title, content.footer)
-        messageOut = await client.sendMessage(chatId, list, options)
-        break
-      }
-      case 'Contact': {
-        const contact = await client.getContactById(typeof content.contactId === 'number' ? content.contactId + '@c.us' : content.contactId)
-        messageOut = await client.sendMessage(chatId, contact, options)
-        break
-      }
-      case 'Poll': {
-        const poll = new Poll(content.pollName, content.pollOptions, content.options)
-        messageOut = await client.sendMessage(chatId, poll, options)
-        break
-      }
-      default:
-        return sendErrorResponse(res, 404, 'contentType invalid, must be string, MessageMedia, MessageMediaFromURL, Location, Buttons, List, Contact or Poll')
-    }
-
+    if (!CONTENT_TYPES.includes(contentType)) return sendErrorResponse(res, 404, INVALID_CONTENT_TYPE)
+    const messageOut = await client.sendMessage(chatId, await buildMessageContent(client, contentType, content, options), options)
     res.json({ success: true, message: messageOut })
   } catch (error) {
     console.log(error)
@@ -1270,6 +1255,9 @@ const setProfilePicture = async (req, res) => {
 }
 
 module.exports = {
+  CONTENT_TYPES,
+  INVALID_CONTENT_TYPE,
+  buildMessageContent,
   getClassInfo,
   acceptInvite,
   archiveChat,

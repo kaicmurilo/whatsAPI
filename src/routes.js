@@ -9,6 +9,7 @@ const middleware = require('./middleware')
 const healthController = require('./controllers/healthController')
 const sessionController = require('./controllers/sessionController')
 const clientController = require('./controllers/clientController')
+const balancedSendController = require('./controllers/balancedSendController')
 const chatController = require('./controllers/chatController')
 const groupChatController = require('./controllers/groupChatController')
 const messageController = require('./controllers/messageController')
@@ -207,6 +208,12 @@ clientRouter.post('/muteChat/:sessionId', createClientMiddleware(clientControlle
 clientRouter.post('/pinChat/:sessionId', createClientMiddleware(clientController.pinChat))
 clientRouter.post('/searchMessages/:sessionId', createClientMiddleware(clientController.searchMessages))
 clientRouter.post('/sendMessage/:sessionId', createClientMiddleware(clientController.sendMessage))
+// Envio multi-instância: escolhe a instância com menos envios no dia; checagem de acesso por instância no controller
+clientRouter.post('/sendMessageBalanced',
+  middleware.checkAuthEnabled,
+  middleware.requireActiveUser,
+  balancedSendController.sendMessageBalanced
+)
 clientRouter.post('/sendPresenceAvailable/:sessionId', createClientMiddleware(clientController.sendPresenceAvailable))
 clientRouter.post('/sendPresenceUnavailable/:sessionId', createClientMiddleware(clientController.sendPresenceUnavailable))
 clientRouter.post('/sendSeen/:sessionId', createClientMiddleware(clientController.sendSeen))

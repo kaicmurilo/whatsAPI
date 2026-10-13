@@ -165,6 +165,29 @@ const latestUsefulChatName = async (sessionId, chatId) => {
   return result.rows[0]?.chatName ?? null
 }
 
+// Mensagens enviadas no dia por instância, de qualquer origem, e a última enviada (qualquer dia).
+// Mesmo formato do loadSendBalance das transmissões, para o pickByDailyLoad. Quem não enviou não aparece.
+const loadDailyOutgoing = async (sessionIds, dayStart, dayEnd) => {
+  if (sessionIds.length === 0) return new Map()
+  const result = await query(
+    `SELECT session_id AS "sessionId",
+            COUNT(*) FILTER (WHERE sent_at >= $2 AND sent_at < $3)::int AS today,
+            MAX(sent_at) AS "lastSentAt"
+     FROM whatsapp_messages
+     WHERE session_id = ANY($1::text[]) AND from_me
+     GROUP BY session_id`,
+    [sessionIds, dayStart, dayEnd]
+  )
+  return new Map(result.rows.map((row) => [row.sessionId, { today: row.today, lastSentAt: row.lastSentAt }]))
+}
+
 module.exports = {
-  saveMessage, listChats, listMessages, isSessionOwnedBy, hasInboundFromPhone, phoneFromChatId, latestUsefulChatName
+  saveMessage,
+  listChats,
+  listMessages,
+  isSessionOwnedBy,
+  hasInboundFromPhone,
+  phoneFromChatId,
+  latestUsefulChatName,
+  loadDailyOutgoing
 }
