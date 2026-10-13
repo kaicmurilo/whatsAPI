@@ -108,7 +108,17 @@ sessionRouter.get('/status/:sessionId',
   sessionController.statusSession
 )
 
-sessionRouter.get('/qr/:sessionId', 
+// O nome dado na criação é o próprio sessionId: a rota confirma que a instância existe,
+// é do usuário e está liberada para a API key, e devolve o ID com o status
+sessionRouter.get('/byName/:sessionId',
+  middleware.checkAuthEnabled,
+  middleware.requireActiveUser,
+  middleware.requireSessionOwnership,
+  middleware.sessionNameValidation,
+  sessionController.getSessionByName
+)
+
+sessionRouter.get('/qr/:sessionId',
   middleware.checkAuthEnabled,
   middleware.requireActiveUser,
   middleware.requireSessionOwnership,

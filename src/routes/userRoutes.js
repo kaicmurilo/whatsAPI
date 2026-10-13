@@ -140,7 +140,26 @@ sessionRouter.get('/status/:sessionId',
   sessionController.statusSession
 )
 
-sessionRouter.get('/qr/:sessionId', 
+sessionRouter.get('/byName/:sessionId',
+  /*
+    #swagger.tags = ['Session']
+    #swagger.summary = 'Get session ID by instance name'
+    #swagger.description = 'Returns the sessionId of the instance with the name given at creation. The API key must be allowed for the instance; 403 when it is not, or when the instance does not exist or belongs to another user.'
+    #swagger.parameters['sessionId'] = { in: 'path', description: 'Instance name given at creation', required: true, type: 'string', example: 'loja-centro-01' }
+    #swagger.responses[200] = { description: 'Instance found', content: { "application/json": { example: { success: true, sessionId: 'loja-centro-01', status: 'connected' } } } }
+    #swagger.responses[403] = { description: 'API key not allowed for the instance, or instance not found / not owned' }
+    #swagger.security = [{
+          "bearerAuth": []
+    }]
+  */
+  middleware.checkAuthEnabled,
+  middleware.requireActiveUser,
+  middleware.requireSessionOwnership,
+  middleware.sessionNameValidation,
+  sessionController.getSessionByName
+)
+
+sessionRouter.get('/qr/:sessionId',
   /*
     #swagger.tags = ['Session']
     #swagger.security = [{

@@ -132,6 +132,18 @@ const statusSession = async (req, res) => {
 }
 
 /**
+ * Resolve o nome dado à instância na criação para o sessionId usado nas demais rotas.
+ * Dono e liberação da API key já foram conferidos por requireSessionOwnership (req.session).
+ *
+ * @param {Object} req - req.session: linha de whatsapp_sessions da instância
+ * @param {Object} res - The HTTP response object.
+ */
+const getSessionByName = (req, res) => {
+  // Documentação Swagger da rota: src/routes/userRoutes.js
+  res.json({ success: true, sessionId: req.session.session_id, status: req.session.status })
+}
+
+/**
  * QR code of the session with the given session ID.
  *
  * @function
@@ -388,6 +400,7 @@ const terminateAllSessions = async (req, res) => {
 module.exports = {
   startSession,
   statusSession,
+  getSessionByName,
   sessionQrCode,
   sessionQrCodeImage,
   terminateSession,
