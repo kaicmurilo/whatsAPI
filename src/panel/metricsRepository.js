@@ -216,4 +216,20 @@ const loadOutcomes = async (userId, windows) => {
   }
 }
 
-module.exports = { REPLY_WINDOW_DAYS, loadSendMetrics, loadOutcomes }
+// Toda mensagem que saiu do número (API, painel, transmissão e celular), lida do histórico gravado.
+// Com a visualização de mensagens desligada as enviadas não são gravadas e não entram aqui.
+const loadOutgoingMetrics = async (userId, windows) => {
+  const { params, indexes } = boundParams(windows)
+  const outgoingIndexes = shiftIndexes(indexes, 1)
+  const result = await query(
+    `SELECT m.session_id AS "sessionId", ${outcomeSelectList(outgoingIndexes, 'm.sent_at')}
+     FROM whatsapp_messages m
+     JOIN whatsapp_sessions s ON s.session_id = m.session_id
+     WHERE s.user_id = $1 AND m.from_me
+     GROUP BY m.session_id`,
+    [userId, ...params]
+  )
+  return result.rows.map((row) => ({ sessionId: row.sessionId, periods: readOutcome(row) }))
+}
+
+module.exports = { REPLY_WINDOW_DAYS, loadSendMetrics, loadOutcomes, loadOutgoingMetrics }

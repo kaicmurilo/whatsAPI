@@ -2,9 +2,9 @@ const { reportTimeZone } = require('../config')
 const { sendErrorResponse } = require('../utils')
 const AuthService = require('../auth/authService')
 const { PERIODS, listDayKeys, metricWindows } = require('./metricsRanges')
-const { REPLY_WINDOW_DAYS, loadSendMetrics, loadOutcomes } = require('./metricsRepository')
+const { REPLY_WINDOW_DAYS, loadSendMetrics, loadOutcomes, loadOutgoingMetrics } = require('./metricsRepository')
 
-const emptySlice = () => ({ sent: 0, delivered: 0, read: 0, replied: 0 })
+const emptySlice = () => ({ sent: 0, delivered: 0, read: 0, replied: 0, outgoing: 0 })
 
 const emptyPeriods = () => Object.fromEntries(PERIODS.map((period) => [period, emptySlice()]))
 
@@ -33,17 +33,32 @@ const mergeOutcomes = (periods, outcomes) => {
   }
 }
 
+// Enviadas de qualquer origem: soma das instâncias no total e o valor de cada uma na tabela
+const mergeOutgoing = (periods, instances, outgoing) => {
+  const bySession = new Map(outgoing.map((row) => [row.sessionId, row.periods]))
+  for (const period of PERIODS) {
+    periods[period].outgoing = outgoing.reduce((total, row) => total + row.periods[period], 0)
+  }
+  for (const instance of instances) {
+    const counts = bySession.get(instance.sessionId)
+    for (const period of PERIODS) instance.periods[period].outgoing = counts?.[period] ?? 0
+  }
+}
+
 const getMetrics = async (req, res) => {
   const userId = req.user.user_id
   const now = new Date()
   const windows = metricWindows(now, reportTimeZone)
   try {
-    const [sends, outcomes, sessions] = await Promise.all([
+    const [sends, outcomes, outgoing, sessions] = await Promise.all([
       loadSendMetrics(userId, windows, reportTimeZone),
       loadOutcomes(userId, windows),
+      loadOutgoingMetrics(userId, windows),
       AuthService.getUserSessions(userId)
     ])
     mergeOutcomes(sends.periods, outcomes)
+    const instances = fillInstances(sends.instances, sessions)
+    mergeOutgoing(sends.periods, instances, outgoing)
     res.json({
       success: true,
       data: {
@@ -51,7 +66,7 @@ const getMetrics = async (req, res) => {
         replyWindowDays: REPLY_WINDOW_DAYS,
         generatedAt: now.toISOString(),
         periods: sends.periods,
-        instances: fillInstances(sends.instances, sessions),
+        instances,
         daily: fillDaily(sends.daily, now, reportTimeZone),
         snapshot: outcomes.snapshot
       }
@@ -62,4 +77,4 @@ const getMetrics = async (req, res) => {
   }
 }
 
-module.exports = { getMetrics }
+module.exports = { getMetrics, mergeOutgoing }

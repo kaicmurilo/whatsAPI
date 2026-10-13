@@ -137,7 +137,8 @@ export function DashboardPane({ sessions }: { sessions: WhatsAppSession[] }) {
         )
       },
     },
-    { key: 'sent', header: 'Enviadas', align: 'end', render: (row) => formatCount(row.periods[period].sent) },
+    { key: 'outgoing', header: 'Todas enviadas', align: 'end', render: (row) => formatCount(row.periods[period].outgoing) },
+    { key: 'sent', header: 'Transmitidas', align: 'end', render: (row) => formatCount(row.periods[period].sent) },
     { key: 'delivered', header: 'Entrega', align: 'end', render: (row) => formatRate(rateOf(row.periods[period].delivered, row.periods[period].sent)) },
     { key: 'read', header: 'Leitura', align: 'end', render: (row) => formatRate(rateOf(row.periods[period].read, row.periods[period].sent)) },
     { key: 'replied', header: 'Resposta', align: 'end', render: (row) => formatRate(rateOf(row.periods[period].replied, row.periods[period].sent)) },
@@ -150,7 +151,7 @@ export function DashboardPane({ sessions }: { sessions: WhatsAppSession[] }) {
           <p className="contacts__eyebrow">Transmissão</p>
           <h1 className="contacts__title">Painel</h1>
           <p className="contacts__note">
-            Enviadas são contatos que o disparo entregou à fila do WhatsApp. Resposta é uma mensagem recebida desse número em até {data.replyWindowDays} dias, em qualquer instância da conta. Fuso {data.timeZone}.
+            Todas enviadas conta qualquer mensagem que saiu do número (API, painel, transmissão e celular). As taxas valem só para transmissões: transmitidas são contatos que o disparo entregou à fila do WhatsApp. Resposta é uma mensagem recebida desse número em até {data.replyWindowDays} dias, em qualquer instância da conta. Fuso {data.timeZone}.
           </p>
         </div>
         <button type="button" className="report__refresh" onClick={() => void metrics.refetch()} disabled={metrics.isFetching}>
@@ -188,7 +189,8 @@ export function DashboardPane({ sessions }: { sessions: WhatsAppSession[] }) {
       </div>
 
       <dl className="report-cards">
-        <VolumeCard label="Enviadas" value={bucket.sent} detail={period === 'today' ? `ontem ${formatCount(data.periods.yesterday.sent)}` : PERIOD_LABEL[period]} />
+        <VolumeCard label="Todas enviadas" value={bucket.outgoing} detail="API, painel, transmissão e celular" />
+        <VolumeCard label="Transmitidas" value={bucket.sent} detail={period === 'today' ? `ontem ${formatCount(data.periods.yesterday.sent)}` : PERIOD_LABEL[period]} />
         <VolumeCard label="Números únicos" value={bucket.uniquePhones} detail="telefones distintos" />
         <VolumeCard label="Reproduzidas" value={bucket.played} detail={formatRate(rateOf(bucket.played, bucket.sent))} />
         <VolumeCard label="Falhas" value={bucket.failed} detail="disparos iniciados no período" />

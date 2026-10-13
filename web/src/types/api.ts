@@ -411,6 +411,8 @@ export type MetricPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'last30' |
 
 export interface MetricBucket {
   sent: number
+  /** Toda mensagem que saiu do número: API, painel, transmissão e celular */
+  outgoing: number
   delivered: number
   read: number
   played: number
@@ -424,6 +426,7 @@ export interface MetricBucket {
 
 export interface InstanceMetricSlice {
   sent: number
+  outgoing: number
   delivered: number
   read: number
   replied: number
