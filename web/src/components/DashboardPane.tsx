@@ -138,6 +138,8 @@ export function DashboardPane({ sessions }: { sessions: WhatsAppSession[] }) {
       },
     },
     { key: 'outgoing', header: 'Todas enviadas', align: 'end', render: (row) => formatCount(row.periods[period].outgoing) },
+    { key: 'outgoingGroups', header: 'Em grupo', align: 'end', render: (row) => formatCount(row.periods[period].outgoingGroups) },
+    { key: 'outgoingContacts', header: 'Para contato', align: 'end', render: (row) => formatCount(row.periods[period].outgoingContacts) },
     { key: 'sent', header: 'Transmitidas', align: 'end', render: (row) => formatCount(row.periods[period].sent) },
     { key: 'delivered', header: 'Entrega', align: 'end', render: (row) => formatRate(rateOf(row.periods[period].delivered, row.periods[period].sent)) },
     { key: 'read', header: 'Leitura', align: 'end', render: (row) => formatRate(rateOf(row.periods[period].read, row.periods[period].sent)) },
@@ -190,6 +192,8 @@ export function DashboardPane({ sessions }: { sessions: WhatsAppSession[] }) {
 
       <dl className="report-cards">
         <VolumeCard label="Todas enviadas" value={bucket.outgoing} detail="API, painel, transmissão e celular" />
+        <VolumeCard label="Em grupo" value={bucket.outgoingGroups} detail={formatRate(rateOf(bucket.outgoingGroups, bucket.outgoing))} />
+        <VolumeCard label="Para contato" value={bucket.outgoingContacts} detail={formatRate(rateOf(bucket.outgoingContacts, bucket.outgoing))} />
         <VolumeCard label="Transmitidas" value={bucket.sent} detail={period === 'today' ? `ontem ${formatCount(data.periods.yesterday.sent)}` : PERIOD_LABEL[period]} />
         <VolumeCard label="Números únicos" value={bucket.uniquePhones} detail="telefones distintos" />
         <VolumeCard label="Reproduzidas" value={bucket.played} detail={formatRate(rateOf(bucket.played, bucket.sent))} />

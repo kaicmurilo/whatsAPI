@@ -413,6 +413,8 @@ export interface MetricBucket {
   sent: number
   /** Toda mensagem que saiu do número: API, painel, transmissão e celular */
   outgoing: number
+  outgoingGroups: number
+  outgoingContacts: number
   delivered: number
   read: number
   played: number
@@ -427,6 +429,8 @@ export interface MetricBucket {
 export interface InstanceMetricSlice {
   sent: number
   outgoing: number
+  outgoingGroups: number
+  outgoingContacts: number
   delivered: number
   read: number
   replied: number

@@ -4,7 +4,7 @@ const AuthService = require('../auth/authService')
 const { PERIODS, listDayKeys, metricWindows } = require('./metricsRanges')
 const { REPLY_WINDOW_DAYS, loadSendMetrics, loadOutcomes, loadOutgoingMetrics } = require('./metricsRepository')
 
-const emptySlice = () => ({ sent: 0, delivered: 0, read: 0, replied: 0, outgoing: 0 })
+const emptySlice = () => ({ sent: 0, delivered: 0, read: 0, replied: 0, outgoing: 0, outgoingGroups: 0, outgoingContacts: 0 })
 
 const emptyPeriods = () => Object.fromEntries(PERIODS.map((period) => [period, emptySlice()]))
 
@@ -33,15 +33,20 @@ const mergeOutcomes = (periods, outcomes) => {
   }
 }
 
-// Enviadas de qualquer origem: soma das instâncias no total e o valor de cada uma na tabela
+const sumPeriod = (rows, period) => rows.reduce((total, row) => total + row.periods[period], 0)
+
+const sumOutgoing = (rows, period) => {
+  const groups = sumPeriod(rows.filter((row) => row.isGroup), period)
+  const contacts = sumPeriod(rows.filter((row) => !row.isGroup), period)
+  return { outgoing: groups + contacts, outgoingGroups: groups, outgoingContacts: contacts }
+}
+
+// Enviadas de qualquer origem, em grupo e para contato: soma das instâncias no total e o valor de cada uma na tabela
 const mergeOutgoing = (periods, instances, outgoing) => {
-  const bySession = new Map(outgoing.map((row) => [row.sessionId, row.periods]))
-  for (const period of PERIODS) {
-    periods[period].outgoing = outgoing.reduce((total, row) => total + row.periods[period], 0)
-  }
+  for (const period of PERIODS) Object.assign(periods[period], sumOutgoing(outgoing, period))
   for (const instance of instances) {
-    const counts = bySession.get(instance.sessionId)
-    for (const period of PERIODS) instance.periods[period].outgoing = counts?.[period] ?? 0
+    const rows = outgoing.filter((row) => row.sessionId === instance.sessionId)
+    for (const period of PERIODS) Object.assign(instance.periods[period], sumOutgoing(rows, period))
   }
 }
 
