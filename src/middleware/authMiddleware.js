@@ -1,5 +1,8 @@
 const AuthService = require('../auth/authService')
 const { sendErrorResponse } = require('../utils')
+const { isSessionAllowed } = require('../auth/credentialScope')
+
+const CREDENTIAL_SESSION_DENIED = 'Acesso negado: credencial não liberada para esta instância'
 
 // Middleware para verificar token de acesso
 const authenticateToken = async (req, res, next) => {
@@ -120,6 +123,10 @@ const requireSessionOwnership = async (req, res, next) => {
     return sendErrorResponse(res, 401, 'Usuário não autenticado')
   }
 
+  if (!isSessionAllowed(req.token, sessionId)) {
+    return sendErrorResponse(res, 403, CREDENTIAL_SESSION_DENIED)
+  }
+
   try {
     const { query } = require('../database')
     const result = await query(
@@ -145,6 +152,10 @@ const requireSessionOwnershipOrCreate = async (req, res, next) => {
   
   if (!req.user) {
     return sendErrorResponse(res, 401, 'Usuário não autenticado')
+  }
+
+  if (!isSessionAllowed(req.token, sessionId)) {
+    return sendErrorResponse(res, 403, CREDENTIAL_SESSION_DENIED)
   }
 
   try {

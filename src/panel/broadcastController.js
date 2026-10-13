@@ -1,4 +1,5 @@
 const { sendErrorResponse } = require('../utils')
+const { isRestrictedCredential, isSessionAllowed } = require('../auth/credentialScope')
 const { listRuns, findRun, countRemainingRecipients } = require('./broadcastRunRepository')
 const { sendQueueSnapshot } = require('./broadcastLane')
 const broadcastService = require('./broadcastService')
@@ -47,12 +48,17 @@ const parseBroadcastInput = (body) => {
 }
 
 // Com scheduledAt → programa; sem → dispara agora. Sem instância na URL (POST /broadcasts): só Telegram.
+// Rodízio pode espalhar o envio por várias instâncias: credencial restrita só usa as liberadas (e não usa Telegram)
+const isBroadcastAllowedFor = (token, input) => !isRestrictedCredential(token) ||
+  (input.channel !== TELEGRAM && input.sessionIds.every((id) => isSessionAllowed(token, id)))
+
 const startBroadcast = async (req, res) => {
   const { sessionId } = req.params
   const userId = req.user.user_id
   const { input, scheduledAt, error } = parseBroadcastInput({ ...req.body, sessionId })
   if (error) return sendErrorResponse(res, 422, error)
   if (input.channel !== TELEGRAM && !input.sessionIds.includes(sessionId)) return sendErrorResponse(res, 422, 'A instância da requisição precisa estar entre as selecionadas')
+  if (!isBroadcastAllowedFor(req.token, input)) return sendErrorResponse(res, 403, 'Credencial não liberada para todas as instâncias do disparo')
   try {
     const result = scheduledAt
       ? await broadcastService.schedule(userId, sessionId, input, scheduledAt)

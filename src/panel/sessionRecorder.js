@@ -2,6 +2,7 @@ const { toMessageRecord, isRecordableMessage, resolveChatId } = require('./messa
 const { saveMessage } = require('./messageRepository')
 const { pickChatTitle, readChatTitleCandidatesInPage } = require('./chatTitle')
 const { noteSuppressionKeyword } = require('./suppressionRepository')
+const { isMessagesViewEnabled } = require('./settingsRepository')
 const { publishPanelEvent, setSessionStatus } = require('./panelEvents')
 const { backfillRecentHistory } = require('./historyBackfill')
 const { createChatIdResolver } = require('./chatIdResolver')
@@ -27,8 +28,11 @@ const fetchChatName = async (sessionId, message) => {
 const recordMessage = async (sessionId, message, resolveCanonicalChatId) => {
   if (!isRecordableMessage(message)) return
   try {
+    // Sem visualização só as recebidas importam (supressão e respostas); enviadas e título custam banco e navegador
+    const isViewEnabled = await isMessagesViewEnabled(sessionId)
+    if (!isViewEnabled && message.fromMe) return
     const [chatName, chatId] = await Promise.all([
-      fetchChatName(sessionId, message),
+      isViewEnabled ? fetchChatName(sessionId, message) : null,
       resolveCanonicalChatId(resolveChatId(message))
     ])
     const record = toMessageRecord(sessionId, message, { chatName, chatId })
@@ -46,6 +50,20 @@ const recordMessage = async (sessionId, message, resolveCanonicalChatId) => {
   } catch (error) {
     console.error(`[panel] falha ao salvar mensagem sessão=${sessionId}:`, error.message)
   }
+}
+
+// O histórico só alimenta a tela de conversas: com a visualização desligada não vale abrir 30 chats no navegador
+const backfillIfViewEnabled = async (sessionId, client, resolveCanonicalChatId) => {
+  try {
+    if (!(await isMessagesViewEnabled(sessionId))) {
+      console.log(`[panel] histórico não importado sessão=${sessionId}: visualização de mensagens desligada`)
+      return
+    }
+  } catch (error) {
+    console.error(`[panel] falha ao ler configuração de visualização sessão=${sessionId}:`, error.message)
+    return
+  }
+  await backfillRecentHistory(sessionId, client, resolveCanonicalChatId)
 }
 
 // A lib emite ready em qualquer mudança de hasSynced, inclusive quando volta a false.
@@ -75,7 +93,7 @@ const attachSessionRecorder = (client, sessionId) => {
     }
     setSessionStatus(sessionId, 'connected')
     // fire-and-forget em sequência (mesmo navegador): conversas recentes, depois tiques perdidos das transmissões
-    backfillRecentHistory(sessionId, client, resolveCanonicalChatId)
+    backfillIfViewEnabled(sessionId, client, resolveCanonicalChatId)
       .then(() => reconcileRecentRuns(sessionId, client))
   })
   client.on('auth_failure', () => setSessionStatus(sessionId, 'auth_failure'))

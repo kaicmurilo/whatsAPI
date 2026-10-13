@@ -5,9 +5,12 @@ const { authenticateToken, requireScope, requireAnyScope } = require('../middlew
 
 // Swagger documentation
 const { authSwagger } = require('../middleware/authMiddleware')
+const { apikey } = require('../middleware')
+
+// Criar usuário é administrativo: exige x-api-key (sem API_KEY configurada, segue aberto como as rotas /admin)
+router.post('/users', apikey, authSwagger, AuthController.createUser)
 
 // Rotas públicas (não requerem autenticação)
-router.post('/users', authSwagger, AuthController.createUser)
 router.post('/authenticate', authSwagger, AuthController.authenticateUser)
 router.post('/refresh', authSwagger, AuthController.refreshToken)
 router.post('/revoke', authSwagger, AuthController.revokeToken)

@@ -1,6 +1,6 @@
 const { sendErrorResponse } = require('../utils')
 const { connectTelegramBot, removeTelegramBot, listTelegramInstances } = require('./telegramBots')
-const { listAccountInstances, removeTelegramAccount } = require('./telegramAccounts')
+const { listAccountInstances, removeTelegramAccount, retryTelegramAccountNow } = require('./telegramAccounts')
 const { startAccountLogin, continueAccountLogin } = require('./telegramAccountLogin')
 const { telegramInstanceId } = require('./broadcastSessions')
 const { normalizePhone } = require('./phone')
@@ -114,6 +114,32 @@ const deleteTelegramAccount = async (req, res) => {
   }
 }
 
+const RETRY_RESPONSES = {
+  not_found: [404, 'Conta não encontrada ou desconectada'],
+  not_cooling: [409, 'A conta não está em pausa']
+}
+
+// "Tentar agora": tira a pausa por limite; os disparos pausados voltam em até 30 s e a 1ª busca testa
+const retryTelegramAccount = async (req, res) => {
+  const userId = req.user.user_id
+  const { accountId } = req.params
+  if (!NUMERIC_ID_PATTERN.test(accountId)) return sendErrorResponse(res, 422, 'Conta inválida')
+  try {
+    const result = await retryTelegramAccountNow(userId, accountId)
+    if (RETRY_RESPONSES[result]) return sendErrorResponse(res, ...RETRY_RESPONSES[result])
+    res.status(202).json({ success: true, message: 'Tentando de novo: os disparos pausados por limite voltam em até 30 s' })
+  } catch (error) {
+    console.error(`[telegram] falha ao tentar de novo conta=${accountId} user=${userId}:`, error)
+    sendErrorResponse(res, 500, 'Erro ao tentar de novo')
+  }
+}
+
 module.exports = {
-  getTelegramInstances, createTelegramBot, deleteTelegramBot, startTelegramAccountLogin, continueTelegramAccountLogin, deleteTelegramAccount
+  retryTelegramAccount,
+  getTelegramInstances,
+  createTelegramBot,
+  deleteTelegramBot,
+  startTelegramAccountLogin,
+  continueTelegramAccountLogin,
+  deleteTelegramAccount
 }

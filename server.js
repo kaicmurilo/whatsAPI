@@ -12,10 +12,9 @@ process.on('unhandledRejection', (reason) => {
 // Start the server
 const port = process.env.PORT || 3000
 
-// Check if BASE_WEBHOOK_URL environment variable is available
+// Webhook é opcional: o painel não depende dele (registra mensagens e status por listeners próprios)
 if (!baseWebhookURL) {
-  console.error('BASE_WEBHOOK_URL environment variable is not available. Exiting...')
-  process.exit(1) // Terminate the application with an error code
+  console.warn('BASE_WEBHOOK_URL vazio: webhooks desligados (defina <SESSIONID>_WEBHOOK_URL para ligar só numa sessão)')
 }
 
 app.listen(port, () => {

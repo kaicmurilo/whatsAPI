@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRequiredToken } from '../auth/useAuth'
-import { downloadReportCsv, fetchBroadcastReport, fetchReportRecipients, refreshBroadcastReport } from '../lib/broadcastApi'
+import { downloadReportCsv, fetchBroadcastReport, fetchReportRecipients, fetchSendReport, downloadSendReportCsv, refreshBroadcastReport } from '../lib/broadcastApi'
+import type { PageQuery } from '../lib/panelApi'
 import { queryKeys } from '../lib/queryKeys'
 import type { ReportSituation } from '../types/api'
 
@@ -44,5 +45,23 @@ export function useRefreshReport(runId: string) {
   return useMutation({
     mutationFn: () => refreshBroadcastReport(token, runId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.reportOf(runId) }),
+  })
+}
+
+// Relatório geral (todas as listas); a chave fica sob broadcast-runs para atualizar junto quando um disparo muda
+export function useSendReport(query: PageQuery) {
+  const token = useRequiredToken()
+  return useQuery({
+    queryKey: queryKeys.sendReport(query),
+    queryFn: () => fetchSendReport(token, query),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useDownloadSendReport() {
+  const token = useRequiredToken()
+  return useMutation({
+    mutationFn: (search: string) => downloadSendReportCsv(token, search),
+    onSuccess: ({ blob, fileName }) => saveBlob(blob, fileName),
   })
 }

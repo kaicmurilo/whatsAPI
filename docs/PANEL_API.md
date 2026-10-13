@@ -95,6 +95,7 @@ Três formatos:
 | POST | `/panel/telegram/accounts` | Login de conta, passo 1: `{ phone, apiId, apiHash }` (my.telegram.org). O Telegram manda o código; resposta `{ loginId }` (202). Rate limit: 5/min |
 | POST | `/panel/telegram/accounts/login/:loginId` | Passo 2/3: `{ code }` e, se pedir, `{ password }` (duas etapas). Resposta `{ needs: "code" \| "password" }` ou `{ instance }` (201). Login pendente vale 10 min |
 | DELETE | `/panel/telegram/accounts/:accountId` | Remove a conta e encerra a sessão no Telegram |
+| POST | `/panel/telegram/accounts/:accountId/retry` | "Tentar agora": tira a pausa por limite (202); disparos pausados por limite voltam em até 30 s. 409 se não está em pausa. Rate limit: 5/min |
 
 Padrão ao criar a linha: supressão **ligada** com `SAIR`, `PARAR`, `REMOVER`, `STOP`. Parar quem respondeu, nome no início, teto diário e horário de envio começam **desligados**. Teto padrão 80 (mínimo 20, máximo 400). Janela padrão `08:00`–`20:00` (fuso `REPORT_TIMEZONE`, padrão `America/Sao_Paulo`).
 
@@ -108,13 +109,38 @@ Padrão ao criar a linha: supressão **ligada** com `SAIR`, `PARAR`, `REMOVER`, 
   "dailyCap": 80,
   "quietHoursEnabled": false,
   "quietStart": "08:00",
-  "quietEnd": "20:00"
+  "quietEnd": "20:00",
+  "messagesViewEnabled": true
 }
 ```
+
+`messagesViewEnabled` (padrão **ligado**) mostra as conversas das instâncias no painel. Desligado economiza recurso: ao conectar não importa o histórico recente, mensagens enviadas não são gravadas e o título do chat não é lido no navegador. Mensagens recebidas continuam gravadas — alimentam supressão, "parar quem respondeu" e a métrica de respostas.
 
 Cada palavra é um termo só, sem espaço, até 32 caracteres, no máximo 10. Com a supressão ligada, a lista não pode ficar vazia. Horário inicial e final não podem ser iguais.
 
 No relatório, destinatário também pode ficar `suppressed`, `duplicate` ou `replied` (não entra em enviado nem em falha).
+
+## Credenciais de API
+
+Chave por aplicação para sistemas consumirem a API sem usar `user_id` + `user_secret`.
+
+| Método | Rota | O que faz |
+|---|---|---|
+| GET | `/panel/credentials` | Lista as credenciais (`page`, `perPage`, `search` pelo nome). Nunca devolve a chave |
+| POST | `/panel/credentials` | Cria. Corpo `{ "name": "CRM", "sessionIds": ["loja-centro-1"] }` (nome até 60 caracteres; `sessionIds` opcional). A resposta traz `apiKey` **uma única vez** |
+| DELETE | `/panel/credentials/:credentialId` | Revoga. O acesso cai na próxima requisição |
+
+A chave tem o formato `wak_...` e vai no mesmo cabeçalho do token: `Authorization: Bearer wak_...`. Vale em todas as rotas que aceitam o access token, com o escopo `read write` da conta que a criou. O banco guarda só o SHA-256 e os 10 primeiros caracteres (para identificar na lista). `lastUsedAt` é atualizado no máximo uma vez por minuto.
+
+**Restringir a instâncias:** sem `sessionIds` (ou `null`), a chave vale para todas as instâncias da conta, inclusive as criadas depois. Com a lista (até 50, todas suas), a chave:
+
+- só passa nas rotas com `:sessionId` dessas instâncias (`/session`, `/client`, `/chat`, `/message`, `/contact`, `/groupChat` e `/panel/sessions/:sessionId/...`); outra instância → 403;
+- não usa as rotas do painel que valem para a conta toda (contatos, listas, arquivos, disparos por id, Telegram, `/panel/sessions`...) → 403;
+- só dispara se todas as instâncias do rodízio estiverem liberadas, e nunca pelo canal Telegram.
+
+A restrição é fixa: para mudar, crie outra chave e revogue a antiga. Na listagem, `sessionIds` vem `null` ou com a lista.
+
+Essas três rotas só aceitam o login do painel (403 com chave de API): uma chave não cria nem revoga outras. Criar e revogar têm limite de 10 por minuto por usuário.
 
 ## Painel de métricas
 
@@ -132,6 +158,7 @@ O comportamento (o que entra em enviada, entrega, leitura e resposta) está em `
 | POST | `/panel/broadcasts` | Mesmo corpo, sem instância na URL: só para `"channel": "telegram"` |
 | GET | `/panel/broadcasts` | Histórico paginado |
 | GET | `/panel/broadcasts/queue/recipients` | Menu Fila: contatos pendentes dos disparos abertos (rodando, pausados, interrompidos), na ordem de envio (`page`, `perPage`, `search` por nome/telefone) |
+| GET | `/panel/broadcasts/send-report` | Relatório geral (tela Transmissão): um número por linha de todas as listas, com `listName`, `message` (texto, ou nome do modelo/arquivo), `createdAt` (agendado em), `scheduledAt` (previsão), `sentAt` e `status` (`scheduled` para programado, que usa os membros atuais da lista). `page`, `perPage`, `search` por lista/nome/telefone |
 | DELETE | `/panel/broadcasts/:runId/recipients/:position` | Tira o contato da fila (status `removed`, situação "Removido" no relatório). Vale na hora, mesmo com o disparo rodando; retomar não traz de volta. 404 se já foi enviado |
 | GET | `/panel/broadcasts/:runId` | Detalhe com destinatários |
 | POST | `/panel/broadcasts/:runId/pause` | Pausa um disparo em andamento (202; para antes do próximo contato) |

@@ -249,6 +249,7 @@ const runBroadcast = async (run, {
 
   const [status, error, pauseCode] = stop ?? ['done', null, null]
   publish(await finish(run.id, status, error, pauseCode))
+  return { status, pauseCode }
 }
 
 const sendPart = (client, chatId, part) =>

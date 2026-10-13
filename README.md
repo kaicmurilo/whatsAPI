@@ -43,7 +43,7 @@ cp env.example .env              # preencha os segredos (nunca commite o .env)
 npm run local:up                 # sobe tudo
 ```
 
-Abra **http://localhost:47321/app** e entre com o `user_id` + `user_secret` de um usuário criado em `POST /auth/users`.
+Abra **http://localhost:47321/app** e entre com o `user_id` + `user_secret` de um usuário criado em `POST /auth/users` (exige o cabeçalho `x-api-key` com o `API_KEY` do `.env`). Para integrar outros sistemas, crie uma chave por aplicação em **Credenciais** no painel e envie como `Authorization: Bearer wak_...`.
 
 | Comando | O que faz |
 |---|---|
@@ -177,7 +177,7 @@ Todas as variáveis estão em [`env.example`](env.example). As principais:
 |---|---|---|
 | `API_KEY` | — | Protege os endpoints REST (obrigatória em produção) |
 | `JWT_SECRET` | — | Assina os tokens do painel e dos clientes |
-| `BASE_WEBHOOK_URL` | — | Destino dos webhooks |
+| `BASE_WEBHOOK_URL` | vazio | Destino dos webhooks. Vazio desliga (o painel não depende deles) |
 | `REPORT_TIMEZONE` | `America/Sao_Paulo` | Fuso do dia no painel, no teto diário e no CSV |
 | `PANEL_MAX_FILE_SIZE` | `50000000` | Limite de upload da biblioteca, em bytes |
 | `RECOVER_SESSIONS` | `false` | Reabre o navegador se a página do WhatsApp fechar |

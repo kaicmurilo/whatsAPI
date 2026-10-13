@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { BroadcastChannel, SenderInstance, TelegramInstance, ContactSyncJob, BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
+import type { BroadcastChannel, CreatedApiCredential, SenderInstance, TelegramInstance, ContactSyncJob, BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
 import type { PanelView, ReportState, TableKey, TableState } from '../hooks/usePanelSearchParams'
 
 export interface StatusLampProps {
@@ -77,6 +77,17 @@ export interface ChatListPaneProps {
   onSelectChat: (chatId: string) => void
   onPageChange: (page: number) => void
   onSearchChange: (search: string) => void
+  onRemoved: () => void
+}
+
+export interface InstanceHeaderProps {
+  session: WhatsAppSession
+  onRemoved: () => void
+  children?: ReactNode
+}
+
+export interface InstanceOverviewPaneProps {
+  session: WhatsAppSession
   onRemoved: () => void
 }
 
@@ -185,6 +196,15 @@ export interface FilePickerProps {
 }
 
 // Tabela paginada com busca, estado vindo da URL
+export interface IssuedApiKeyProps {
+  credential: CreatedApiCredential
+  onDismiss: () => void
+}
+
+export interface CreateApiCredentialFormProps {
+  onCreated: (credential: CreatedApiCredential) => void
+}
+
 export interface TablePaneProps {
   page: number
   search: string
@@ -204,8 +224,16 @@ export interface BroadcastsPaneProps extends ReportControls {
   defaultSessionId: string | null
   lists: TableState
   runs: TableState
+  sendReport: TableState
   onTablePage: (table: TableKey, page: number) => void
   onTableSearch: (table: TableKey, search: string) => void
+}
+
+export interface SendReportSectionProps {
+  page: number
+  search: string
+  onPageChange: (page: number) => void
+  onSearchChange: (search: string) => void
 }
 
 export interface BroadcastReportProps {

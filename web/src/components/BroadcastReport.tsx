@@ -1,26 +1,14 @@
 import { useBroadcastReport, useDownloadReport, useRefreshReport, useReportRecipients } from '../hooks/useBroadcastReport'
 import { formatDateTime, formatPhone } from '../lib/format'
 import { TABLE_PER_PAGE } from '../lib/panelApi'
-import type { RecipientSituation, ReportRecipient } from '../types/api'
+import { SITUATION_LABELS } from '../lib/recipientSituation'
+import type { ReportRecipient } from '../types/api'
 import type { BroadcastReportProps, DataTableColumn } from '../types/components'
 import { DataTable } from './DataTable'
 import { EmptyState } from './EmptyState'
 import { Pagination } from './Pagination'
 import { ReportSituationFilter } from './ReportSituationFilter'
 import { ReportSummaryCards } from './ReportSummaryCards'
-
-const SITUATION_LABELS: Record<RecipientSituation, string> = {
-  pending: 'Pendente',
-  awaiting_reply: 'Aguardando resposta',
-  suppressed: 'Suprimido',
-  duplicate: 'Duplicado',
-  replied: 'Respondeu',
-  removed: 'Removido da fila',
-  sent: 'Enviado',
-  delivered: 'Entregue',
-  read: 'Lido',
-  failed: 'Falhou',
-}
 
 const optionalTime = (value: string | null) => (value ? formatDateTime(value) : '—')
 const getRecipientKey = (recipient: ReportRecipient): string => String(recipient.position)

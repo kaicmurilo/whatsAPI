@@ -1,6 +1,6 @@
 const { query } = require('../database')
 
-const ACCOUNT_COLUMNS = 'a.id::text AS id, a.user_id AS "userId", a.phone, a.label, a.cooldown_until AS "cooldownUntil", a.created_at AS "createdAt"'
+const ACCOUNT_COLUMNS = 'a.id::text AS id, a.user_id AS "userId", a.phone, a.label, a.cooldown_until AS "cooldownUntil", a.cooldown_strikes AS "cooldownStrikes", a.created_at AS "createdAt"'
 
 /**
  * Salva a conta logada (novo login substitui a sessão). Conta de outro usuário do painel não é tomada.
@@ -34,8 +34,9 @@ const listUserTelegramAccounts = async (userId) => {
   return result.rows
 }
 
-const setAccountCooldown = async (accountId, until) => {
-  await query('UPDATE telegram_accounts SET cooldown_until = $2 WHERE id = $1', [accountId, until])
+// until null = sem pausa (tentar agora / sucesso); strikes = limites seguidos
+const setAccountCooldown = async (accountId, { until, strikes }) => {
+  await query('UPDATE telegram_accounts SET cooldown_until = $2, cooldown_strikes = $3 WHERE id = $1', [accountId, until, strikes])
 }
 
 const listOwnedAccountIds = async (userId, accountIds) => {

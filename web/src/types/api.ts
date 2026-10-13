@@ -301,6 +301,23 @@ export interface QueuedRecipient {
 
 export type QueuedRecipientPage = Paginated<QueuedRecipient>
 
+// Linha do relatório geral: um número de um disparo (programado usa os membros atuais da lista)
+export interface SendReportRow {
+  runId: string
+  position: number
+  name: string
+  phone: string
+  listName: string
+  channel: BroadcastChannel
+  message: string | null
+  status: RecipientSituation | 'scheduled'
+  createdAt: string
+  scheduledAt: string | null
+  sentAt: string | null
+}
+
+export type SendReportPage = Paginated<SendReportRow>
+
 export interface SendQueueSnapshot {
   queued: number
   sending: boolean
@@ -339,6 +356,7 @@ export interface PanelSettings {
   quietHoursEnabled: boolean
   quietStart: string
   quietEnd: string
+  messagesViewEnabled: boolean
 }
 
 // Instância que envia disparo: número do WhatsApp ou bot do Telegram. label substitui o id na tela.
@@ -354,11 +372,33 @@ export interface TelegramInstance extends SenderInstance {
   linkedContacts: number | null
   // Só conta: em pausa pelo limite do Telegram até esta hora (fora do rodízio de todos os disparos)
   cooldownUntil?: string | null
+  // Só conta: limites seguidos (cada um dobra a espera; envio com sucesso zera)
+  cooldownStrikes?: number
   createdAt: string
 }
 
 // Login da conta: o Telegram pede o código e, se houver verificação em duas etapas, a senha
 export type TelegramLoginStep = { needs: 'code' | 'password' } | { instance: TelegramInstance }
+
+export interface ApiCredential {
+  id: string
+  name: string
+  tokenPrefix: string
+  // null = todas as instâncias da conta, inclusive as criadas depois
+  sessionIds: string[] | null
+  createdAt: string
+  lastUsedAt: string | null
+}
+
+export interface NewApiCredential {
+  name: string
+  sessionIds: string[] | null
+}
+
+// Só a resposta da criação traz a chave inteira; depois disso o servidor guarda apenas o hash
+export interface CreatedApiCredential extends ApiCredential {
+  apiKey: string
+}
 
 export interface SuppressedNumber {
   id: string

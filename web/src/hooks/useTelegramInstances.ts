@@ -2,15 +2,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRequiredToken } from '../auth/useAuth'
 import { queryKeys } from '../lib/queryKeys'
 import {
-  continueTelegramLogin, createTelegramBot, deleteTelegramInstance, fetchTelegramInstances, startTelegramLogin,
+  continueTelegramLogin, createTelegramBot, deleteTelegramInstance, fetchTelegramInstances, retryTelegramAccount, startTelegramLogin,
   type TelegramLoginAnswer, type TelegramLoginStart,
 } from '../lib/telegramApi'
+
+// Status, vinculados e pausa por limite mudam no servidor (nova tentativa automática): atualiza a cada minuto
+const INSTANCES_REFRESH_MS = 60 * 1000
 
 export function useTelegramInstances() {
   const token = useRequiredToken()
   return useQuery({
     queryKey: queryKeys.telegramInstances,
     queryFn: () => fetchTelegramInstances(token),
+    refetchInterval: INSTANCES_REFRESH_MS,
   })
 }
 
@@ -27,6 +31,8 @@ function useInstancesMutation<TInput, TResult>(mutate: (token: string, input: TI
 export const useCreateTelegramBot = () => useInstancesMutation(createTelegramBot)
 
 export const useDeleteTelegramInstance = () => useInstancesMutation(deleteTelegramInstance)
+
+export const useRetryTelegramAccount = () => useInstancesMutation(retryTelegramAccount)
 
 export function useStartTelegramLogin() {
   const token = useRequiredToken()

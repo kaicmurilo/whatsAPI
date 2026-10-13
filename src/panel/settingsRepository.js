@@ -8,7 +8,8 @@ const SETTINGS_COLUMNS = `suppression_enabled AS "suppressionEnabled",
   daily_cap AS "dailyCap",
   quiet_hours_enabled AS "quietHoursEnabled",
   quiet_start AS "quietStart",
-  quiet_end AS "quietEnd"`
+  quiet_end AS "quietEnd",
+  messages_view_enabled AS "messagesViewEnabled"`
 
 // Cria a linha padrão na primeira leitura (supressão ligada, o resto desligado)
 const getSettings = async (userId) => {
@@ -24,8 +25,8 @@ const saveSettings = async (userId, settings) => {
   const result = await query(
     `INSERT INTO panel_user_settings (
        user_id, suppression_enabled, suppression_keywords, stop_on_reply, prepend_first_name,
-       daily_cap_enabled, daily_cap, quiet_hours_enabled, quiet_start, quiet_end, updated_at
-     ) VALUES ($1, $2, $3::text[], $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+       daily_cap_enabled, daily_cap, quiet_hours_enabled, quiet_start, quiet_end, messages_view_enabled, updated_at
+     ) VALUES ($1, $2, $3::text[], $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
      ON CONFLICT (user_id) DO UPDATE SET
        suppression_enabled = EXCLUDED.suppression_enabled,
        suppression_keywords = EXCLUDED.suppression_keywords,
@@ -36,13 +37,27 @@ const saveSettings = async (userId, settings) => {
        quiet_hours_enabled = EXCLUDED.quiet_hours_enabled,
        quiet_start = EXCLUDED.quiet_start,
        quiet_end = EXCLUDED.quiet_end,
+       messages_view_enabled = EXCLUDED.messages_view_enabled,
        updated_at = CURRENT_TIMESTAMP
      RETURNING ${SETTINGS_COLUMNS}`,
     [userId, settings.suppressionEnabled, settings.suppressionKeywords, settings.stopOnReply,
       settings.prependFirstName, settings.dailyCapEnabled, settings.dailyCap,
-      settings.quietHoursEnabled, settings.quietStart, settings.quietEnd]
+      settings.quietHoursEnabled, settings.quietStart, settings.quietEnd, settings.messagesViewEnabled]
   )
   return result.rows[0]
 }
 
-module.exports = { getSettings, saveSettings }
+// ponytail: uma consulta indexada por mensagem; cache por sessão se o volume de message_create pesar no banco
+// Sem linha de configuração vale o padrão (ligado)
+const isMessagesViewEnabled = async (sessionId) => {
+  const result = await query(
+    `SELECT COALESCE(p.messages_view_enabled, true) AS enabled
+     FROM whatsapp_sessions s
+     LEFT JOIN panel_user_settings p ON p.user_id = s.user_id
+     WHERE s.session_id = $1`,
+    [sessionId]
+  )
+  return result.rows[0]?.enabled ?? true
+}
+
+module.exports = { getSettings, saveSettings, isMessagesViewEnabled }

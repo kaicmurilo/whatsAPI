@@ -5,7 +5,9 @@ import { ChatListPane } from '../components/ChatListPane'
 import { ContactsPane } from '../components/ContactsPane'
 import { ConversationPane } from '../components/ConversationPane'
 import { EmptyState } from '../components/EmptyState'
+import { CredentialsPane } from '../components/CredentialsPane'
 import { FilesPane } from '../components/FilesPane'
+import { InstanceOverviewPane } from '../components/InstanceOverviewPane'
 import { SettingsPane } from '../components/SettingsPane'
 import { QrCard } from '../components/QrCard'
 import { QueuePane } from '../components/QueuePane'
@@ -13,6 +15,7 @@ import { SessionRail } from '../components/SessionRail'
 import { TelegramInstancePane } from '../components/TelegramInstancePane'
 import { TemplatesPane } from '../components/TemplatesPane'
 import { usePanelPage } from '../hooks/usePanelPage'
+import { useSettings } from '../hooks/useSettings'
 import { useTelegramInstances } from '../hooks/useTelegramInstances'
 
 export function PanelPage() {
@@ -20,7 +23,11 @@ export function PanelPage() {
   const { sessions, selectedSession, selection, ...actions } = usePanelPage()
   const { view, tables } = selection
   const isChatsView = view === 'chats'
-  const showChats = isChatsView && selectedSession !== null && !selectedSession.showQr
+  const settings = useSettings()
+  // Espera a configuração para não consultar conversas de quem desligou; se ela falhar, mostra
+  const showInstance = isChatsView && selectedSession !== null && !selectedSession.showQr && !settings.isPending
+  const isMessagesViewEnabled = settings.data?.messagesViewEnabled ?? true
+  const showChats = showInstance && isMessagesViewEnabled
   const sessionList = sessions.data ?? []
   const telegramInstances = useTelegramInstances().data ?? []
 
@@ -66,6 +73,7 @@ export function PanelPage() {
             defaultSessionId={selectedSession?.session.sessionId ?? null}
             lists={tables.lists}
             runs={tables.runs}
+            sendReport={tables.sendReport}
             onTablePage={actions.setTablePage}
             onTableSearch={actions.setTableSearch}
             report={selection.report}
@@ -81,6 +89,15 @@ export function PanelPage() {
             search={tables.files.search}
             onPageChange={(page) => actions.setTablePage('files', page)}
             onSearchChange={(search) => actions.setTableSearch('files', search)}
+          />
+        ) : null}
+
+        {view === 'credentials' ? (
+          <CredentialsPane
+            page={tables.credentials.page}
+            search={tables.credentials.search}
+            onPageChange={(page) => actions.setTablePage('credentials', page)}
+            onSearchChange={(search) => actions.setTableSearch('credentials', search)}
           />
         ) : null}
 
@@ -111,6 +128,10 @@ export function PanelPage() {
         ) : null}
 
         {isChatsView && selectedSession?.showQr ? <QrCard session={selectedSession.session} onRemoved={() => actions.setView('dashboard')} /> : null}
+
+        {showInstance && !isMessagesViewEnabled && selectedSession ? (
+          <InstanceOverviewPane session={selectedSession.session} onRemoved={() => actions.setView('dashboard')} />
+        ) : null}
 
         {showChats && selectedSession ? (
           <>

@@ -1,5 +1,6 @@
 import type {
   QueuedRecipientPage,
+  SendReportPage,
   BroadcastInput,
   BroadcastListDetail,
   BroadcastListInput,
@@ -46,6 +47,10 @@ export function startBroadcast(token: string, sessionId: string | null, input: B
 
 export function fetchQueuedRecipients(token: string, query: PageQuery): Promise<QueuedRecipientPage> {
   return requestData<QueuedRecipientPage>(`/panel/broadcasts/queue/recipients?${pageParams(query, TABLE_PER_PAGE)}`, { token })
+}
+
+export function fetchSendReport(token: string, query: PageQuery): Promise<SendReportPage> {
+  return requestData<SendReportPage>(`/panel/broadcasts/send-report?${pageParams(query, TABLE_PER_PAGE)}`, { token })
 }
 
 export async function removeQueuedRecipient(token: string, runId: string, position: number): Promise<void> {
@@ -100,6 +105,14 @@ const FILE_NAME_PATTERN = /filename="([^"]+)"/
 export async function downloadReportCsv(token: string, runId: string): Promise<ReportFile> {
   const response = await requestRaw(`/panel/broadcasts/${encodeURIComponent(runId)}/report.csv`, { token })
   const fileName = FILE_NAME_PATTERN.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? `relatorio-${runId}.csv`
+  return { blob: await response.blob(), fileName }
+}
+
+// Relatório geral inteiro (com a busca da tela)
+export async function downloadSendReportCsv(token: string, search: string): Promise<ReportFile> {
+  const params = search ? `?${new URLSearchParams({ search })}` : ''
+  const response = await requestRaw(`/panel/broadcasts/send-report.csv${params}`, { token })
+  const fileName = FILE_NAME_PATTERN.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? 'relatorio-envios.csv'
   return { blob: await response.blob(), fileName }
 }
 

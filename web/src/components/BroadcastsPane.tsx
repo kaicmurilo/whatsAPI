@@ -3,9 +3,10 @@ import { BroadcastListsSection } from './BroadcastListsSection'
 import { BroadcastReport } from './BroadcastReport'
 import { BroadcastRunsSection } from './BroadcastRunsSection'
 import { BroadcastSendForm } from './BroadcastSendForm'
+import { SendReportSection } from './SendReportSection'
 
 export function BroadcastsPane({
-  sessions, defaultSessionId, lists, runs, onTablePage, onTableSearch, report, onOpenReport, onReportPage, onReportSituation,
+  sessions, defaultSessionId, lists, runs, sendReport, onTablePage, onTableSearch, report, onOpenReport, onReportPage, onReportSituation,
 }: BroadcastsPaneProps) {
   return (
     <section className="library broadcasts" aria-labelledby="broadcasts-title">
@@ -26,6 +27,13 @@ export function BroadcastsPane({
           onSearchChange={(search) => onTableSearch('lists', search)}
         />
       </div>
+
+      <SendReportSection
+        page={sendReport.page}
+        search={sendReport.search}
+        onPageChange={(page) => onTablePage('sendReport', page)}
+        onSearchChange={(search) => onTableSearch('sendReport', search)}
+      />
 
       {report.runId ? (
         <BroadcastReport

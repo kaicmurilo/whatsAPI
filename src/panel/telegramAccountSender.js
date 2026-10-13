@@ -5,15 +5,11 @@ const { deliverParts } = require('./broadcastRunner')
 const { telegramCallsOf } = require('./telegramParts')
 const { splitName } = require('./whatsappContact')
 const { alternatePhone } = require('./phone')
-const { coolDownTelegramAccount } = require('./telegramAccounts')
+const { coolDownTelegramAccount, resetTelegramAccountStrikes } = require('./telegramAccounts')
 
 const NOT_ON_TELEGRAM_ERROR = 'Número sem Telegram (ou a privacidade do contato não deixa achar pelo telefone)'
 const IMPORT_LIMIT_ERROR = 'Telegram limitou a busca por telefone desta conta (importContacts). Retome mais tarde — o limite costuma durar horas'
 const BR_MOBILE_WITHOUT_NINE_LENGTH = 12
-const HOUR_MS = 60 * 60 * 1000
-// ponytail: o Telegram não diz quanto dura o limite de busca nem o PEER_FLOOD; 6h/24h são conservadores — ajuste se medir
-const IMPORT_LIMIT_COOLDOWN_MS = 6 * HOUR_MS
-const PEER_FLOOD_COOLDOWN_MS = 24 * HOUR_MS
 
 // Problema do contato: não conta como falha seguida da conta
 const RECIPIENT_SIDE_ERRORS = new Set(['USER_PRIVACY_RESTRICTED', 'PEER_ID_INVALID', 'INPUT_USER_DEACTIVATED', 'USER_IS_BLOCKED', 'YOU_BLOCKED_USER'])
@@ -33,10 +29,10 @@ const FILE_OPTIONS = {
 const toSendError = (error) => {
   const code = error?.errorMessage || ''
   if (code === 'PEER_FLOOD') {
-    return Object.assign(new Error('Telegram limitou a conta (PEER_FLOOD): muitas mensagens para quem não a tem nos contatos'), { cooldownMs: PEER_FLOOD_COOLDOWN_MS })
+    return Object.assign(new Error('Telegram limitou a conta (PEER_FLOOD): muitas mensagens para quem não a tem nos contatos'), { cooldown: { policy: 'peerFlood' } })
   }
-  if (error?.seconds) return Object.assign(new Error(`Telegram pediu espera de ${error.seconds}s (FLOOD_WAIT)`), { cooldownMs: error.seconds * 1000 })
-  if (error?.message === IMPORT_LIMIT_ERROR) return Object.assign(error, { cooldownMs: IMPORT_LIMIT_COOLDOWN_MS })
+  if (error?.seconds) return Object.assign(new Error(`Telegram pediu espera de ${error.seconds}s (FLOOD_WAIT)`), { cooldown: { fixedMs: error.seconds * 1000 } })
+  if (error?.message === IMPORT_LIMIT_ERROR) return Object.assign(error, { cooldown: { policy: 'importLimit' } })
   return Object.assign(new Error(`Telegram: ${code || error?.message || 'erro desconhecido'}`), { recipientSide: RECIPIENT_SIDE_ERRORS.has(code) })
 }
 
@@ -53,7 +49,7 @@ const runAccountCall = (client, user, { method, params, file }) => {
 // Erro de limite põe a conta inteira em pausa (todos os disparos), não só neste contato
 const classifyAccountError = async (account, error) => {
   const sendError = toSendError(error)
-  if (sendError.cooldownMs) await coolDownTelegramAccount(account, sendError.cooldownMs, sendError.message)
+  if (sendError.cooldown) await coolDownTelegramAccount(account, sendError.cooldown, sendError.message)
   return sendError
 }
 
@@ -65,7 +61,7 @@ const sendPartToUser = async (account, user, part, onLimit) => {
     for (const call of telegramCallsOf(part)) await runAccountCall(account.client, user, call)
   } catch (error) {
     const sendError = await classifyAccountError(account, error)
-    if (sendError.cooldownMs) onLimit(sendError)
+    if (sendError.cooldown) onLimit(sendError)
     throw sendError
   }
   return null
@@ -98,13 +94,15 @@ const sendToAccountRecipient = async (account, recipient, options, pauseBetweenP
     user = await resolveUserByPhone(account.client, recipient)
   } catch (error) {
     const sendError = await classifyAccountError(account, error)
-    return sendError.cooldownMs ? deferred(sendError) : { status: 'failed', error: sendError.message.slice(0, 255) }
+    return sendError.cooldown ? deferred(sendError) : { status: 'failed', error: sendError.message.slice(0, 255) }
   }
   if (!user) return { status: 'failed', error: NOT_ON_TELEGRAM_ERROR, noAccount: true }
   let limitError = null
   const outcome = await deliverParts(recipient, options, (part) => sendPartToUser(account, user, part, (error) => { limitError = error }), pauseBetweenParts)
   // Nada chegou ao contato antes do limite: adia em vez de falhar
-  return outcome.status === 'failed' && limitError ? deferred(limitError) : outcome
+  if (outcome.status === 'failed' && limitError) return deferred(limitError)
+  if (outcome.status === 'sent') await resetTelegramAccountStrikes(account)
+  return outcome
 }
 
 module.exports = { sendToAccountRecipient, toSendError, telegramPhoneOf, NOT_ON_TELEGRAM_ERROR, IMPORT_LIMIT_ERROR }

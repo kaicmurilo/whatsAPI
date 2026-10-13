@@ -34,7 +34,8 @@ const executeInBackground = ({ channel, sessionIds, run, recipients, storedParts
     publish: (progress) => publishProgress(primarySessionId(), progress),
     gate
   })
-    .then(() => console.log(`[panel] disparo concluído run=${run.id} canal=${channel.name} sessões=${ids.join(',')} destinatários=${recipients.length} em ${Date.now() - startedAt}ms`))
+    // Encerrar o executor não é concluir: pausa (cooldown, horário, teto) também termina aqui
+    .then(({ status, pauseCode }) => console.log(`[panel] disparo encerrado run=${run.id} status=${status}${pauseCode ? ` motivo=${pauseCode}` : ''} canal=${channel.name} sessões=${ids.join(',')} destinatários=${recipients.length} em ${Date.now() - startedAt}ms`))
     .catch((error) => {
       console.error(`[panel] disparo abortado run=${run.id} sessões=${ids.join(',')}:`, error)
       return runs.finishRun(run.id, 'failed', `Erro interno ao registrar o envio: ${error.message}`)

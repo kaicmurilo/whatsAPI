@@ -1050,3 +1050,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 /* Remover instância (WhatsApp): ação destrutiva discreta no cabeçalho */
 .remove-instance { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 .qr-card .remove-instance { margin-top: var(--space-3); }
+
+/* Conta do Telegram em pausa por limite: próxima tentativa + "Tentar agora" */
+.telegram-cooldown { display: grid; gap: var(--space-2); }
+.telegram-cooldown__actions { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }

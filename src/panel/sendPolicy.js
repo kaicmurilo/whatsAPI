@@ -179,6 +179,8 @@ const parseSettingsInput = (body) => {
   if (dailyCapEnabled.error) return dailyCapEnabled
   const quietHoursEnabled = parseBool(body.quietHoursEnabled, 'Horário de envio')
   if (quietHoursEnabled.error) return quietHoursEnabled
+  const messagesViewEnabled = parseBool(body.messagesViewEnabled, 'Visualização de mensagens')
+  if (messagesViewEnabled.error) return messagesViewEnabled
   const parsedKeywords = parseKeywordList(body.suppressionKeywords)
   if (parsedKeywords.error) return parsedKeywords
   if (suppressionEnabled.value && parsedKeywords.keywords.length === 0) {
@@ -202,7 +204,8 @@ const parseSettingsInput = (body) => {
       dailyCap,
       quietHoursEnabled: quietHoursEnabled.value,
       quietStart,
-      quietEnd
+      quietEnd,
+      messagesViewEnabled: messagesViewEnabled.value
     }
   }
 }

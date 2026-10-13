@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken')
 const { v4: uuidv4 } = require('uuid')
 const { query } = require('../database')
 const config = require('../config')
+const { isApiKey, findApiCredentialByKey } = require('../panel/apiCredentialRepository')
 
 class AuthService {
   // Gerar hash da senha
@@ -134,8 +135,22 @@ class AuthService {
     return true
   }
 
+  // Chave de aplicação criada no painel: mesmo acesso do JWT, sem expirar até ser revogada
+  static async validateApiKey(apiKey) {
+    const credential = await findApiCredentialByKey(apiKey)
+    if (!credential) return null
+    const user = await this.getUserById(credential.user_id)
+    if (!user) return null
+    return {
+      user,
+      token: { scope: 'read write', expires_at: null, apiCredentialId: credential.id, allowedSessionIds: credential.session_ids },
+      decoded: null
+    }
+  }
+
   // Verificar token válido
   static async validateToken(accessToken) {
+    if (isApiKey(accessToken)) return this.validateApiKey(accessToken)
     const decoded = this.verifyToken(accessToken)
     if (!decoded) return null
 

@@ -21,6 +21,7 @@ export const queryKeys = {
   allTemplates: ['templates'] as const,
   templates: (query: PageQuery) => ['templates', 'page', query] as const,
   template: (templateId: string) => ['templates', 'detail', templateId] as const,
+  sendReport: (query: PageQuery) => ['broadcast-runs', 'send-report', query] as const,
   reportOf: (runId: string) => ['broadcast-report', runId] as const,
   reportRecipients: (runId: string, page: number, situation: string) => ['broadcast-report', runId, 'recipients', page, situation] as const,
   settings: ['panel-settings'] as const,
@@ -31,4 +32,6 @@ export const queryKeys = {
   sendQueue: ['send-queue'] as const,
   allSuppressed: ['suppression'] as const,
   suppressed: (query: PageQuery) => ['suppression', query] as const,
+  allCredentials: ['api-credentials'] as const,
+  credentials: (query: PageQuery) => ['api-credentials', query] as const,
 }

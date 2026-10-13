@@ -82,7 +82,7 @@ const explainTelegramUnavailable = (userId, instanceIds) => {
   if (runningTelegram(userId, instanceIds).length > 0) return null
   const end = nearestCooldownEnd(instanceIds, userId)
   if (!end) return null
-  return { code: 'cooldown', error: `Pausado: conta do Telegram limitada pelo Telegram até ${formatClock(end)}. Retoma sozinho depois desse horário.` }
+  return { code: 'cooldown', error: `Pausado: conta do Telegram limitada pelo Telegram. Nova tentativa automática às ${formatClock(end)} (ou "Tentar agora" na instância).` }
 }
 
 /**

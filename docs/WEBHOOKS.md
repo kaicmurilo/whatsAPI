@@ -5,7 +5,7 @@ Webhooks são a forma principal de receber eventos assíncronos do WhatsApp.
 ## Configuração
 
 ### URLs de Destino
-1. **Global**: Definida via `BASE_WEBHOOK_URL`.
+1. **Global**: Definida via `BASE_WEBHOOK_URL`. Vazio desliga os webhooks (sem erro no log); o painel não depende deles.
 2. **Por Sessão**: Definida via `[SESSIONID]_WEBHOOK_URL` (ex: `DEMO_WEBHOOK_URL`).
 
 ### Desabilitação de Callbacks

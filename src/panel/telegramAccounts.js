@@ -2,6 +2,7 @@ const { TelegramClient, Api } = require('telegram')
 const { StringSession } = require('telegram/sessions')
 const { saveTelegramAccount, deleteTelegramAccount, listAllTelegramAccounts, listUserTelegramAccounts, setAccountCooldown } = require('./telegramAccountRepository')
 const { accountInstanceId } = require('./broadcastSessions')
+const { nextCooldown } = require('./telegramCooldown')
 
 const CONNECTION_RETRIES = 5
 
@@ -16,24 +17,65 @@ const createTelegramClient = (session, apiId, apiHash) => {
   return client
 }
 
-const registerAccount = ({ id, userId, label, phone, cooldownUntil = null }, client) => {
+const registerAccount = ({ id, userId, label, phone, cooldownUntil = null, cooldownStrikes = 0 }, client) => {
   const instanceId = accountInstanceId(id)
-  accounts.set(instanceId, { kind: 'account', id: String(id), instanceId, userId, label, phone, client, cooldownUntil: cooldownUntil ? new Date(cooldownUntil) : null })
+  accounts.set(instanceId, {
+    kind: 'account',
+    id: String(id),
+    instanceId,
+    userId,
+    label,
+    phone,
+    client,
+    cooldownUntil: cooldownUntil ? new Date(cooldownUntil) : null,
+    cooldownStrikes
+  })
   return instanceId
 }
+
+const persistCooldown = (account) =>
+  setAccountCooldown(account.id, { until: account.cooldownUntil, strikes: account.cooldownStrikes })
+    .catch((error) => console.error(`[telegram] falha ao gravar pausa da conta=${account.label}: ${error.message}`))
 
 const isCoolingDown = (account, now = Date.now()) => Boolean(account.cooldownUntil && account.cooldownUntil.getTime() > now)
 
 /**
- * Telegram limitou a conta: tira do rodízio de todos os disparos até `ms` passar (fica no banco, sobrevive a reinício).
- * Disparos que só têm esta conta pausam no próximo contato ("nenhuma instância conectada") e são retomados à mão.
+ * Telegram limitou a conta: tira do rodízio de todos os disparos até a próxima tentativa (no banco, sobrevive a reinício).
+ * Espera crescente (telegramCooldown). Quando acaba, o agendador retoma os disparos e a 1ª busca testa se liberou.
+ * @param {{ policy?: string, fixedMs?: number }} cooldown
  */
-const coolDownTelegramAccount = async (account, ms, reason) => {
-  const until = new Date(Date.now() + ms)
-  if (account.cooldownUntil && account.cooldownUntil >= until) return
-  account.cooldownUntil = until
-  console.warn(`[telegram] conta em pausa pelo limite do Telegram conta=${account.label} até=${until.toISOString()} motivo=${reason}`)
-  await setAccountCooldown(account.id, until).catch((error) => console.error(`[telegram] falha ao gravar pausa da conta=${account.label}: ${error.message}`))
+const coolDownTelegramAccount = async (account, cooldown, reason) => {
+  // Outro disparo já pôs em pausa neste mesmo limite: não conta strike de novo
+  if (isCoolingDown(account)) return
+  const { ms, strikes } = nextCooldown(account.cooldownStrikes, cooldown)
+  account.cooldownUntil = new Date(Date.now() + ms)
+  account.cooldownStrikes = strikes
+  console.warn(`[telegram] conta em pausa pelo limite do Telegram conta=${account.label} próxima tentativa=${account.cooldownUntil.toISOString()} limites seguidos=${strikes} motivo=${reason}`)
+  await persistCooldown(account)
+}
+
+// Envio com sucesso: a conta voltou, a próxima pausa recomeça da espera mínima
+const resetTelegramAccountStrikes = async (account) => {
+  if (account.cooldownStrikes === 0) return
+  console.log(`[telegram] conta liberada pelo Telegram conta=${account.label} depois de ${account.cooldownStrikes} limite(s)`)
+  account.cooldownStrikes = 0
+  account.cooldownUntil = null
+  await persistCooldown(account)
+}
+
+/**
+ * "Tentar agora": tira a pausa (mantém os strikes — se ainda estiver limitada, a próxima espera é maior).
+ * O agendador retoma os disparos pausados por limite em até 30 s; a 1ª busca testa.
+ * @returns {Promise<'retrying' | 'not_found' | 'not_cooling'>}
+ */
+const retryTelegramAccountNow = async (userId, accountId) => {
+  const account = accounts.get(accountInstanceId(accountId))
+  if (!account || account.userId !== userId) return 'not_found'
+  if (!isCoolingDown(account)) return 'not_cooling'
+  account.cooldownUntil = null
+  console.log(`[telegram] nova tentativa pedida pelo usuário conta=${account.label} user=${userId}`)
+  await persistCooldown(account)
+  return 'retrying'
 }
 
 // Boot: reconecta com a sessão salva. Sessão encerrada no celular (dispositivos) fica desconectada até logar de novo.
@@ -116,6 +158,7 @@ const listAccountInstances = async (userId) => {
       label: account.label,
       status: getTelegramAccount(instanceId, userId) ? 'connected' : 'disconnected',
       cooldownUntil: cooling ? account.cooldownUntil : null,
+      cooldownStrikes: account.cooldownStrikes,
       phone: account.phone || null,
       pushName: null,
       linkedContacts: null,
@@ -125,5 +168,14 @@ const listAccountInstances = async (userId) => {
 }
 
 module.exports = {
-  createTelegramClient, saveLoggedAccount, removeTelegramAccount, startTelegramAccounts, getTelegramAccount, listAccountInstances, coolDownTelegramAccount, nearestCooldownEnd
+  createTelegramClient,
+  saveLoggedAccount,
+  removeTelegramAccount,
+  startTelegramAccounts,
+  getTelegramAccount,
+  listAccountInstances,
+  coolDownTelegramAccount,
+  nearestCooldownEnd,
+  resetTelegramAccountStrikes,
+  retryTelegramAccountNow
 }

@@ -213,6 +213,7 @@ const ensureSettingsTables = async () => {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
   `)
+  await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS messages_view_enabled BOOLEAN NOT NULL DEFAULT true')
   await query(`
     CREATE TABLE IF NOT EXISTS suppressed_numbers (
       id BIGSERIAL PRIMARY KEY,
@@ -265,6 +266,8 @@ const ensureTelegramTables = async () => {
   await query('CREATE INDEX IF NOT EXISTS idx_telegram_accounts_user ON telegram_accounts(user_id)')
   // Limite do Telegram (busca por telefone, PEER_FLOOD, FLOOD_WAIT) vale para a conta inteira: ela descansa até aqui
   await query('ALTER TABLE telegram_accounts ADD COLUMN IF NOT EXISTS cooldown_until TIMESTAMPTZ')
+  // Limites seguidos: cada um dobra a próxima espera; envio com sucesso zera
+  await query('ALTER TABLE telegram_accounts ADD COLUMN IF NOT EXISTS cooldown_strikes INTEGER NOT NULL DEFAULT 0')
   // Primeira versão guardava um bot só por usuário nas configurações: migra uma vez e tira as colunas
   await query(`
     DO $$ BEGIN
@@ -283,6 +286,24 @@ const ensureTelegramTables = async () => {
   `)
 }
 
+// Chaves que a conta libera para aplicações; só o hash fica salvo
+const ensureApiCredentialsTable = async () => {
+  await query(`
+    CREATE TABLE IF NOT EXISTS api_credentials (
+      id BIGSERIAL PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      name VARCHAR(60) NOT NULL,
+      token_hash CHAR(64) NOT NULL UNIQUE,
+      token_prefix VARCHAR(16) NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_used_at TIMESTAMPTZ
+    )
+  `)
+  await query('CREATE INDEX IF NOT EXISTS idx_api_credentials_user ON api_credentials(user_id, created_at DESC)')
+  // NULL = todas as instâncias da conta; lista = só essas
+  await query('ALTER TABLE api_credentials ADD COLUMN IF NOT EXISTS session_ids TEXT[]')
+}
+
 // Idempotente: roda a cada boot porque o init.sql só executa em volume novo do Postgres
 const ensurePanelSchema = async () => {
   await ensureMessagesTable()
@@ -292,6 +313,7 @@ const ensurePanelSchema = async () => {
   await ensureTemplateTables()
   await ensureSettingsTables()
   await ensureTelegramTables()
+  await ensureApiCredentialsTable()
 }
 
 module.exports = { ensurePanelSchema }

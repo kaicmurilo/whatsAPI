@@ -3,6 +3,8 @@ const { globalApiKey, disabledCallbacks } = require('./config')
 
 // Trigger webhook endpoint
 const triggerWebhook = (webhookURL, sessionId, dataType, data) => {
+  // Sem destino configurado = webhooks desligados; o resto do evento (cache, lido, painel) segue normal
+  if (!webhookURL) return
   // Sem payload no log: ele carrega números e conteúdo das mensagens (PII)
   console.log(`[webhook] ${dataType} sessão=${sessionId}`)
   axios.post(webhookURL, { dataType, data, sessionId }, { headers: { 'x-api-key': globalApiKey } })

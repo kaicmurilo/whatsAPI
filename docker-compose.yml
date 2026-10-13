@@ -15,7 +15,7 @@ services:
     environment:
       # ⚠️ SEGURANÇA: Use variáveis de ambiente ou secrets do Docker
       - API_KEY=${API_KEY:-your_secure_api_key_here}
-      - BASE_WEBHOOK_URL=http://localhost:3000
+      - BASE_WEBHOOK_URL=  # opcional: URL completa do receptor; vazio desliga os webhooks
       - ENABLE_LOCAL_CALLBACK_EXAMPLE=FALSE # ⚠️ DESABILITADO POR SEGURANÇA
       - MAX_ATTACHMENT_SIZE=5000000 # IN BYTES
       - SET_MESSAGES_AS_SEEN=TRUE # WILL MARK THE MESSAGES AS READ AUTOMATICALLY

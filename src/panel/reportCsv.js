@@ -10,6 +10,7 @@ const SITUATION_LABELS = {
   suppressed: 'Suprimido',
   duplicate: 'Duplicado',
   replied: 'Respondeu',
+  removed: 'Removido da fila',
   sent: 'Enviado',
   delivered: 'Entregue',
   read: 'Lido',
@@ -68,10 +69,31 @@ const buildReportCsv = (summary, recipients, timeZone) => {
   return UTF8_BOM + [HEADERS, ...rows].map(toLine).join(LINE_BREAK) + LINE_BREAK
 }
 
+const SEND_REPORT_HEADERS = ['Lista', 'Contato', 'Telefone', 'Mensagem', 'Agendado em', 'Previsto para', 'Enviado em', 'Situação']
+
+// Quebra de linha dentro da célula desalinha a planilha em vários leitores: mensagem vai numa linha só
+const singleLine = (text) => (text ? text.replace(/\s*[\r\n]+\s*/g, ' ').trim() : text)
+
+// Relatório geral (todas as listas): programado ainda não tem situação de envio → "Agendado"
+const buildSendReportCsv = (rows, timeZone) => {
+  const formatDate = createDateFormatter(timeZone)
+  const lines = rows.map((row) => [
+    row.listName,
+    row.name,
+    formatPhoneForReport(row.phone),
+    singleLine(row.message),
+    formatDate(row.createdAt),
+    formatDate(row.scheduledAt),
+    formatDate(row.sentAt),
+    row.status === 'scheduled' ? 'Agendado' : (SITUATION_LABELS[row.status] ?? row.status)
+  ])
+  return UTF8_BOM + [SEND_REPORT_HEADERS, ...lines].map(toLine).join(LINE_BREAK) + LINE_BREAK
+}
+
 // "Promoção Setembro!" → "relatorio-promocao-setembro-12.csv"
 const reportFileName = (summary) => {
   const slug = summary.listName.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
   return `relatorio-${slug || 'transmissao'}-${summary.id}.csv`
 }
 
-module.exports = { buildReportCsv, reportFileName }
+module.exports = { buildReportCsv, buildSendReportCsv, reportFileName }

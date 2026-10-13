@@ -1,4 +1,5 @@
 const { query } = require('../database')
+const { buildContactSearch } = require('./contactRepository')
 
 // Situação do destinatário, da mais avançada para a menos: lido > entregue > enviado
 const SITUATION_SQL = `CASE
@@ -69,4 +70,42 @@ const listAllReportRecipients = async (runId) => {
 
 const isKnownSituation = (situation) => Object.prototype.hasOwnProperty.call(SITUATION_FILTERS, situation)
 
-module.exports = { findReportSummary, listReportRecipients, listAllReportRecipients, isKnownSituation }
+// Mensagem do disparo para o relatório: texto; sem texto, o modelo ou o arquivo
+const RUN_MESSAGE_SQL = "COALESCE(NULLIF(b.text, ''), b.template_name, b.file_name)"
+
+/**
+ * Relatório geral (todas as listas): um número por linha com lista, mensagem, quando foi agendado e quando sai/saiu.
+ * Quem foi removido da fila não entra. Programado ainda não tem destinatários gravados: usa os membros atuais da lista, que é quem vai receber no horário.
+ * Busca casa no nome do contato e da lista; com dígitos, também no telefone.
+ * perPage null traz todas as linhas (CSV).
+ */
+const listSendReport = async (userId, { page, perPage, search }) => {
+  const { namePattern, phonePattern } = buildContactSearch(search)
+  const result = await query(
+    `WITH report_rows AS (
+       SELECT b.id AS run_id, rr.position, rr.name, rr.phone, b.list_name, b.channel, ${RUN_MESSAGE_SQL} AS message,
+              rr.status, b.created_at, b.scheduled_at, rr.sent_at
+       FROM broadcast_runs b JOIN broadcast_run_recipients rr ON rr.run_id = b.id
+       WHERE b.user_id = $1 AND b.status NOT IN ('scheduled', 'canceled') AND rr.status <> 'removed'
+       UNION ALL
+       SELECT b.id, (ROW_NUMBER() OVER (PARTITION BY b.id ORDER BY c.name, c.id) - 1)::int, c.name, c.phone, b.list_name, b.channel,
+              ${RUN_MESSAGE_SQL}, 'scheduled', b.created_at, b.scheduled_at, NULL
+       FROM broadcast_runs b
+       JOIN broadcast_list_members m ON m.list_id = b.list_id
+       JOIN panel_contacts c ON c.id = m.contact_id
+       WHERE b.user_id = $1 AND b.status = 'scheduled'
+     )
+     SELECT run_id::text AS "runId", position, name, phone, list_name AS "listName", channel, message, status,
+            created_at AS "createdAt", scheduled_at AS "scheduledAt", sent_at AS "sentAt", COUNT(*) OVER() AS total
+     FROM report_rows
+     WHERE ($2::text IS NULL OR name ILIKE $2 OR list_name ILIKE $2 OR ($3::text IS NOT NULL AND phone LIKE $3))
+     ORDER BY created_at DESC, run_id DESC, position
+     LIMIT $4 OFFSET $5`,
+    [userId, namePattern, phonePattern, perPage, (page - 1) * (perPage ?? 0)]
+  )
+  const total = result.rows.length > 0 ? Number(result.rows[0].total) : 0
+  const items = result.rows.map(({ total: _total, ...row }) => row)
+  return { items, total, page, perPage }
+}
+
+module.exports = { findReportSummary, listReportRecipients, listAllReportRecipients, isKnownSituation, listSendReport }

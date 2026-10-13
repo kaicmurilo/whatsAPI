@@ -24,4 +24,4 @@ const parsePagination = (query, { defaultPerPage }) => ({
 
 const isValidPagination = ({ page, perPage, search }) => page !== null && perPage !== null && search !== null
 
-module.exports = { CHAT_ID_PATTERN, parseBoundedInt, parseId, parsePagination, isValidPagination }
+module.exports = { CHAT_ID_PATTERN, parseBoundedInt, parseId, parsePagination, parseSearch, isValidPagination }

@@ -11,6 +11,7 @@ const RAIL_VIEWS: { view: PanelView; label: string }[] = [
   { view: 'broadcasts', label: 'Transmissão' },
   { view: 'queue', label: 'Fila' },
   { view: 'files', label: 'Arquivos' },
+  { view: 'credentials', label: 'Credenciais' },
   { view: 'settings', label: 'Configurações' },
 ]
 

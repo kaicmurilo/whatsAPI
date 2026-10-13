@@ -23,7 +23,8 @@ const deps = (extra) => ({
 
 test('sem remetente e com conta em pausa: pausa com cooldown (retomada automática)', async () => {
   const runDeps = deps({ explainUnavailable: () => ({ code: 'cooldown', error: 'Pausado: limite até 19:09' }) })
-  await runBroadcast(baseRun(), runDeps)
+  const result = await runBroadcast(baseRun(), runDeps)
+  expect(result).toEqual({ status: 'paused', pauseCode: 'cooldown' })
   expect(runDeps.finish).toHaveBeenCalledWith(1, 'paused', 'Pausado: limite até 19:09', 'cooldown')
   expect(runDeps.recordResult).not.toHaveBeenCalled()
 })

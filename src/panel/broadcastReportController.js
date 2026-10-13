@@ -5,9 +5,9 @@ const { isSessionOwnedBy } = require('./messageRepository')
 const { publishPanelEvent } = require('./panelEvents')
 const { TELEGRAM } = require('./broadcastChannels')
 const { sendErrorResponse } = require('../utils')
-const { findReportSummary, listReportRecipients, listAllReportRecipients, isKnownSituation } = require('./broadcastReportRepository')
-const { buildReportCsv, reportFileName } = require('./reportCsv')
-const { parseId, parsePagination, isValidPagination } = require('./validators')
+const { findReportSummary, listReportRecipients, listAllReportRecipients, isKnownSituation, listSendReport } = require('./broadcastReportRepository')
+const { buildReportCsv, buildSendReportCsv, reportFileName } = require('./reportCsv')
+const { parseId, parsePagination, parseSearch, isValidPagination } = require('./validators')
 
 const RECIPIENTS_DEFAULT_PER_PAGE = 5
 
@@ -50,6 +50,40 @@ const getReportRecipients = async (req, res) => {
   }
 }
 
+// Relatório geral da tela de Transmissão: todos os números de todas as listas
+const getSendReport = async (req, res) => {
+  const pagination = parsePagination(req.query, { defaultPerPage: RECIPIENTS_DEFAULT_PER_PAGE })
+  if (!isValidPagination(pagination)) return sendErrorResponse(res, 422, 'Parâmetros de paginação ou busca inválidos')
+  try {
+    res.json({ success: true, data: await listSendReport(req.user.user_id, { ...pagination, search: pagination.search || null }) })
+  } catch (error) {
+    console.error(`[panel] falha ao montar relatório geral user=${req.user.user_id}:`, error)
+    sendErrorResponse(res, 500, 'Erro ao montar relatório geral')
+  }
+}
+
+const CSV_HEADERS = (fileName) => ({
+  'Content-Type': 'text/csv; charset=utf-8',
+  'Content-Disposition': `attachment; filename="${fileName}"`,
+  'Cache-Control': 'no-store'
+})
+
+// CSV do relatório geral: todas as linhas, respeitando a busca da tela
+const downloadSendReportCsv = async (req, res) => {
+  const userId = req.user.user_id
+  const search = parseSearch(req.query.search)
+  if (search === null) return sendErrorResponse(res, 422, 'Busca inválida')
+  try {
+    const { items } = await listSendReport(userId, { page: 1, perPage: null, search: search || null })
+    console.log(`[panel] relatório geral exportado user=${userId} linhas=${items.length}`)
+    res.set(CSV_HEADERS('relatorio-envios.csv'))
+    res.send(buildSendReportCsv(items, reportTimeZone))
+  } catch (error) {
+    console.error(`[panel] falha ao exportar relatório geral user=${userId}:`, error)
+    sendErrorResponse(res, 500, 'Erro ao exportar relatório geral')
+  }
+}
+
 const downloadReportCsv = async (req, res) => {
   try {
     const summary = await loadOwnedSummary(req, res)
@@ -57,11 +91,7 @@ const downloadReportCsv = async (req, res) => {
     const recipients = await listAllReportRecipients(summary.id)
     const fileName = reportFileName(summary)
     console.log(`[panel] relatório exportado user=${req.user.user_id} run=${summary.id} linhas=${recipients.length}`)
-    res.set({
-      'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="${fileName}"`,
-      'Cache-Control': 'no-store'
-    })
+    res.set(CSV_HEADERS(fileName))
     res.send(buildReportCsv(summary, recipients, reportTimeZone))
   } catch (error) {
     console.error(`[panel] falha ao exportar relatório user=${req.user.user_id} run=${req.params.runId}:`, error)
@@ -88,4 +118,4 @@ const refreshReport = async (req, res) => {
   }
 }
 
-module.exports = { getReport, getReportRecipients, downloadReportCsv, refreshReport }
+module.exports = { getSendReport, downloadSendReportCsv, getReport, getReportRecipients, downloadReportCsv, refreshReport }

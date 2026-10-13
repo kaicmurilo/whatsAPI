@@ -32,6 +32,12 @@ export async function deleteTelegramInstance(token: string, instanceId: string):
   await requestRaw(deletePathOf(instanceId), { token, method: 'DELETE' })
 }
 
+// Tira a pausa por limite: os disparos pausados voltam em até 30 s (gasta 1 busca da cota se ainda estiver limitada)
+export async function retryTelegramAccount(token: string, instanceId: string): Promise<void> {
+  const [, accountId] = instanceId.split(':')
+  await requestRaw(`${TELEGRAM_PATH}/accounts/${encodeURIComponent(accountId)}/retry`, { token, method: 'POST' })
+}
+
 export function startTelegramLogin(token: string, input: TelegramLoginStart): Promise<{ loginId: string }> {
   return requestData<{ loginId: string }>(`${TELEGRAM_PATH}/accounts`, { token, method: 'POST', body: input })
 }

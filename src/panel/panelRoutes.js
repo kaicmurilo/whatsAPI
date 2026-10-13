@@ -17,6 +17,7 @@ const suppressionController = require('./suppressionController')
 const metricsController = require('./metricsController')
 const telegramController = require('./telegramController')
 const broadcastQueueController = require('./broadcastQueueController')
+const apiCredentialController = require('./apiCredentialController')
 
 const ONE_MINUTE_MS = 60 * 1000
 
@@ -42,7 +43,8 @@ panelRouter.use(
   middleware.rateLimiter,
   middleware.userAuth,
   middleware.checkAuthEnabled,
-  middleware.requireActiveUser
+  middleware.requireActiveUser,
+  apiCredentialController.restrictToSessionRoutes
 )
 
 const sessionScoped = [middleware.sessionNameValidation, middleware.requireSessionOwnership]
@@ -103,6 +105,14 @@ panelRouter.delete('/telegram/bots/:botId', telegramRateLimiter, telegramControl
 panelRouter.post('/telegram/accounts', telegramLoginRateLimiter, telegramController.startTelegramAccountLogin)
 panelRouter.post('/telegram/accounts/login/:loginId', telegramLoginRateLimiter, telegramController.continueTelegramAccountLogin)
 panelRouter.delete('/telegram/accounts/:accountId', telegramRateLimiter, telegramController.deleteTelegramAccount)
+// Cada "Tentar agora" gasta 1 busca da cota da conta: limite próprio evita insistir
+panelRouter.post('/telegram/accounts/:accountId/retry', telegramLoginRateLimiter, telegramController.retryTelegramAccount)
+// Credenciais de aplicação: o segredo sai uma vez no POST; limite estrito evita gerar chave em série
+const credentialRateLimiter = perUserLimiter(10, 'Muitas alterações de credenciais. Aguarde um minuto.')
+const panelLoginOnly = apiCredentialController.requirePanelLogin
+panelRouter.get('/credentials', panelLoginOnly, apiCredentialController.getApiCredentials)
+panelRouter.post('/credentials', panelLoginOnly, credentialRateLimiter, apiCredentialController.postApiCredential)
+panelRouter.delete('/credentials/:credentialId', panelLoginOnly, credentialRateLimiter, apiCredentialController.deleteApiCredential)
 panelRouter.get('/suppression', suppressionController.getSuppressed)
 panelRouter.delete('/suppression/:suppressionId', settingsRateLimiter, suppressionController.deleteSuppressed)
 
@@ -115,6 +125,9 @@ panelRouter.get('/broadcasts/queue', queuePollLimiter, broadcastController.getSe
 // Menu Fila: contatos pendentes dos disparos abertos; remover tira só aquele contato
 panelRouter.get('/broadcasts/queue/recipients', broadcastQueueController.getQueuedRecipients)
 panelRouter.delete('/broadcasts/:runId/recipients/:position', settingsRateLimiter, broadcastQueueController.deleteQueuedRecipient)
+// Relatório geral (todas as listas); antes de /broadcasts/:runId para não cair como id
+panelRouter.get('/broadcasts/send-report', broadcastReportController.getSendReport)
+panelRouter.get('/broadcasts/send-report.csv', broadcastReportController.downloadSendReportCsv)
 panelRouter.get('/broadcasts', broadcastController.getRuns)
 panelRouter.get('/broadcasts/:runId', broadcastController.getRun)
 panelRouter.post('/broadcasts/:runId/retry', broadcastRateLimiter, broadcastController.retryBroadcast)

@@ -480,6 +480,7 @@
 .report-situation[data-situation='delivered'] { color: var(--color-ink-soft); }
 .report-situation[data-situation='failed'] { color: var(--color-alert); }
 .report-situation[data-situation='pending'],
+.report-situation[data-situation='scheduled'],
 .report-situation[data-situation='awaiting_reply'] { color: var(--color-pending); }
 .report-situation[data-situation='suppressed'],
 .report-situation[data-situation='duplicate'],
@@ -512,3 +513,22 @@
 .run-pacing { display: grid; gap: var(--space-1); min-width: min(22rem, 70vw); }
 .run-pacing__hint { font-size: var(--text-xs); color: var(--color-muted); }
 .run-pacing__actions { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+/* Relatório de envios: mensagem longa vira uma linha com reticências (texto completo no title) */
+.send-report__message { display: block; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Credenciais de API: aviso da chave recém-criada */
+.credentials__name { flex: 1; min-width: 12rem; }
+.credentials__issued {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-ink);
+  border-radius: var(--radius-sm);
+}
+.credentials__warning, .credentials__hint { margin: 0; font-size: var(--text-xs); }
+.credentials__hint { color: var(--color-muted); }
+.credentials__key-row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.credentials__key-row .field__input { flex: 1; min-width: 14rem; }
+.credentials__dismiss { padding: var(--space-2) var(--space-3); border: 0; background: none; color: var(--color-muted); text-decoration: underline; }
+.credentials__form { display: grid; gap: var(--space-3); }

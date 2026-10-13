@@ -1,13 +1,16 @@
-jest.mock('./telegramAccounts', () => ({ coolDownTelegramAccount: jest.fn() }))
+jest.mock('./telegramAccounts', () => ({ coolDownTelegramAccount: jest.fn(), resetTelegramAccountStrikes: jest.fn() }))
 
-const { coolDownTelegramAccount } = require('./telegramAccounts')
+const { coolDownTelegramAccount, resetTelegramAccountStrikes } = require('./telegramAccounts')
 const { sendToAccountRecipient, toSendError, telegramPhoneOf, NOT_ON_TELEGRAM_ERROR, IMPORT_LIMIT_ERROR } = require('./telegramAccountSender')
 
 const recipient = { position: 0, name: 'Ana Souza', phone: '5511999998888' }
 const textParts = { parts: [{ kind: 'text', text: 'Oi' }] }
 const noPause = async () => {}
 
-beforeEach(() => coolDownTelegramAccount.mockReset())
+beforeEach(() => {
+  coolDownTelegramAccount.mockReset()
+  resetTelegramAccountStrikes.mockReset()
+})
 
 const fakeClient = ({ users = [{ id: 1 }], retryContacts = [], sendError = null } = {}) => ({
   invoke: jest.fn().mockResolvedValue({ users, retryContacts }),
@@ -22,6 +25,7 @@ test('acha o contato pelo telefone e envia o texto', async () => {
   const [contact] = client.invoke.mock.calls[0][0].contacts
   expect(contact).toMatchObject({ phone: '5511999998888', firstName: 'Ana', lastName: 'Souza' })
   expect(client.sendMessage).toHaveBeenCalledWith({ id: 1 }, { message: 'Oi' })
+  expect(resetTelegramAccountStrikes).toHaveBeenCalledWith({ client })
 })
 
 test('número sem Telegram (ou privacidade) é problema do contato', async () => {
@@ -34,7 +38,7 @@ test('PEER_FLOOD põe a conta em pausa e o contato volta para a fila', async () 
   const outcome = await sendToAccountRecipient({ client }, recipient, textParts, noPause)
   expect(outcome.status).toBe('pending')
   expect(outcome.error).toContain('PEER_FLOOD')
-  expect(coolDownTelegramAccount).toHaveBeenCalledWith({ client }, 24 * 60 * 60 * 1000, expect.stringContaining('PEER_FLOOD'))
+  expect(coolDownTelegramAccount).toHaveBeenCalledWith({ client }, { policy: 'peerFlood' }, expect.stringContaining('PEER_FLOOD'))
 })
 
 test('privacidade do contato vira noAccount', () => {
@@ -54,7 +58,8 @@ test('limite de busca da conta (retryContacts) adia o contato e põe a conta em 
   const outcome = await sendToAccountRecipient({ client }, recipient, textParts, noPause)
   expect(outcome).toEqual({ status: 'pending', error: IMPORT_LIMIT_ERROR })
   expect(client.sendMessage).not.toHaveBeenCalled()
-  expect(coolDownTelegramAccount).toHaveBeenCalledWith({ client }, 6 * 60 * 60 * 1000, IMPORT_LIMIT_ERROR)
+  expect(coolDownTelegramAccount).toHaveBeenCalledWith({ client }, { policy: 'importLimit' }, IMPORT_LIMIT_ERROR)
+  expect(resetTelegramAccountStrikes).not.toHaveBeenCalled()
 })
 
 test('celular BR sem o 9º dígito é buscado com o 9; os demais como estão', () => {

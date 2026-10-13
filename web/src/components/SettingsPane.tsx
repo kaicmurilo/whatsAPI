@@ -202,6 +202,17 @@ export function SettingsPane() {
                 </div>
               </div>
             </section>
+
+            <section className="settings__section settings__section--span" aria-labelledby="settings-panel">
+              <h2 id="settings-panel" className="settings__legend">Painel</h2>
+              <SettingToggle
+                checked={draft.messagesViewEnabled}
+                title="Mostrar conversas das instâncias"
+                onChange={(messagesViewEnabled) => setDraft({ ...draft, messagesViewEnabled })}
+              >
+                Desligado economiza recurso: não importa histórico nem guarda as enviadas. Respostas continuam valendo para supressão e relatório.
+              </SettingToggle>
+            </section>
           </div>
 
           <div className="settings__actions">

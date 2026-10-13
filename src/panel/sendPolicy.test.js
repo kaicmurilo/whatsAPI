@@ -92,7 +92,8 @@ describe('parseSettingsInput', () => {
     dailyCap: 80,
     quietHoursEnabled: false,
     quietStart: '08:00',
-    quietEnd: '20:00'
+    quietEnd: '20:00',
+    messagesViewEnabled: true
   }
 
   test('accepts a whitelist body and drops a duplicate keyword', () => {
@@ -106,6 +107,7 @@ describe('parseSettingsInput', () => {
     expect(parseSettingsInput({ ...valid, suppressionKeywords: ['quero sair'] }).error).toMatch(/único termo/)
     expect(parseSettingsInput({ ...valid, quietStart: '08:00', quietEnd: '08:00' }).error).toMatch(/iguais/)
     expect(parseSettingsInput({ ...valid, dailyCap: 10 }).error).toMatch(/20/)
+    expect(parseSettingsInput({ ...valid, messagesViewEnabled: undefined }).error).toMatch(/Visualização/)
     expect(parseSettingsInput({ ...valid, suppressionEnabled: true, suppressionKeywords: [] }).error).toMatch(/ao menos uma/)
   })
 })
