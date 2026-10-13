@@ -214,6 +214,8 @@ const ensureSettingsTables = async () => {
     )
   `)
   await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS messages_view_enabled BOOLEAN NOT NULL DEFAULT true')
+  // Horas de histórico de mensagens guardado; NULL = sem limite
+  await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS message_retention_hours INTEGER')
   await query(`
     CREATE TABLE IF NOT EXISTS suppressed_numbers (
       id BIGSERIAL PRIMARY KEY,
@@ -304,6 +306,23 @@ const ensureApiCredentialsTable = async () => {
   await query('ALTER TABLE api_credentials ADD COLUMN IF NOT EXISTS session_ids TEXT[]')
 }
 
+// Envios feitos pela integração (rotas da API), sem conteúdo: base do balanceamento e do dashboard.
+// Fica fora de whatsapp_messages porque aquela tabela mistura o celular e expira pela retenção.
+const ensureApiSendsTable = async () => {
+  await query(`
+    CREATE TABLE IF NOT EXISTS api_sent_messages (
+      id BIGSERIAL PRIMARY KEY,
+      session_id VARCHAR(255) NOT NULL REFERENCES whatsapp_sessions(session_id) ON DELETE CASCADE,
+      message_id VARCHAR(255),
+      chat_id VARCHAR(255) NOT NULL,
+      is_group BOOLEAN NOT NULL,
+      credential_id BIGINT,
+      sent_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+  await query('CREATE INDEX IF NOT EXISTS idx_api_sent_messages_session_day ON api_sent_messages(session_id, sent_at)')
+}
+
 // Idempotente: roda a cada boot porque o init.sql só executa em volume novo do Postgres
 const ensurePanelSchema = async () => {
   await ensureMessagesTable()
@@ -314,6 +333,7 @@ const ensurePanelSchema = async () => {
   await ensureSettingsTables()
   await ensureTelegramTables()
   await ensureApiCredentialsTable()
+  await ensureApiSendsTable()
 }
 
 module.exports = { ensurePanelSchema }

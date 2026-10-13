@@ -10,7 +10,7 @@ const filterGroupMembers = async (sessionIds, groupId, getClient, isMember) => {
 }
 
 /**
- * Escolhe a instância que menos enviou no dia (empate: a que enviou há mais tempo).
+ * Escolhe a instância que menos enviou pela integração no dia (empate: a que enviou há mais tempo).
  * Grupo: só concorrem as instâncias conectadas que participam do grupo. Contato: qualquer conectada.
  * ponytail: duas chamadas simultâneas podem escolher a mesma instância (a contagem só sobe quando a
  * mensagem é gravada); para cravar o rodízio sob concorrência, reservar a instância em memória.

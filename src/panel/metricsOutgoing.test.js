@@ -11,13 +11,14 @@ const emptyPeriods = () => Object.fromEntries(PERIODS.map((period) => [period, {
 describe('outgoing messages in the dashboard', () => {
   beforeEach(() => query.mockReset())
 
-  test('counts only messages sent from the user own instances, split by group', async () => {
+  test('counts only integration sends from the user own instances, split by group', async () => {
     query.mockResolvedValueOnce({ rows: [{ sessionId: 'loja-centro-01', isGroup: true, ...countsFor('3') }] })
     const outgoing = await loadOutgoingMetrics('user-1', metricWindows(new Date('2026-10-13T15:00:00Z'), 'America/Sao_Paulo'))
     const [sql, params] = query.mock.calls[0]
-    expect(sql).toMatch(/m\.from_me/)
+    expect(sql).toMatch(/FROM api_sent_messages/)
+    expect(sql).not.toMatch(/whatsapp_messages/)
     expect(sql).toMatch(/s\.user_id = \$1/)
-    expect(sql).toMatch(/@g\.us/)
+    expect(sql).toMatch(/is_group/)
     expect(params[0]).toBe('user-1')
     expect(outgoing).toEqual([{ sessionId: 'loja-centro-01', isGroup: true, periods: countsFor(3) }])
   })

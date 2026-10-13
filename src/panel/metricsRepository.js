@@ -216,18 +216,17 @@ const loadOutcomes = async (userId, windows) => {
   }
 }
 
-// Toda mensagem que saiu do número (API, painel, transmissão e celular), lida do histórico gravado,
-// separada por destino: grupo (@g.us) ou contato (qualquer outro; status@broadcast nem é gravado).
-// Com a visualização de mensagens desligada as enviadas não são gravadas e não entram aqui.
+// Envios feitos pela integração (rotas da API), separados por destino: grupo (@g.us) ou contato.
+// Não usa whatsapp_messages: lá entram mensagens do celular e o histórico expira pela retenção.
 const loadOutgoingMetrics = async (userId, windows) => {
   const { params, indexes } = boundParams(windows)
   const outgoingIndexes = shiftIndexes(indexes, 1)
   const result = await query(
-    `SELECT m.session_id AS "sessionId", m.chat_id LIKE '%@g.us' AS "isGroup",
-            ${outcomeSelectList(outgoingIndexes, 'm.sent_at')}
-     FROM whatsapp_messages m
-     JOIN whatsapp_sessions s ON s.session_id = m.session_id
-     WHERE s.user_id = $1 AND m.from_me
+    `SELECT a.session_id AS "sessionId", a.is_group AS "isGroup",
+            ${outcomeSelectList(outgoingIndexes, 'a.sent_at')}
+     FROM api_sent_messages a
+     JOIN whatsapp_sessions s ON s.session_id = a.session_id
+     WHERE s.user_id = $1
      GROUP BY 1, 2`,
     [userId, ...params]
   )

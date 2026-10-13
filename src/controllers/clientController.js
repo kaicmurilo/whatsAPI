@@ -2,6 +2,7 @@ const { MessageMedia, Location, Buttons, List, Poll } = require('whatsapp-web.js
 const { sessions } = require('../sessions')
 const { sendErrorResponse } = require('../utils')
 const { cacheHelpers } = require('../utils/cache')
+const { recordApiSend } = require('../panel/apiSendRepository')
 
 const CONTENT_TYPES = ['string', 'MessageMediaFromURL', 'MessageMedia', 'Location', 'Buttons', 'List', 'Contact', 'Poll']
 const INVALID_CONTENT_TYPE = 'contentType invalid, must be string, MessageMedia, MessageMediaFromURL, Location, Buttons, List, Contact or Poll'
@@ -104,6 +105,7 @@ const sendMessage = async (req, res) => {
     const client = sessions.get(req.params.sessionId)
     if (!CONTENT_TYPES.includes(contentType)) return sendErrorResponse(res, 404, INVALID_CONTENT_TYPE)
     const messageOut = await client.sendMessage(chatId, await buildMessageContent(client, contentType, content, options), options)
+    recordApiSend({ sessionId: req.params.sessionId, chatId, message: messageOut, credentialId: req.token?.apiCredentialId })
     res.json({ success: true, message: messageOut })
   } catch (error) {
     console.log(error)

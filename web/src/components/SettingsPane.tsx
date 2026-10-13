@@ -12,6 +12,10 @@ import { SearchInput } from './SearchInput'
 
 const DAILY_CAP_MIN = 20
 const DAILY_CAP_MAX = 400
+const RETENTION_HOURS_MAX = 8760
+
+// Campo vazio = sem limite; o servidor valida o intervalo
+const parseRetentionHours = (text: string): number | null => (text.trim() === '' ? null : Math.trunc(Number(text)))
 
 function SettingToggle({
   checked,
@@ -210,8 +214,23 @@ export function SettingsPane() {
                 title="Mostrar conversas das instâncias"
                 onChange={(messagesViewEnabled) => setDraft({ ...draft, messagesViewEnabled })}
               >
-                Desligado economiza recurso: não importa histórico nem guarda as enviadas. Respostas continuam valendo para supressão e relatório.
+                Desligado esconde a tela de conversas e economiza recurso: não importa histórico nem guarda as enviadas. Respostas continuam valendo para supressão e relatório.
               </SettingToggle>
+              <label className="field">
+                <span className="field__label">Guardar histórico de mensagens por (horas)</span>
+                <input
+                  className="field__input"
+                  type="number"
+                  min={1}
+                  max={RETENTION_HOURS_MAX}
+                  placeholder="Sem limite"
+                  value={draft.messageRetentionHours ?? ''}
+                  onChange={(event) => setDraft({ ...draft, messageRetentionHours: parseRetentionHours(event.target.value) })}
+                />
+                <span className="settings__hint">
+                  Vazio guarda tudo. Com limite, mensagens mais antigas são apagadas a cada 5 minutos; a taxa de resposta das transmissões só enxerga respostas dentro da janela. Envios pela API seguem contando no painel.
+                </span>
+              </label>
             </section>
           </div>
 

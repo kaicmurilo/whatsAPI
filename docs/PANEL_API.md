@@ -147,7 +147,7 @@ Essas três rotas só aceitam o login do painel (403 com chave de API): uma chav
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/panel/metrics` | Totais de transmissão por período e por instância, mais `outgoing`: toda mensagem enviada pelo número (API, painel, transmissão e celular; não conta com a visualização de mensagens desligada), dividida em `outgoingGroups` (grupos) e `outgoingContacts` (contatos). Rate limit: 20/min por usuário, além do limite global |
+| GET | `/panel/metrics` | Totais de transmissão por período e por instância, mais `outgoing`: envios feitos pela integração (`/client/sendMessage` e `/client/sendMessageBalanced`), dividido em `outgoingGroups` e `outgoingContacts` |
 
 O comportamento (o que entra em enviada, entrega, leitura e resposta) está em `docs/DASHBOARD.md`.
 

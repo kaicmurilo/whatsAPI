@@ -137,7 +137,7 @@ export function DashboardPane({ sessions }: { sessions: WhatsAppSession[] }) {
         )
       },
     },
-    { key: 'outgoing', header: 'Todas enviadas', align: 'end', render: (row) => formatCount(row.periods[period].outgoing) },
+    { key: 'outgoing', header: 'Pela API', align: 'end', render: (row) => formatCount(row.periods[period].outgoing) },
     { key: 'outgoingGroups', header: 'Em grupo', align: 'end', render: (row) => formatCount(row.periods[period].outgoingGroups) },
     { key: 'outgoingContacts', header: 'Para contato', align: 'end', render: (row) => formatCount(row.periods[period].outgoingContacts) },
     { key: 'sent', header: 'Transmitidas', align: 'end', render: (row) => formatCount(row.periods[period].sent) },
@@ -153,7 +153,7 @@ export function DashboardPane({ sessions }: { sessions: WhatsAppSession[] }) {
           <p className="contacts__eyebrow">Transmissão</p>
           <h1 className="contacts__title">Painel</h1>
           <p className="contacts__note">
-            Todas enviadas conta qualquer mensagem que saiu do número (API, painel, transmissão e celular). As taxas valem só para transmissões: transmitidas são contatos que o disparo entregou à fila do WhatsApp. Resposta é uma mensagem recebida desse número em até {data.replyWindowDays} dias, em qualquer instância da conta. Fuso {data.timeZone}.
+            Pela API conta só os envios da integração (/client/sendMessage e /client/sendMessageBalanced), em grupo e para contato; mensagens do celular ficam de fora. As taxas valem só para transmissões: transmitidas são contatos que o disparo entregou à fila do WhatsApp. Resposta é uma mensagem recebida desse número em até {data.replyWindowDays} dias, em qualquer instância da conta. Fuso {data.timeZone}.
           </p>
         </div>
         <button type="button" className="report__refresh" onClick={() => void metrics.refetch()} disabled={metrics.isFetching}>
@@ -191,7 +191,7 @@ export function DashboardPane({ sessions }: { sessions: WhatsAppSession[] }) {
       </div>
 
       <dl className="report-cards">
-        <VolumeCard label="Todas enviadas" value={bucket.outgoing} detail="API, painel, transmissão e celular" />
+        <VolumeCard label="Pela API" value={bucket.outgoing} detail="envios da integração" />
         <VolumeCard label="Em grupo" value={bucket.outgoingGroups} detail={formatRate(rateOf(bucket.outgoingGroups, bucket.outgoing))} />
         <VolumeCard label="Para contato" value={bucket.outgoingContacts} detail={formatRate(rateOf(bucket.outgoingContacts, bucket.outgoing))} />
         <VolumeCard label="Transmitidas" value={bucket.sent} detail={period === 'today' ? `ontem ${formatCount(data.periods.yesterday.sent)}` : PERIOD_LABEL[period]} />

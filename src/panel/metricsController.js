@@ -41,7 +41,7 @@ const sumOutgoing = (rows, period) => {
   return { outgoing: groups + contacts, outgoingGroups: groups, outgoingContacts: contacts }
 }
 
-// Enviadas de qualquer origem, em grupo e para contato: soma das instâncias no total e o valor de cada uma na tabela
+// Enviadas pela integração, em grupo e para contato: soma das instâncias no total e o valor de cada uma na tabela
 const mergeOutgoing = (periods, instances, outgoing) => {
   for (const period of PERIODS) Object.assign(periods[period], sumOutgoing(outgoing, period))
   for (const instance of instances) {

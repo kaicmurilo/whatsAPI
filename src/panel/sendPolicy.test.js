@@ -110,4 +110,14 @@ describe('parseSettingsInput', () => {
     expect(parseSettingsInput({ ...valid, messagesViewEnabled: undefined }).error).toMatch(/Visualização/)
     expect(parseSettingsInput({ ...valid, suppressionEnabled: true, suppressionKeywords: [] }).error).toMatch(/ao menos uma/)
   })
+
+  test('message retention: missing or null means no limit, 1–8760 whole hours otherwise', () => {
+    expect(parseSettingsInput(valid).settings.messageRetentionHours).toBeNull()
+    expect(parseSettingsInput({ ...valid, messageRetentionHours: null }).settings.messageRetentionHours).toBeNull()
+    expect(parseSettingsInput({ ...valid, messageRetentionHours: 1 }).settings.messageRetentionHours).toBe(1)
+    expect(parseSettingsInput({ ...valid, messageRetentionHours: 0 }).error).toMatch(/Retenção/)
+    expect(parseSettingsInput({ ...valid, messageRetentionHours: 1.5 }).error).toMatch(/Retenção/)
+    expect(parseSettingsInput({ ...valid, messageRetentionHours: '1' }).error).toMatch(/Retenção/)
+    expect(parseSettingsInput({ ...valid, messageRetentionHours: 8761 }).error).toMatch(/Retenção/)
+  })
 })

@@ -5,14 +5,15 @@ const { CHAT_ID_PATTERN } = require('../panel/validators')
 const { parseSessionIds, listOwnedSessionIds } = require('../panel/broadcastSessions')
 const { getConnectedClient } = require('../panel/broadcastChannels')
 const { isGroupChatId, isGroupMember } = require('../panel/groupMembership')
-const { loadDailyOutgoing } = require('../panel/messageRepository')
+const { recordApiSend, loadDailyApiSends } = require('../panel/apiSendRepository')
 const { zonedDayBounds } = require('../panel/sendPolicy')
 const { pickBalancedSender } = require('../panel/balancedSender')
 const { CONTENT_TYPES, INVALID_CONTENT_TYPE, buildMessageContent } = require('./clientController')
 
-const loadTodayOutgoing = (sessionIds) => {
+// Só envios da integração: o que o dono manda pelo celular não pesa no rodízio
+const loadTodayApiSends = (sessionIds) => {
   const { start, end } = zonedDayBounds(new Date(), reportTimeZone)
-  return loadDailyOutgoing(sessionIds, start, end)
+  return loadDailyApiSends(sessionIds, start, end)
 }
 
 // Corpo inválido → [status, mensagem]; válido → null
@@ -34,7 +35,7 @@ const findAccessError = async (req, sessionIds) => {
 }
 
 /**
- * Envia pela instância que menos enviou no dia entre as informadas.
+ * Envia pela instância que menos enviou pela integração no dia entre as informadas.
  * Grupo: só entre as que participam do grupo. Contato: entre todas as conectadas.
  */
 const sendMessageBalanced = async (req, res) => {
@@ -48,12 +49,13 @@ const sendMessageBalanced = async (req, res) => {
     const accessError = await findAccessError(req, sessionIds)
     if (accessError) return sendErrorResponse(res, ...accessError)
     const picked = await pickBalancedSender({
-      sessionIds, chatId: body.chatId, getClient: getConnectedClient, isMember: isGroupMember, loadDaily: loadTodayOutgoing
+      sessionIds, chatId: body.chatId, getClient: getConnectedClient, isMember: isGroupMember, loadDaily: loadTodayApiSends
     })
     if (picked.error) return sendErrorResponse(res, ...picked.error)
     const { sessionId, client } = picked.sender
     const content = await buildMessageContent(client, body.contentType, body.content, body.options)
     const message = await client.sendMessage(body.chatId, content, body.options)
+    recordApiSend({ sessionId, chatId: body.chatId, message, credentialId: req.token?.apiCredentialId })
     console.log(`[send] envio balanceado sessão=${sessionId} destino=${target} candidatas=${picked.candidates}/${sessionIds.length} user=${req.user.user_id}`)
     res.json({ success: true, sessionId, message })
   } catch (error) {

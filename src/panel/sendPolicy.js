@@ -1,5 +1,8 @@
 const DAILY_CAP_MIN = 20
 const DAILY_CAP_MAX = 400
+// Retenção do histórico de mensagens em horas: 1 hora a 1 ano; null = sem limite
+const RETENTION_HOURS_MIN = 1
+const RETENTION_HOURS_MAX = 8760
 const DAILY_CAP_DEFAULT = 80
 const QUIET_START_DEFAULT = '08:00'
 const QUIET_END_DEFAULT = '20:00'
@@ -161,6 +164,15 @@ const parseKeywordList = (value) => {
   return { keywords }
 }
 
+// Ausente ou null = sem limite (mantém compatível com quem não manda o campo)
+const parseRetentionHours = (value) => {
+  if (value === undefined || value === null) return { value: null }
+  if (!Number.isInteger(value) || value < RETENTION_HOURS_MIN || value > RETENTION_HOURS_MAX) {
+    return { error: `Retenção de mensagens entre ${RETENTION_HOURS_MIN} e ${RETENTION_HOURS_MAX} horas, ou vazio para sem limite` }
+  }
+  return { value }
+}
+
 const parseBool = (value, label) => (typeof value === 'boolean' ? { value } : { error: `${label} precisa ser verdadeiro ou falso` })
 
 /**
@@ -181,6 +193,8 @@ const parseSettingsInput = (body) => {
   if (quietHoursEnabled.error) return quietHoursEnabled
   const messagesViewEnabled = parseBool(body.messagesViewEnabled, 'Visualização de mensagens')
   if (messagesViewEnabled.error) return messagesViewEnabled
+  const messageRetentionHours = parseRetentionHours(body.messageRetentionHours)
+  if (messageRetentionHours.error) return messageRetentionHours
   const parsedKeywords = parseKeywordList(body.suppressionKeywords)
   if (parsedKeywords.error) return parsedKeywords
   if (suppressionEnabled.value && parsedKeywords.keywords.length === 0) {
@@ -205,12 +219,15 @@ const parseSettingsInput = (body) => {
       quietHoursEnabled: quietHoursEnabled.value,
       quietStart,
       quietEnd,
-      messagesViewEnabled: messagesViewEnabled.value
+      messagesViewEnabled: messagesViewEnabled.value,
+      messageRetentionHours: messageRetentionHours.value
     }
   }
 }
 
 module.exports = {
+  RETENTION_HOURS_MIN,
+  RETENTION_HOURS_MAX,
   DAILY_CAP_MIN,
   DAILY_CAP_MAX,
   DAILY_CAP_DEFAULT,

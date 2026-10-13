@@ -357,6 +357,8 @@ export interface PanelSettings {
   quietStart: string
   quietEnd: string
   messagesViewEnabled: boolean
+  /** Horas de histórico de mensagens guardado; null = sem limite */
+  messageRetentionHours: number | null
 }
 
 // Instância que envia disparo: número do WhatsApp ou bot do Telegram. label substitui o id na tela.
@@ -411,7 +413,7 @@ export type MetricPeriod = 'today' | 'yesterday' | 'week' | 'month' | 'last30' |
 
 export interface MetricBucket {
   sent: number
-  /** Toda mensagem que saiu do número: API, painel, transmissão e celular */
+  /** Envios da integração (rotas /client/sendMessage*) */
   outgoing: number
   outgoingGroups: number
   outgoingContacts: number
