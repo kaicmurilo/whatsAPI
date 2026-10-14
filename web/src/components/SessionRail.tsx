@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { PanelView } from '../hooks/usePanelSearchParams'
 import type { SessionRailProps } from '../types/components'
 import { NewSessionForm } from './NewSessionForm'
@@ -19,49 +20,62 @@ export function SessionRail({
   sessions, telegramInstances, isLoading, selectedSessionId, activeView, onSelect, onSelectTelegram, onOpenView, onLogout,
 }: SessionRailProps) {
   const instanceCount = sessions.length + telegramInstances.length
+  // Só tem efeito no celular (CSS): menu recolhido devolve a tela ao conteúdo; escolher algo fecha
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const closeAfter = <T,>(action: (value: T) => void) => (value: T) => {
+    setIsMenuOpen(false)
+    action(value)
+  }
+
   return (
-    <nav className="rail" aria-label="Instâncias">
+    <nav className="rail" aria-label="Instâncias" data-menu-open={isMenuOpen}>
       <header className="rail__header">
         <span className="rail__brand">Central</span>
         <span className="rail__count">{instanceCount.toString().padStart(2, '0')} instâncias</span>
+        <button type="button" className="rail__menu-toggle" aria-expanded={isMenuOpen} aria-controls="rail-menu" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+          {isMenuOpen ? 'Fechar' : 'Menu'}
+        </button>
       </header>
 
-      <div className="rail__views">
-        {RAIL_VIEWS.map(({ view, label }) => (
-          <button key={view} type="button" className="rail__view" aria-current={activeView === view ? 'page' : undefined} onClick={() => onOpenView(view)}>
-            {label}
-          </button>
-        ))}
-        <a className="rail__view rail__view--external" href="/api-docs/" target="_blank" rel="noopener noreferrer">
-          API · Swagger
-        </a>
+      <div id="rail-menu" className="rail__menu">
+
+        <div className="rail__views">
+          {RAIL_VIEWS.map(({ view, label }) => (
+            <button key={view} type="button" className="rail__view" aria-current={activeView === view ? 'page' : undefined} onClick={() => closeAfter(onOpenView)(view)}>
+              {label}
+            </button>
+          ))}
+          <a className="rail__view rail__view--external" href="/api-docs/" target="_blank" rel="noopener noreferrer">
+            API · Swagger
+          </a>
+        </div>
+
+        {isLoading ? <p className="rail__note">Carregando…</p> : null}
+        {!isLoading && instanceCount === 0 ? <p className="rail__note">Nenhuma instância ainda.</p> : null}
+
+        <ul className="rail__list">
+          {sessions.map((session) => (
+            <SessionRailItem
+              key={session.sessionId}
+              session={session}
+              isSelected={activeView === 'chats' && session.sessionId === selectedSessionId}
+              onSelect={closeAfter(onSelect)}
+            />
+          ))}
+          {telegramInstances.map((instance) => (
+            <TelegramRailItem
+              key={instance.sessionId}
+              instance={instance}
+              isSelected={activeView === 'telegram' && instance.sessionId === selectedSessionId}
+              onSelect={closeAfter(onSelectTelegram)}
+            />
+          ))}
+        </ul>
+
+        <NewSessionForm onCreated={closeAfter(onSelect)} onTelegramCreated={closeAfter(onSelectTelegram)} />
+
+        <button type="button" className="rail__logout" onClick={onLogout}>Sair</button>
       </div>
-
-      {isLoading ? <p className="rail__note">Carregando…</p> : null}
-      {!isLoading && instanceCount === 0 ? <p className="rail__note">Nenhuma instância ainda.</p> : null}
-
-      <ul className="rail__list">
-        {sessions.map((session) => (
-          <SessionRailItem
-            key={session.sessionId}
-            session={session}
-            isSelected={activeView === 'chats' && session.sessionId === selectedSessionId}
-            onSelect={onSelect}
-          />
-        ))}
-        {telegramInstances.map((instance) => (
-          <TelegramRailItem
-            key={instance.sessionId}
-            instance={instance}
-            isSelected={activeView === 'telegram' && instance.sessionId === selectedSessionId}
-            onSelect={onSelectTelegram}
-          />
-        ))}
-      </ul>
-
-      <NewSessionForm onCreated={onSelect} onTelegramCreated={onSelectTelegram} />
-
-      <button type="button" className="rail__logout" onClick={onLogout}>Sair</button>
     </nav>
   )
 }

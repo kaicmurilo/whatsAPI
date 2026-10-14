@@ -183,7 +183,9 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .rail {
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  /* Rola o menu inteiro: em tela baixa a lista de instâncias, o formulário e o Sair continuam alcançáveis */
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -205,9 +207,6 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 }
 .rail__note { margin: 0; padding-inline: var(--space-2); color: var(--color-rail-muted); font-size: var(--text-sm); }
 .rail__list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -215,6 +214,18 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
   align-content: start;
   gap: 2px;
 }
+.rail__menu { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+/* Botão Menu só aparece no celular */
+.rail__menu-toggle {
+  display: none;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-rail-raised);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-rail-text);
+  font-size: var(--text-sm);
+}
+.rail__menu-toggle[aria-expanded='true'] { background: var(--color-rail-raised); }
 .rail__logout {
   align-self: flex-start;
   padding: var(--space-1) var(--space-2);
@@ -226,6 +237,7 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .rail__logout:hover { color: var(--color-rail-text); }
 
 .rail-item {
+  position: relative;
   width: 100%;
   display: flex;
   align-items: flex-start;
@@ -833,12 +845,23 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 
 @media (max-width: 640px) {
   .panel { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-  .rail { flex-direction: row; flex-wrap: wrap; align-items: center; padding: var(--space-3); gap: var(--space-3); }
-  .rail__header { flex: 1; }
-  .rail__list { flex: 1 1 100%; grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; overflow-y: hidden; }
-  .rail-item { border-left: 0; border-bottom: 3px solid transparent; border-radius: var(--radius-sm); }
-  .rail-item[aria-current='true'] { border-bottom-color: var(--color-live); }
-  .new-session { flex: 1 1 100%; }
+  /* Barra no topo; o menu abre por cima do conteúdo e rola sozinho */
+  .rail { position: relative; z-index: 2; overflow: visible; padding: var(--space-3); gap: 0; }
+  .rail__header { align-items: center; gap: var(--space-3); padding-inline: 0; }
+  .rail__count { flex: 1; text-align: right; }
+  .rail__menu-toggle { display: block; }
+  .rail__menu {
+    position: absolute;
+    inset: 100% 0 auto;
+    max-height: calc(100dvh - 4rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: var(--space-3);
+    background: var(--color-rail);
+    box-shadow: 0 12px 24px rgb(0 0 0 / 0.35);
+  }
+  .rail[data-menu-open='false'] .rail__menu { display: none; }
+  .rail__views { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .chats__header, .conversation__header { padding-inline: var(--space-4); }
   .conversation__stream { padding: var(--space-3); }
   .bubble { max-width: 88%; }
