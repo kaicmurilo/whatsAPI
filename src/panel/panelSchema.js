@@ -341,6 +341,8 @@ const ensureApiSendsTable = async () => {
     )
   `)
   await query('CREATE INDEX IF NOT EXISTS idx_api_sent_messages_session_day ON api_sent_messages(session_id, sent_at)')
+  // Quantos textos o lote do agrupamento juntou nesta mensagem; NULL = envio avulso
+  await query('ALTER TABLE api_sent_messages ADD COLUMN IF NOT EXISTS batch_size INTEGER')
 }
 
 // Textos esperando a janela do agrupamento. No banco (não em memória) para sobreviver a deploy/reinício.

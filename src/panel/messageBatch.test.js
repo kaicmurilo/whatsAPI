@@ -71,7 +71,7 @@ describe('message batching', () => {
     expect(client.sendMessage).toHaveBeenCalledWith(GROUP, 'primeira\n\nsegunda')
     expect(deps.deleteBatch).toHaveBeenCalledWith(7)
     expect(deps.recordApiSend).toHaveBeenCalledTimes(1)
-    expect(deps.recordApiSend.mock.calls[0][0]).toMatchObject({ sessionId: 'loja-a-0001', chatId: GROUP, credentialId: 3 })
+    expect(deps.recordApiSend.mock.calls[0][0]).toMatchObject({ sessionId: 'loja-a-0001', chatId: GROUP, credentialId: 3, batchSize: 2 })
   })
 
   test('flush balanced: sender picked at send time among group members', async () => {

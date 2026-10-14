@@ -10,8 +10,10 @@ describe('integration sends and message retention', () => {
   test('records an integration send as group or contact, tolerating a missing message', () => {
     recordApiSend({ sessionId: 'loja-centro-01', chatId: '120363000000000000@g.us', message: { id: { _serialized: 'true_x@g.us_ABC' } }, credentialId: 3 })
     recordApiSend({ sessionId: 'loja-centro-01', chatId: '5511999998888@c.us', message: undefined })
-    expect(query.mock.calls[0][1]).toEqual(['loja-centro-01', 'true_x@g.us_ABC', '120363000000000000@g.us', true, 3])
-    expect(query.mock.calls[1][1]).toEqual(['loja-centro-01', null, '5511999998888@c.us', false, null])
+    expect(query.mock.calls[0][1]).toEqual(['loja-centro-01', 'true_x@g.us_ABC', '120363000000000000@g.us', true, 3, null])
+    expect(query.mock.calls[1][1]).toEqual(['loja-centro-01', null, '5511999998888@c.us', false, null, null])
+    recordApiSend({ sessionId: 'loja-centro-01', chatId: '5511999998888@c.us', batchSize: 4 })
+    expect(query.mock.calls[2][1][5]).toBe(4)
   })
 
   test('a failed record is logged and does not throw', async () => {

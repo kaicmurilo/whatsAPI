@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { ApiCredential, BroadcastChannel, DownAlertTarget, PanelSettings, CreatedApiCredential, SenderInstance, TelegramInstance, ContactSyncJob, BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
+import type { ApiCredential, BroadcastChannel, DownAlertTarget, MetricBucket, PanelSettings, CreatedApiCredential, SenderInstance, TelegramInstance, ContactSyncJob, BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
 import type { PanelView, ReportState, TableKey, TableState } from '../hooks/usePanelSearchParams'
 
 export interface StatusLampProps {
@@ -417,4 +417,15 @@ export interface DownAlertTargetsProps {
 export interface BatchSettingsProps {
   draft: PanelSettings
   onChange: (draft: PanelSettings) => void
+}
+
+export interface VolumeCardProps {
+  label: string
+  value: number
+  detail: string
+}
+
+export interface IntegrationSummaryProps {
+  bucket: MetricBucket
+  periodLabel: string
 }

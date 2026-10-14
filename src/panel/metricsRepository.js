@@ -233,4 +233,34 @@ const loadOutgoingMetrics = async (userId, windows) => {
   return result.rows.map((row) => ({ sessionId: row.sessionId, isGroup: row.isGroup, periods: readOutcome(row) }))
 }
 
-module.exports = { REPLY_WINDOW_DAYS, loadSendMetrics, loadOutcomes, loadOutgoingMetrics }
+// Totais da integração por período. Economizados = textos que não viraram mensagem própria
+// (lote de 3 textos = 1 mensagem enviada, 2 economizadas). Distintos contam chats, não envios.
+const INTEGRATION_COLUMNS = {
+  batches: 'COUNT(*) FILTER (WHERE a.batch_size IS NOT NULL AND {w})',
+  batchedTexts: 'COALESCE(SUM(a.batch_size) FILTER (WHERE {w}), 0)',
+  savedSends: 'COALESCE(SUM(a.batch_size - 1) FILTER (WHERE a.batch_size IS NOT NULL AND {w}), 0)',
+  distinctGroups: 'COUNT(DISTINCT a.chat_id) FILTER (WHERE a.is_group AND {w})',
+  distinctContacts: 'COUNT(DISTINCT a.chat_id) FILTER (WHERE NOT a.is_group AND {w})'
+}
+
+const integrationSelectList = (indexes) => PERIODS.flatMap((period) => {
+  const where = windowClause(indexes, period, 'a.sent_at')
+  return Object.entries(INTEGRATION_COLUMNS).map(([key, expression]) => `${expression.replace('{w}', where)}::int AS "${key}_${period}"`)
+}).join(', ')
+
+const loadIntegrationSummary = async (userId, windows) => {
+  const { params, indexes } = boundParams(windows)
+  const result = await query(
+    `SELECT ${integrationSelectList(shiftIndexes(indexes, 1))}
+     FROM api_sent_messages a
+     JOIN whatsapp_sessions s ON s.session_id = a.session_id
+     WHERE s.user_id = $1`,
+    [userId, ...params]
+  )
+  const row = result.rows[0] ?? {}
+  return Object.fromEntries(PERIODS.map((period) => [period, Object.fromEntries(
+    Object.keys(INTEGRATION_COLUMNS).map((key) => [key, num(row[`${key}_${period}`])])
+  )]))
+}
+
+module.exports = { REPLY_WINDOW_DAYS, loadSendMetrics, loadOutcomes, loadOutgoingMetrics, loadIntegrationSummary }

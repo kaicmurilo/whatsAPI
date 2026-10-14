@@ -2,7 +2,7 @@ const { reportTimeZone } = require('../config')
 const { sendErrorResponse } = require('../utils')
 const AuthService = require('../auth/authService')
 const { PERIODS, listDayKeys, metricWindows } = require('./metricsRanges')
-const { REPLY_WINDOW_DAYS, loadSendMetrics, loadOutcomes, loadOutgoingMetrics } = require('./metricsRepository')
+const { REPLY_WINDOW_DAYS, loadSendMetrics, loadOutcomes, loadOutgoingMetrics, loadIntegrationSummary } = require('./metricsRepository')
 
 const emptySlice = () => ({ sent: 0, delivered: 0, read: 0, replied: 0, outgoing: 0, outgoingGroups: 0, outgoingContacts: 0 })
 
@@ -50,20 +50,27 @@ const mergeOutgoing = (periods, instances, outgoing) => {
   }
 }
 
+// Agrupamento e chats distintos da integração entram no mesmo bucket do período
+const mergeIntegrationSummary = (periods, summary) => {
+  for (const period of PERIODS) Object.assign(periods[period], summary[period])
+}
+
 const getMetrics = async (req, res) => {
   const userId = req.user.user_id
   const now = new Date()
   const windows = metricWindows(now, reportTimeZone)
   try {
-    const [sends, outcomes, outgoing, sessions] = await Promise.all([
+    const [sends, outcomes, outgoing, integration, sessions] = await Promise.all([
       loadSendMetrics(userId, windows, reportTimeZone),
       loadOutcomes(userId, windows),
       loadOutgoingMetrics(userId, windows),
+      loadIntegrationSummary(userId, windows),
       AuthService.getUserSessions(userId)
     ])
     mergeOutcomes(sends.periods, outcomes)
     const instances = fillInstances(sends.instances, sessions)
     mergeOutgoing(sends.periods, instances, outgoing)
+    mergeIntegrationSummary(sends.periods, integration)
     res.json({
       success: true,
       data: {
@@ -82,4 +89,4 @@ const getMetrics = async (req, res) => {
   }
 }
 
-module.exports = { getMetrics, mergeOutgoing }
+module.exports = { getMetrics, mergeOutgoing, mergeIntegrationSummary }

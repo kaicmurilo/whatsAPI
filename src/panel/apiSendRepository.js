@@ -9,11 +9,11 @@ const { serializeMessageId } = require('./messageMapper')
  * só deixa de contar no balanceamento e no dashboard (fica no log).
  * `message` pode vir undefined: o whatsapp-web.js às vezes não devolve a mensagem enviada.
  */
-const recordApiSend = ({ sessionId, chatId, message, credentialId }) => {
+const recordApiSend = ({ sessionId, chatId, message, credentialId, batchSize = null }) => {
   const messageId = message ? serializeMessageId(message) : null
   query(
-    'INSERT INTO api_sent_messages (session_id, message_id, chat_id, is_group, credential_id) VALUES ($1, $2, $3, $4, $5)',
-    [sessionId, messageId, chatId, isGroupChatId(chatId), credentialId || null]
+    'INSERT INTO api_sent_messages (session_id, message_id, chat_id, is_group, credential_id, batch_size) VALUES ($1, $2, $3, $4, $5, $6)',
+    [sessionId, messageId, chatId, isGroupChatId(chatId), credentialId || null, batchSize]
   ).catch((error) => console.error(`[send] falha ao registrar envio da integração sessão=${sessionId}:`, error.message))
 }
 

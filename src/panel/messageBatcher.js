@@ -63,7 +63,7 @@ const flushBatch = async (batch, deps) => {
   try {
     const message = await sender.client.sendMessage(batch.chatId, joinParts(batch.parts))
     await deps.deleteBatch(batch.id)
-    deps.recordApiSend({ sessionId: sender.sessionId, chatId: batch.chatId, message, credentialId: batch.credentialId })
+    deps.recordApiSend({ sessionId: sender.sessionId, chatId: batch.chatId, message, credentialId: batch.credentialId, batchSize: batch.parts.length })
     console.log(`[lote] enviado lote=${batch.id} sessão=${sender.sessionId} chat=${batch.chatId} textos=${batch.parts.length} user=${batch.userId}`)
   } catch (error) {
     await giveUpOrRetry(batch, error.message, deps)

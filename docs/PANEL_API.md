@@ -148,7 +148,7 @@ Essas três rotas só aceitam o login do painel (403 com chave de API): uma chav
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/panel/metrics` | Totais de transmissão por período e por instância, mais `outgoing`: envios feitos pela integração (`/client/sendMessage` e `/client/sendMessageBalanced`), dividido em `outgoingGroups` e `outgoingContacts` |
+| GET | `/panel/metrics` | Totais de transmissão por período e por instância, mais `outgoing`: envios feitos pela integração (`/client/sendMessage` e `/client/sendMessageBalanced`), dividido em `outgoingGroups` e `outgoingContacts`; `distinctGroups`/`distinctContacts` (chats distintos que receberam envio pela API), `batches` (mensagens que saíram de um lote do agrupamento), `batchedTexts` (textos nesses lotes) e `savedSends` (`batchedTexts − batches`, disparos economizados) |
 
 O comportamento (o que entra em enviada, entrega, leitura e resposta) está em `docs/DASHBOARD.md`.
 

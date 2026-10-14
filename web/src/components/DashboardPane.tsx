@@ -1,10 +1,13 @@
 import { useEffect, useState, type CSSProperties } from 'react'
 import { useMetrics, useSendQueue } from '../hooks/useMetrics'
+import { formatCount, formatRate, rateOf } from '../lib/metricFormat'
 import { whatsappIdentity } from '../lib/sessionLabel'
 import type { DailyMetric, InstanceMetrics, MetricBucket, MetricPeriod, WhatsAppSession } from '../types/api'
 import type { DataTableColumn } from '../types/components'
 import { DataTable } from './DataTable'
 import { EmptyState } from './EmptyState'
+import { IntegrationSummary } from './IntegrationSummary'
+import { VolumeCard } from './VolumeCard'
 
 const PERIODS: MetricPeriod[] = ['today', 'yesterday', 'week', 'month', 'last30', 'all']
 
@@ -16,12 +19,6 @@ const PERIOD_LABEL: Record<MetricPeriod, string> = {
   last30: '30 dias',
   all: 'Tudo',
 }
-
-const rateOf = (part: number, whole: number): number | null => (whole > 0 ? part / whole : null)
-
-const formatRate = (value: number | null): string => (value === null ? '—' : `${Math.round(value * 100)}%`)
-
-const formatCount = (value: number): string => value.toLocaleString('pt-BR')
 
 const formatDay = (day: string): string => {
   const [, month, date] = day.split('-')
@@ -38,15 +35,6 @@ function RateCard({ label, value, hint }: { label: string; value: string; hint: 
   )
 }
 
-function VolumeCard({ label, value, detail }: { label: string; value: number; detail: string }) {
-  return (
-    <div className="report-card">
-      <dt className="report-card__label">{label}</dt>
-      <dd className="report-card__value">{formatCount(value)}</dd>
-      <dd className="report-card__percent">{detail}</dd>
-    </div>
-  )
-}
 
 function DailyChart({ days }: { days: DailyMetric[] }) {
   const peak = Math.max(1, ...days.map((day) => day.sent))
@@ -202,6 +190,8 @@ export function DashboardPane({ sessions }: { sessions: WhatsAppSession[] }) {
         <VolumeCard label="Saídas" value={bucket.optOuts} detail="palavra de supressão no período" />
         <VolumeCard label="Campanhas" value={bucket.campaigns} detail="disparos criados no período" />
       </dl>
+
+      <IntegrationSummary bucket={bucket} periodLabel={PERIOD_LABEL[period]} />
 
       <section className="dash-block">
         <h2 className="dash-block__title">Últimos 30 dias</h2>

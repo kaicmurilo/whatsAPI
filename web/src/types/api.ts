@@ -436,6 +436,15 @@ export interface MetricBucket {
   outgoing: number
   outgoingGroups: number
   outgoingContacts: number
+  /** Mensagens que saíram de um lote do agrupamento */
+  batches: number
+  /** Textos que entraram nesses lotes */
+  batchedTexts: number
+  /** Textos que não viraram mensagem própria: batchedTexts − batches */
+  savedSends: number
+  /** Chats distintos que receberam envio pela API */
+  distinctGroups: number
+  distinctContacts: number
   delivered: number
   read: number
   played: number
