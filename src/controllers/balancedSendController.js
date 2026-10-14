@@ -1,20 +1,12 @@
 const { sendErrorResponse } = require('../utils')
-const { reportTimeZone } = require('../config')
 const { isSessionAllowed } = require('../auth/credentialScope')
 const { CHAT_ID_PATTERN } = require('../panel/validators')
 const { parseSessionIds, listOwnedSessionIds } = require('../panel/broadcastSessions')
 const { getConnectedClient } = require('../panel/broadcastChannels')
 const { isGroupChatId, isGroupMember } = require('../panel/groupMembership')
-const { recordApiSend, loadDailyApiSends } = require('../panel/apiSendRepository')
-const { zonedDayBounds } = require('../panel/sendPolicy')
+const { recordApiSend, loadTodayApiSends } = require('../panel/apiSendRepository')
 const { pickBalancedSender } = require('../panel/balancedSender')
 const { CONTENT_TYPES, INVALID_CONTENT_TYPE, buildMessageContent } = require('./clientController')
-
-// Só envios da integração: o que o dono manda pelo celular não pesa no rodízio
-const loadTodayApiSends = (sessionIds) => {
-  const { start, end } = zonedDayBounds(new Date(), reportTimeZone)
-  return loadDailyApiSends(sessionIds, start, end)
-}
 
 // Corpo inválido → [status, mensagem]; válido → null
 const findBodyError = (body) => {

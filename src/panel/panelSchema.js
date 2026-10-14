@@ -216,6 +216,10 @@ const ensureSettingsTables = async () => {
   await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS messages_view_enabled BOOLEAN NOT NULL DEFAULT true')
   // Horas de histórico de mensagens guardado; NULL = sem limite
   await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS message_retention_hours INTEGER')
+  // Aviso de instância fora do ar: destino (contato @c.us ou grupo @g.us) e modelo com placeholders; NULL = padrão
+  await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS down_alert_enabled BOOLEAN NOT NULL DEFAULT false')
+  await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS down_alert_chat_id VARCHAR(100)')
+  await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS down_alert_message TEXT')
   await query(`
     CREATE TABLE IF NOT EXISTS suppressed_numbers (
       id BIGSERIAL PRIMARY KEY,

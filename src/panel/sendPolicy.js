@@ -1,3 +1,5 @@
+const { parseDownAlertInput } = require('./downAlertMessage')
+
 const DAILY_CAP_MIN = 20
 const DAILY_CAP_MAX = 400
 // Retenção do histórico de mensagens em horas: 1 hora a 1 ano; null = sem limite
@@ -195,6 +197,8 @@ const parseSettingsInput = (body) => {
   if (messagesViewEnabled.error) return messagesViewEnabled
   const messageRetentionHours = parseRetentionHours(body.messageRetentionHours)
   if (messageRetentionHours.error) return messageRetentionHours
+  const downAlert = parseDownAlertInput(body)
+  if (downAlert.error) return downAlert
   const parsedKeywords = parseKeywordList(body.suppressionKeywords)
   if (parsedKeywords.error) return parsedKeywords
   if (suppressionEnabled.value && parsedKeywords.keywords.length === 0) {
@@ -220,7 +224,8 @@ const parseSettingsInput = (body) => {
       quietStart,
       quietEnd,
       messagesViewEnabled: messagesViewEnabled.value,
-      messageRetentionHours: messageRetentionHours.value
+      messageRetentionHours: messageRetentionHours.value,
+      ...downAlert.value
     }
   }
 }

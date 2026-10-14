@@ -10,7 +10,10 @@ const SETTINGS_COLUMNS = `suppression_enabled AS "suppressionEnabled",
   quiet_start AS "quietStart",
   quiet_end AS "quietEnd",
   messages_view_enabled AS "messagesViewEnabled",
-  message_retention_hours AS "messageRetentionHours"`
+  message_retention_hours AS "messageRetentionHours",
+  down_alert_enabled AS "downAlertEnabled",
+  down_alert_chat_id AS "downAlertChatId",
+  down_alert_message AS "downAlertMessage"`
 
 // Cria a linha padrão na primeira leitura (supressão ligada, o resto desligado)
 const getSettings = async (userId) => {
@@ -27,8 +30,8 @@ const saveSettings = async (userId, settings) => {
     `INSERT INTO panel_user_settings (
        user_id, suppression_enabled, suppression_keywords, stop_on_reply, prepend_first_name,
        daily_cap_enabled, daily_cap, quiet_hours_enabled, quiet_start, quiet_end, messages_view_enabled,
-       message_retention_hours, updated_at
-     ) VALUES ($1, $2, $3::text[], $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_TIMESTAMP)
+       message_retention_hours, down_alert_enabled, down_alert_chat_id, down_alert_message, updated_at
+     ) VALUES ($1, $2, $3::text[], $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, CURRENT_TIMESTAMP)
      ON CONFLICT (user_id) DO UPDATE SET
        suppression_enabled = EXCLUDED.suppression_enabled,
        suppression_keywords = EXCLUDED.suppression_keywords,
@@ -41,12 +44,15 @@ const saveSettings = async (userId, settings) => {
        quiet_end = EXCLUDED.quiet_end,
        messages_view_enabled = EXCLUDED.messages_view_enabled,
        message_retention_hours = EXCLUDED.message_retention_hours,
+       down_alert_enabled = EXCLUDED.down_alert_enabled,
+       down_alert_chat_id = EXCLUDED.down_alert_chat_id,
+       down_alert_message = EXCLUDED.down_alert_message,
        updated_at = CURRENT_TIMESTAMP
      RETURNING ${SETTINGS_COLUMNS}`,
     [userId, settings.suppressionEnabled, settings.suppressionKeywords, settings.stopOnReply,
       settings.prependFirstName, settings.dailyCapEnabled, settings.dailyCap,
       settings.quietHoursEnabled, settings.quietStart, settings.quietEnd, settings.messagesViewEnabled,
-      settings.messageRetentionHours]
+      settings.messageRetentionHours, settings.downAlertEnabled, settings.downAlertChatId, settings.downAlertMessage]
   )
   return result.rows[0]
 }

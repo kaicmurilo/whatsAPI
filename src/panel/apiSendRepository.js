@@ -1,4 +1,6 @@
 const { query } = require('../database')
+const { reportTimeZone } = require('../config')
+const { zonedDayBounds } = require('./sendPolicy')
 const { isGroupChatId } = require('./groupMembership')
 const { serializeMessageId } = require('./messageMapper')
 
@@ -31,4 +33,10 @@ const loadDailyApiSends = async (sessionIds, dayStart, dayEnd) => {
   return new Map(result.rows.map((row) => [row.sessionId, { today: row.today, lastSentAt: row.lastSentAt }]))
 }
 
-module.exports = { recordApiSend, loadDailyApiSends }
+// Carga de hoje no fuso dos relatórios: o que o balanceamento compara entre as instâncias
+const loadTodayApiSends = (sessionIds) => {
+  const { start, end } = zonedDayBounds(new Date(), reportTimeZone)
+  return loadDailyApiSends(sessionIds, start, end)
+}
+
+module.exports = { recordApiSend, loadDailyApiSends, loadTodayApiSends }

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { ApiCredential, BroadcastChannel, CreatedApiCredential, SenderInstance, TelegramInstance, ContactSyncJob, BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
+import type { ApiCredential, BroadcastChannel, PanelSettings, CreatedApiCredential, SenderInstance, TelegramInstance, ContactSyncJob, BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
 import type { PanelView, ReportState, TableKey, TableState } from '../hooks/usePanelSearchParams'
 
 export interface StatusLampProps {
@@ -375,4 +375,16 @@ export interface ContactSyncPanelProps {
 
 export interface ContactSyncProgressProps {
   job: ContactSyncJob
+}
+
+export interface SettingToggleProps {
+  checked: boolean
+  title: string
+  children: ReactNode
+  onChange: (checked: boolean) => void
+}
+
+export interface DownAlertSettingsProps {
+  draft: PanelSettings
+  onChange: (draft: PanelSettings) => void
 }

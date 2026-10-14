@@ -359,6 +359,11 @@ export interface PanelSettings {
   messagesViewEnabled: boolean
   /** Horas de histórico de mensagens guardado; null = sem limite */
   messageRetentionHours: number | null
+  downAlertEnabled: boolean
+  /** 5511...@c.us ou 1203...@g.us; o servidor aceita telefone e normaliza */
+  downAlertChatId: string | null
+  /** null = mensagem padrão do servidor */
+  downAlertMessage: string | null
 }
 
 // Instância que envia disparo: número do WhatsApp ou bot do Telegram. label substitui o id na tela.

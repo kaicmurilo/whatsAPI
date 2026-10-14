@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useDeleteSuppressed, useSaveSettings, useSettings, useSuppressed } from '../hooks/useSettings'
 import { formatDateTime, formatPhone } from '../lib/format'
 import { SUPPRESSION_PER_PAGE } from '../lib/settingsApi'
@@ -9,6 +9,8 @@ import { DataTable } from './DataTable'
 import { EmptyState } from './EmptyState'
 import { Pagination } from './Pagination'
 import { SearchInput } from './SearchInput'
+import { SettingToggle } from './SettingToggle'
+import { DownAlertSettings } from './DownAlertSettings'
 
 const DAILY_CAP_MIN = 20
 const DAILY_CAP_MAX = 400
@@ -16,28 +18,6 @@ const RETENTION_HOURS_MAX = 8760
 
 // Campo vazio = sem limite; o servidor valida o intervalo
 const parseRetentionHours = (text: string): number | null => (text.trim() === '' ? null : Math.trunc(Number(text)))
-
-function SettingToggle({
-  checked,
-  title,
-  children,
-  onChange,
-}: {
-  checked: boolean
-  title: string
-  children: ReactNode
-  onChange: (checked: boolean) => void
-}) {
-  return (
-    <label className="settings__toggle">
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
-      <span className="settings__toggle-copy">
-        <span className="settings__toggle-title">{title}</span>
-        <span className="settings__toggle-text">{children}</span>
-      </span>
-    </label>
-  )
-}
 
 const keywordTextOf = (keywords: string[]): string => keywords.join('\n')
 
@@ -206,6 +186,8 @@ export function SettingsPane() {
                 </div>
               </div>
             </section>
+
+            <DownAlertSettings draft={draft} onChange={setDraft} />
 
             <section className="settings__section settings__section--span" aria-labelledby="settings-panel">
               <h2 id="settings-panel" className="settings__legend">Painel</h2>
