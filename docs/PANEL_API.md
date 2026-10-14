@@ -87,7 +87,7 @@ Três formatos:
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/panel/settings` | Configuração da conta (cria o padrão na primeira leitura) |
-| PUT | `/panel/settings` | Substitui a configuração. Rate limit: 30/min por usuário. Aviso de instância fora do ar: `downAlertEnabled`, `downAlertTargets` (até 20: `{ "kind": "contact", "phone", "name" }` da agenda e/ou `{ "kind": "group", "chatId", "name" }`), `downAlertMessage` (até 1000 caracteres, marcadores `{instancia}`, `{status}`, `{minutos}`, `{desde}`; vazio = padrão). Sai por outra instância conectada após 5 min fora do ar |
+| PUT | `/panel/settings` | Substitui a configuração. Rate limit: 30/min por usuário. Aviso de instância fora do ar: `downAlertEnabled`, `downAlertTargets` (até 20: `{ "kind": "contact", "phone", "name" }` da agenda e/ou `{ "kind": "group", "chatId", "name" }`), `downAlertMessage` (até 1000 caracteres, marcadores `{instancia}`, `{status}`, `{minutos}`, `{desde}`; vazio = padrão). Sai por outra instância conectada após 5 min fora do ar. Agrupamento: `batchEnabled`, `batchWindowMinutes` (1–60) — textos da API para o mesmo chat saem juntos ao fim da janela e a rota de envio responde `202 { batched: true, sendAt, batchSize }` |
 | GET | `/panel/suppression` | Números que pediram para sair (`page`, `perPage`, `search`) |
 | DELETE | `/panel/suppression/:suppressionId` | Tira o número da supressão. Não apaga o contato da agenda |
 | GET | `/panel/telegram/instances` | Instâncias do Telegram: bots (`kind: "bot"`, `sessionId: "telegram:<id>"`, `linkedContacts`) e contas (`kind: "account"`, `sessionId: "tguser:<id>"`, `phone`). Token e sessão nunca voltam |

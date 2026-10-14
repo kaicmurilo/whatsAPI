@@ -217,6 +217,9 @@ const ensureSettingsTables = async () => {
   // Horas de histórico de mensagens guardado; NULL = sem limite
   await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS message_retention_hours INTEGER')
   // Aviso de instância fora do ar: destino (contato @c.us ou grupo @g.us) e modelo com placeholders; NULL = padrão
+  // Agrupamento de textos da integração para o mesmo chat dentro de uma janela de N minutos
+  await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS batch_enabled BOOLEAN NOT NULL DEFAULT false')
+  await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS batch_window_minutes INTEGER NOT NULL DEFAULT 5')
   await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS down_alert_enabled BOOLEAN NOT NULL DEFAULT false')
   // Destinos: [{ kind: 'contact', phone, name } | { kind: 'group', chatId, name }]; nome é só rótulo da tela
   await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS down_alert_targets JSONB NOT NULL DEFAULT \'[]\'::jsonb')
@@ -340,6 +343,31 @@ const ensureApiSendsTable = async () => {
   await query('CREATE INDEX IF NOT EXISTS idx_api_sent_messages_session_day ON api_sent_messages(session_id, sent_at)')
 }
 
+// Textos esperando a janela do agrupamento. No banco (não em memória) para sobreviver a deploy/reinício.
+// sender_key separa quem envia: instância fixa ("session:x") ou lista do balanceado ("balanced:a,b").
+// Lote em envio (claimed_at preenchido) sai do índice único: texto novo abre outro lote, nada se perde.
+const ensureMessageBatchesTable = async () => {
+  await query(`
+    CREATE TABLE IF NOT EXISTS api_message_batches (
+      id BIGSERIAL PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      chat_id VARCHAR(255) NOT NULL,
+      sender_key VARCHAR(2200) NOT NULL,
+      session_ids TEXT[] NOT NULL,
+      is_balanced BOOLEAN NOT NULL,
+      parts TEXT[] NOT NULL,
+      credential_id BIGINT,
+      flush_at TIMESTAMPTZ NOT NULL,
+      claimed_at TIMESTAMPTZ,
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `)
+  await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_api_message_batches_open
+    ON api_message_batches(user_id, chat_id, sender_key) WHERE claimed_at IS NULL`)
+  await query('CREATE INDEX IF NOT EXISTS idx_api_message_batches_due ON api_message_batches(flush_at) WHERE claimed_at IS NULL')
+}
+
 // Idempotente: roda a cada boot porque o init.sql só executa em volume novo do Postgres
 const ensurePanelSchema = async () => {
   await ensureMessagesTable()
@@ -351,6 +379,7 @@ const ensurePanelSchema = async () => {
   await ensureTelegramTables()
   await ensureApiCredentialsTable()
   await ensureApiSendsTable()
+  await ensureMessageBatchesTable()
 }
 
 module.exports = { ensurePanelSchema }

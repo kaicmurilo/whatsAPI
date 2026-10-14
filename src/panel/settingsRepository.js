@@ -11,6 +11,8 @@ const SETTINGS_COLUMNS = `suppression_enabled AS "suppressionEnabled",
   quiet_end AS "quietEnd",
   messages_view_enabled AS "messagesViewEnabled",
   message_retention_hours AS "messageRetentionHours",
+  batch_enabled AS "batchEnabled",
+  batch_window_minutes AS "batchWindowMinutes",
   down_alert_enabled AS "downAlertEnabled",
   down_alert_targets AS "downAlertTargets",
   down_alert_message AS "downAlertMessage"`
@@ -30,8 +32,9 @@ const saveSettings = async (userId, settings) => {
     `INSERT INTO panel_user_settings (
        user_id, suppression_enabled, suppression_keywords, stop_on_reply, prepend_first_name,
        daily_cap_enabled, daily_cap, quiet_hours_enabled, quiet_start, quiet_end, messages_view_enabled,
-       message_retention_hours, down_alert_enabled, down_alert_targets, down_alert_message, updated_at
-     ) VALUES ($1, $2, $3::text[], $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, CURRENT_TIMESTAMP)
+       message_retention_hours, down_alert_enabled, down_alert_targets, down_alert_message, batch_enabled,
+       batch_window_minutes, updated_at
+     ) VALUES ($1, $2, $3::text[], $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15, $16, $17, CURRENT_TIMESTAMP)
      ON CONFLICT (user_id) DO UPDATE SET
        suppression_enabled = EXCLUDED.suppression_enabled,
        suppression_keywords = EXCLUDED.suppression_keywords,
@@ -47,12 +50,15 @@ const saveSettings = async (userId, settings) => {
        down_alert_enabled = EXCLUDED.down_alert_enabled,
        down_alert_targets = EXCLUDED.down_alert_targets,
        down_alert_message = EXCLUDED.down_alert_message,
+       batch_enabled = EXCLUDED.batch_enabled,
+       batch_window_minutes = EXCLUDED.batch_window_minutes,
        updated_at = CURRENT_TIMESTAMP
      RETURNING ${SETTINGS_COLUMNS}`,
     [userId, settings.suppressionEnabled, settings.suppressionKeywords, settings.stopOnReply,
       settings.prependFirstName, settings.dailyCapEnabled, settings.dailyCap,
       settings.quietHoursEnabled, settings.quietStart, settings.quietEnd, settings.messagesViewEnabled,
-      settings.messageRetentionHours, settings.downAlertEnabled, JSON.stringify(settings.downAlertTargets), settings.downAlertMessage]
+      settings.messageRetentionHours, settings.downAlertEnabled, JSON.stringify(settings.downAlertTargets), settings.downAlertMessage,
+      settings.batchEnabled, settings.batchWindowMinutes]
   )
   return result.rows[0]
 }

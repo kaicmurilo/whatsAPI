@@ -371,6 +371,9 @@ export interface PanelSettings {
   messagesViewEnabled: boolean
   /** Horas de histórico de mensagens guardado; null = sem limite */
   messageRetentionHours: number | null
+  /** Junta textos da integração para o mesmo chat e envia um só ao fim da janela */
+  batchEnabled: boolean
+  batchWindowMinutes: number
   downAlertEnabled: boolean
   downAlertTargets: DownAlertTarget[]
   /** null = mensagem padrão do servidor */

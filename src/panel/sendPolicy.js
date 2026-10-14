@@ -1,4 +1,5 @@
 const { parseDownAlertInput } = require('./downAlertMessage')
+const { parseBatchInput } = require('./messageBatchPolicy')
 
 const DAILY_CAP_MIN = 20
 const DAILY_CAP_MAX = 400
@@ -199,6 +200,8 @@ const parseSettingsInput = (body) => {
   if (messageRetentionHours.error) return messageRetentionHours
   const downAlert = parseDownAlertInput(body)
   if (downAlert.error) return downAlert
+  const batch = parseBatchInput(body)
+  if (batch.error) return batch
   const parsedKeywords = parseKeywordList(body.suppressionKeywords)
   if (parsedKeywords.error) return parsedKeywords
   if (suppressionEnabled.value && parsedKeywords.keywords.length === 0) {
@@ -225,7 +228,8 @@ const parseSettingsInput = (body) => {
       quietEnd,
       messagesViewEnabled: messagesViewEnabled.value,
       messageRetentionHours: messageRetentionHours.value,
-      ...downAlert.value
+      ...downAlert.value,
+      ...batch.value
     }
   }
 }

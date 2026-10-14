@@ -7,6 +7,7 @@ const { isGroupChatId, isGroupMember } = require('../panel/groupMembership')
 const { recordApiSend, loadTodayApiSends } = require('../panel/apiSendRepository')
 const { pickBalancedSender } = require('../panel/balancedSender')
 const { CONTENT_TYPES, INVALID_CONTENT_TYPE, buildMessageContent } = require('./clientController')
+const { queueIfBatching, batchedResponse } = require('../panel/messageBatcher')
 
 // Corpo inválido → [status, mensagem]; válido → null
 const findBodyError = (body) => {
@@ -40,6 +41,9 @@ const sendMessageBalanced = async (req, res) => {
   try {
     const accessError = await findAccessError(req, sessionIds)
     if (accessError) return sendErrorResponse(res, ...accessError)
+    // Agrupado: a instância é escolhida na hora do disparo, com a carga daquele momento
+    const queued = await queueIfBatching({ userId: req.user.user_id, chatId: body.chatId, sessionIds, isBalanced: true, contentType: body.contentType, content: body.content, options: body.options, credentialId: req.token?.apiCredentialId })
+    if (queued) return res.status(202).json(batchedResponse(queued))
     const picked = await pickBalancedSender({
       sessionIds, chatId: body.chatId, getClient: getConnectedClient, isMember: isGroupMember, loadDaily: loadTodayApiSends
     })

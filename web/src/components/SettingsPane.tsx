@@ -10,6 +10,7 @@ import { EmptyState } from './EmptyState'
 import { Pagination } from './Pagination'
 import { SearchInput } from './SearchInput'
 import { SettingToggle } from './SettingToggle'
+import { BatchSettings } from './BatchSettings'
 import { DownAlertSettings } from './DownAlertSettings'
 
 const DAILY_CAP_MIN = 20
@@ -186,6 +187,8 @@ export function SettingsPane() {
                 </div>
               </div>
             </section>
+
+            <BatchSettings draft={draft} onChange={setDraft} />
 
             <DownAlertSettings draft={draft} onChange={setDraft} />
 

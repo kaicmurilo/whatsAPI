@@ -413,3 +413,8 @@ export interface DownAlertTargetsProps {
   targets: DownAlertTarget[]
   onChange: (targets: DownAlertTarget[]) => void
 }
+
+export interface BatchSettingsProps {
+  draft: PanelSettings
+  onChange: (draft: PanelSettings) => void
+}
