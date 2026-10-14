@@ -11,6 +11,7 @@ Listagens paginadas aceitam `page` e `perPage` e devolvem `{ items, total }`.
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/panel/sessions` | Instâncias do usuário com status. O nome no painel é o `sessionId` definido na criação; `pushName` e `phone` aparecem só como detalhe, cada um na sua linha, sem reticências |
+| GET | `/panel/groups` | Grupos de que as instâncias conectadas participam (`page`, `perPage`, `search` pelo nome). Cada item traz `sessionIds` das instâncias que estão no grupo |
 | DELETE | `/panel/sessions/:sessionId` | Remove a instância do WhatsApp: logout, apaga a sessão e as mensagens salvas, e tira do rodízio dos disparos abertos. Rate limit: 10/min |
 | GET | `/panel/sessions/:sessionId/chats` | Conversas salvas. O nome do grupo é o título do WhatsApp, não o do último participante. |
 | GET | `/panel/sessions/:sessionId/chats/:chatId/messages` | Mensagens de uma conversa. `chatName` é o último título real do chat (vazio se só havia o JID). |
@@ -86,7 +87,7 @@ Três formatos:
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/panel/settings` | Configuração da conta (cria o padrão na primeira leitura) |
-| PUT | `/panel/settings` | Substitui a configuração. Rate limit: 30/min por usuário. Aviso de instância fora do ar: `downAlertEnabled`, `downAlertChatId` (telefone com DDI ou `1203...@g.us`), `downAlertMessage` (até 1000 caracteres, marcadores `{instancia}`, `{status}`, `{minutos}`, `{desde}`; vazio = padrão). Sai por outra instância conectada após 5 min fora do ar |
+| PUT | `/panel/settings` | Substitui a configuração. Rate limit: 30/min por usuário. Aviso de instância fora do ar: `downAlertEnabled`, `downAlertTargets` (até 20: `{ "kind": "contact", "phone", "name" }` da agenda e/ou `{ "kind": "group", "chatId", "name" }`), `downAlertMessage` (até 1000 caracteres, marcadores `{instancia}`, `{status}`, `{minutos}`, `{desde}`; vazio = padrão). Sai por outra instância conectada após 5 min fora do ar |
 | GET | `/panel/suppression` | Números que pediram para sair (`page`, `perPage`, `search`) |
 | DELETE | `/panel/suppression/:suppressionId` | Tira o número da supressão. Não apaga o contato da agenda |
 | GET | `/panel/telegram/instances` | Instâncias do Telegram: bots (`kind: "bot"`, `sessionId: "telegram:<id>"`, `linkedContacts`) e contas (`kind: "account"`, `sessionId: "tguser:<id>"`, `phone`). Token e sessão nunca voltam |

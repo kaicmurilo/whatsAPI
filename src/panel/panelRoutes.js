@@ -18,6 +18,7 @@ const metricsController = require('./metricsController')
 const telegramController = require('./telegramController')
 const broadcastQueueController = require('./broadcastQueueController')
 const apiCredentialController = require('./apiCredentialController')
+const groupController = require('./groupController')
 
 const ONE_MINUTE_MS = 60 * 1000
 
@@ -51,6 +52,7 @@ const sessionScoped = [middleware.sessionNameValidation, middleware.requireSessi
 const connectedSession = [...sessionScoped, middleware.sessionValidation]
 
 panelRouter.get('/sessions', panelController.getSessions)
+panelRouter.get('/groups', groupController.getGroups)
 // Remover instância: logout no WhatsApp + apaga sessão e mensagens salvas
 const instanceRemovalRateLimiter = perUserLimiter(10, 'Muitas remoções de instância. Aguarde um minuto.')
 panelRouter.delete('/sessions/:sessionId', sessionScoped, instanceRemovalRateLimiter, panelController.deleteSession)

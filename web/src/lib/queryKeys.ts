@@ -10,6 +10,7 @@ export const queryKeys = {
   qr: (sessionId: string) => ['qr', sessionId] as const,
   allContacts: ['contacts'] as const,
   contacts: (query: PageQuery, perPage: number) => ['contacts', query, perPage] as const,
+  groups: (query: PageQuery) => ['whatsapp-groups', query] as const,
   contactSync: ['contact-sync'] as const,
   allFiles: ['files'] as const,
   files: (query: PageQuery, perPage: number) => ['files', query, perPage] as const,

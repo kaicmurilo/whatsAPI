@@ -8,7 +8,8 @@ const { getConnectedClient } = require('./broadcastChannels')
 const { isGroupMember } = require('./groupMembership')
 const { loadTodayApiSends } = require('./apiSendRepository')
 const { pickBalancedSender } = require('./balancedSender')
-const { renderDownAlertMessage, statusLabel } = require('./downAlertMessage')
+const { renderDownAlertMessage, statusLabel, targetKey } = require('./downAlertMessage')
+const { serializeWid } = require('./messageMapper')
 
 const DOWN_ALERT_DELAY_MS = 5 * 60 * 1000
 
@@ -30,15 +31,52 @@ const formatSince = (since) => since.toLocaleString('pt-BR', {
   timeZone: reportTimeZone, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
 })
 
+// Contato: o telefone da agenda vira o chat real pelo WhatsApp (resolve o 9º dígito e o LID)
+const resolveTargetChatId = async (client, target) => {
+  if (target.kind === 'group') return target.chatId
+  return serializeWid(await client.getNumberId(target.phone))
+}
+
 /**
- * Envia o aviso por outra instância conectada da mesma conta (a que caiu não consegue avisar).
- * Grupo: só entre as que participam dele; escolha pela menor carga de envios da integração no dia.
+ * Um destino: escolhe o remetente entre as outras instâncias conectadas (grupo: só quem participa),
+ * pela menor carga de envios da integração no dia.
+ */
+const sendToTarget = async ({ sessionId, userId, otherSessionIds, target, text }) => {
+  const label = `${target.kind}=${target.name}`
+  const picked = await pickBalancedSender({
+    sessionIds: otherSessionIds,
+    chatId: targetKey(target),
+    getClient: getConnectedClient,
+    isMember: isGroupMember,
+    loadDaily: loadTodayApiSends
+  })
+  if (picked.error) {
+    console.warn(`[alerta] sem como avisar ${label} sobre sessão=${sessionId} user=${userId}: ${picked.error[1]}`)
+    return
+  }
+  const { client, sessionId: via } = picked.sender
+  try {
+    const chatId = await resolveTargetChatId(client, target)
+    if (!chatId) {
+      console.warn(`[alerta] contato sem WhatsApp ${label} sessão=${sessionId} user=${userId}`)
+      return
+    }
+    await client.sendMessage(chatId, text)
+    console.log(`[alerta] aviso enviado ${label} sessão=${sessionId} via=${via} user=${userId}`)
+  } catch (error) {
+    console.error(`[alerta] falha ao avisar ${label} sessão=${sessionId} via=${via} user=${userId}:`, error.message)
+  }
+}
+
+/**
+ * Envia o aviso para cada destino configurado, por outra instância conectada da mesma conta
+ * (a que caiu não consegue avisar). Um destino que falha não impede os outros.
  */
 const sendDownAlert = async (sessionId, since) => {
   const userId = await findOwner(sessionId)
   if (!userId) return
   const settings = await getSettings(userId)
-  if (!settings.downAlertEnabled || !settings.downAlertChatId) return
+  if (!settings.downAlertEnabled || settings.downAlertTargets.length === 0) return
   const status = getSessionStatus(sessionId)
   const text = renderDownAlertMessage(settings.downAlertMessage, {
     instancia: sessionId,
@@ -46,19 +84,10 @@ const sendDownAlert = async (sessionId, since) => {
     minutos: Math.round((Date.now() - since.getTime()) / 60000),
     desde: formatSince(since)
   })
-  const picked = await pickBalancedSender({
-    sessionIds: await listOtherSessionIds(userId, sessionId),
-    chatId: settings.downAlertChatId,
-    getClient: getConnectedClient,
-    isMember: isGroupMember,
-    loadDaily: loadTodayApiSends
-  })
-  if (picked.error) {
-    console.warn(`[alerta] instância fora do ar sem como avisar sessão=${sessionId} user=${userId}: ${picked.error[1]}`)
-    return
+  const otherSessionIds = await listOtherSessionIds(userId, sessionId)
+  for (const target of settings.downAlertTargets) {
+    await sendToTarget({ sessionId, userId, otherSessionIds, target, text })
   }
-  await picked.sender.client.sendMessage(settings.downAlertChatId, text)
-  console.log(`[alerta] aviso de instância fora do ar enviado sessão=${sessionId} status=${status} via=${picked.sender.sessionId} user=${userId}`)
 }
 
 /**
@@ -108,4 +137,4 @@ const startInstanceDownAlerts = () => {
   console.log(`[alerta] aviso de instância fora do ar ativo (após ${DOWN_ALERT_DELAY_MS / 60000} min)`)
 }
 
-module.exports = { startInstanceDownAlerts, createDownAlertWatcher, DOWN_ALERT_DELAY_MS }
+module.exports = { startInstanceDownAlerts, createDownAlertWatcher, sendToTarget, DOWN_ALERT_DELAY_MS }

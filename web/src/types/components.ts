@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { ApiCredential, BroadcastChannel, PanelSettings, CreatedApiCredential, SenderInstance, TelegramInstance, ContactSyncJob, BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
+import type { ApiCredential, BroadcastChannel, DownAlertTarget, PanelSettings, CreatedApiCredential, SenderInstance, TelegramInstance, ContactSyncJob, BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
 import type { PanelView, ReportState, TableKey, TableState } from '../hooks/usePanelSearchParams'
 
 export interface StatusLampProps {
@@ -387,4 +387,29 @@ export interface SettingToggleProps {
 export interface DownAlertSettingsProps {
   draft: PanelSettings
   onChange: (draft: PanelSettings) => void
+}
+
+export interface TargetOption {
+  target: DownAlertTarget
+  detail: string
+}
+
+export interface TargetOptionListProps {
+  label: string
+  search: string
+  onSearchChange: (search: string) => void
+  options: TargetOption[]
+  selected: DownAlertTarget[]
+  onToggle: (target: DownAlertTarget) => void
+  page: number
+  perPage: number
+  total: number
+  onPageChange: (page: number) => void
+  isFetching: boolean
+  emptyText: string
+}
+
+export interface DownAlertTargetsProps {
+  targets: DownAlertTarget[]
+  onChange: (targets: DownAlertTarget[]) => void
 }

@@ -1,4 +1,5 @@
 import type { DownAlertSettingsProps } from '../types/components'
+import { DownAlertTargets } from './DownAlertTargets'
 import { SettingToggle } from './SettingToggle'
 
 const DEFAULT_MESSAGE = '⚠️ A instância {instancia} está fora do ar há {minutos} min ({status}, desde {desde}).'
@@ -23,20 +24,9 @@ export function DownAlertSettings({ draft, onChange }: DownAlertSettingsProps) {
         title="Avisar quando uma instância ficar mais de 5 minutos fora do ar"
         onChange={(downAlertEnabled) => onChange({ ...draft, downAlertEnabled })}
       >
-        O aviso sai por outra instância conectada da conta (a que caiu não consegue avisar). Para grupo, só por uma que participa dele. Um aviso por queda; remover ou encerrar de propósito não avisa.
+        Escolha contatos da agenda e grupos, juntos. O aviso sai por outra instância conectada da conta (a que caiu não consegue avisar); para grupo, só por uma que participa dele. Um aviso por queda; remover ou encerrar de propósito não avisa.
       </SettingToggle>
-      <label className="field">
-        <span className="field__label">Número ou grupo</span>
-        <input
-          className="field__input"
-          value={draft.downAlertChatId ?? ''}
-          placeholder="5511999998888 ou 120363...@g.us"
-          autoComplete="off"
-          spellCheck={false}
-          required={draft.downAlertEnabled}
-          onChange={(event) => onChange({ ...draft, downAlertChatId: emptyToNull(event.target.value) })}
-        />
-      </label>
+      <DownAlertTargets targets={draft.downAlertTargets} onChange={(downAlertTargets) => onChange({ ...draft, downAlertTargets })} />
       <label className="field">
         <span className="field__label">Mensagem</span>
         <textarea

@@ -218,7 +218,20 @@ const ensureSettingsTables = async () => {
   await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS message_retention_hours INTEGER')
   // Aviso de instância fora do ar: destino (contato @c.us ou grupo @g.us) e modelo com placeholders; NULL = padrão
   await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS down_alert_enabled BOOLEAN NOT NULL DEFAULT false')
-  await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS down_alert_chat_id VARCHAR(100)')
+  // Destinos: [{ kind: 'contact', phone, name } | { kind: 'group', chatId, name }]; nome é só rótulo da tela
+  await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS down_alert_targets JSONB NOT NULL DEFAULT \'[]\'::jsonb')
+  // Destino único da primeira versão vira um item da lista; depois a coluna sai
+  await query(`DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'panel_user_settings' AND column_name = 'down_alert_chat_id') THEN
+      UPDATE panel_user_settings SET down_alert_targets = jsonb_build_array(
+        CASE WHEN down_alert_chat_id LIKE '%@g.us'
+          THEN jsonb_build_object('kind', 'group', 'chatId', down_alert_chat_id, 'name', down_alert_chat_id)
+          ELSE jsonb_build_object('kind', 'contact', 'phone', split_part(down_alert_chat_id, '@', 1), 'name', split_part(down_alert_chat_id, '@', 1))
+        END)
+      WHERE down_alert_chat_id IS NOT NULL AND down_alert_targets = '[]'::jsonb;
+      ALTER TABLE panel_user_settings DROP COLUMN down_alert_chat_id;
+    END IF;
+  END $$`)
   await query('ALTER TABLE panel_user_settings ADD COLUMN IF NOT EXISTS down_alert_message TEXT')
   await query(`
     CREATE TABLE IF NOT EXISTS suppressed_numbers (

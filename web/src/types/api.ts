@@ -106,6 +106,18 @@ export interface Paginated<T> {
 
 export type ContactPage = Paginated<Contact>
 
+/** Grupo de que ao menos uma instância conectada participa; sessionIds = quais */
+export interface WhatsAppGroup {
+  chatId: string
+  name: string | null
+  sessionIds: string[]
+}
+
+/** Destino do aviso de instância fora do ar; name é só o rótulo mostrado na tela */
+export type DownAlertTarget =
+  | { kind: 'contact'; phone: string; name: string }
+  | { kind: 'group'; chatId: string; name: string }
+
 export interface ContactInput {
   name: string
   phone: string
@@ -360,8 +372,7 @@ export interface PanelSettings {
   /** Horas de histórico de mensagens guardado; null = sem limite */
   messageRetentionHours: number | null
   downAlertEnabled: boolean
-  /** 5511...@c.us ou 1203...@g.us; o servidor aceita telefone e normaliza */
-  downAlertChatId: string | null
+  downAlertTargets: DownAlertTarget[]
   /** null = mensagem padrão do servidor */
   downAlertMessage: string | null
 }

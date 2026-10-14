@@ -2,18 +2,21 @@ jest.mock('../database', () => ({ query: jest.fn() }))
 jest.mock('../sessions', () => ({ sessions: new Map(), validateSession: jest.fn() }))
 
 const { createDownAlertWatcher } = require('./instanceDownAlert')
-const { normalizeAlertChatId, renderDownAlertMessage, parseDownAlertInput, DEFAULT_DOWN_ALERT_MESSAGE } = require('./downAlertMessage')
+const { parseAlertTarget, renderDownAlertMessage, parseDownAlertInput, DEFAULT_DOWN_ALERT_MESSAGE } = require('./downAlertMessage')
+const { mergeGroups, filterAndPage } = require('./groupController')
 
 const flush = () => new Promise((resolve) => jest.requireActual('timers').setImmediate(resolve))
 
 describe('instance down alert', () => {
   describe('destination and message', () => {
-    test('accepts a phone in any format, a contact id and a group id', () => {
-      expect(normalizeAlertChatId('+55 (11) 99999-8888')).toBe('5511999998888@c.us')
-      expect(normalizeAlertChatId('5511999998888@c.us')).toBe('5511999998888@c.us')
-      expect(normalizeAlertChatId('120363413982189751@g.us')).toBe('120363413982189751@g.us')
-      expect(normalizeAlertChatId('1234')).toBeNull()
-      expect(normalizeAlertChatId('grupo da loja')).toBeNull()
+    test('targets: agenda contact by phone, group by id; anything else is rejected', () => {
+      expect(parseAlertTarget({ kind: 'contact', phone: '+55 (11) 99999-8888', name: ' Kaic ' }))
+        .toEqual({ kind: 'contact', phone: '5511999998888', name: 'Kaic' })
+      expect(parseAlertTarget({ kind: 'group', chatId: '120363413982189751@g.us', name: '' }))
+        .toEqual({ kind: 'group', chatId: '120363413982189751@g.us', name: '120363413982189751@g.us' })
+      expect(parseAlertTarget({ kind: 'contact', phone: '1234' })).toBeNull()
+      expect(parseAlertTarget({ kind: 'group', chatId: '5511999998888@c.us' })).toBeNull()
+      expect(parseAlertTarget({ kind: 'canal', chatId: 'x' })).toBeNull()
     })
 
     test('fills placeholders, keeps unknown ones and falls back to the default text', () => {
@@ -23,14 +26,29 @@ describe('instance down alert', () => {
       expect(renderDownAlertMessage(null, values)).toBe(renderDownAlertMessage(DEFAULT_DOWN_ALERT_MESSAGE, values))
     })
 
-    test('settings: off by default, destination required when on, message capped', () => {
-      expect(parseDownAlertInput({}).value).toEqual({ downAlertEnabled: false, downAlertChatId: null, downAlertMessage: null })
-      expect(parseDownAlertInput({ downAlertEnabled: true }).error).toMatch(/número ou grupo/)
-      expect(parseDownAlertInput({ downAlertEnabled: false, downAlertChatId: 'abc' }).error).toMatch(/inválido/)
-      expect(parseDownAlertInput({ downAlertEnabled: true, downAlertChatId: '5511999998888', downAlertMessage: '  oi  ' }).value)
-        .toEqual({ downAlertEnabled: true, downAlertChatId: '5511999998888@c.us', downAlertMessage: 'oi' })
-      expect(parseDownAlertInput({ downAlertEnabled: true, downAlertChatId: '5511999998888', downAlertMessage: 'x'.repeat(1001) }).error).toMatch(/1000/)
+    test('settings: off by default, at least one target when on, duplicates merged, message capped', () => {
+      const contact = { kind: 'contact', phone: '5511999998888', name: 'Kaic' }
+      const group = { kind: 'group', chatId: '120363413982189751@g.us', name: 'Monitoramento' }
+      expect(parseDownAlertInput({}).value).toEqual({ downAlertEnabled: false, downAlertTargets: [], downAlertMessage: null })
+      expect(parseDownAlertInput({ downAlertEnabled: true }).error).toMatch(/ao menos um/)
+      expect(parseDownAlertInput({ downAlertTargets: [{ kind: 'group', chatId: 'abc' }] }).error).toMatch(/inválido/)
+      expect(parseDownAlertInput({ downAlertTargets: 'grupo' }).error).toBeDefined()
+      const both = parseDownAlertInput({ downAlertEnabled: true, downAlertTargets: [contact, group, { ...contact, name: 'outro' }], downAlertMessage: '  oi  ' })
+      expect(both.value).toEqual({ downAlertEnabled: true, downAlertTargets: [contact, group], downAlertMessage: 'oi' })
+      expect(parseDownAlertInput({ downAlertTargets: Array.from({ length: 21 }, (_, index) => ({ ...contact, phone: `55119999900${String(index).padStart(2, '0')}` })) }).error).toMatch(/20/)
+      expect(parseDownAlertInput({ downAlertEnabled: true, downAlertTargets: [contact], downAlertMessage: 'x'.repeat(1001) }).error).toMatch(/1000/)
       expect(parseDownAlertInput({ downAlertEnabled: 'sim' }).error).toBeDefined()
+    })
+
+    test('groups of all connected instances merge by id, sorted by name, searched and paged on the server', () => {
+      const merged = mergeGroups([
+        { sessionId: 'loja-a-0001', groups: [{ chatId: '2@g.us', name: 'Vendas' }, { chatId: '1@g.us', name: 'Ávisos' }] },
+        { sessionId: 'loja-b-0002', groups: [{ chatId: '2@g.us', name: null }, { chatId: '3@g.us', name: null }] }
+      ])
+      expect(merged.map((group) => group.chatId)).toEqual(['1@g.us', '2@g.us', '3@g.us'])
+      expect(merged[1]).toEqual({ chatId: '2@g.us', name: 'Vendas', sessionIds: ['loja-a-0001', 'loja-b-0002'] })
+      expect(filterAndPage(merged, { page: 1, perPage: 20, search: 'avisos' }).items.map((group) => group.chatId)).toEqual(['1@g.us'])
+      expect(filterAndPage(merged, { page: 2, perPage: 2, search: '' })).toMatchObject({ total: 3, items: [{ chatId: '3@g.us' }] })
     })
   })
 

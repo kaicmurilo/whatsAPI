@@ -1,4 +1,4 @@
-import type { AuthTokens, ChatPage, Contact, ContactInput, ContactPage, ContactSyncInput, ContactSyncJob, MessagePage, OutgoingMessage, WhatsAppSession } from '../types/api'
+import type { AuthTokens, ChatPage, Contact, ContactInput, ContactPage, ContactSyncInput, ContactSyncJob, MessagePage, OutgoingMessage, Paginated, WhatsAppGroup, WhatsAppSession } from '../types/api'
 import { requestData, requestRaw } from './apiClient'
 
 export const CHATS_PER_PAGE = 20
@@ -55,6 +55,12 @@ export async function resolveChatId(token: string, sessionId: string, phone: str
 
 export function fetchContacts(token: string, query: PageQuery, perPage = CONTACTS_PER_PAGE): Promise<ContactPage> {
   return requestData<ContactPage>(`/panel/contacts?${pageParams(query, perPage)}`, { token })
+}
+
+export const GROUP_PICKER_PER_PAGE = 10
+
+export function fetchGroups(token: string, query: PageQuery): Promise<Paginated<WhatsAppGroup>> {
+  return requestData<Paginated<WhatsAppGroup>>(`/panel/groups?${pageParams(query, GROUP_PICKER_PER_PAGE)}`, { token })
 }
 
 export function saveContact(token: string, contact: ContactInput): Promise<Contact> {

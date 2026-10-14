@@ -15,6 +15,20 @@ const isGroupMemberInPage = (groupId) => {
   }
 }
 
+// Roda na página: grupos de que a instância participa, com o título que o WhatsApp mostra
+const listMemberGroupsInPage = () => {
+  try {
+    const { getMaybeMeLidUser, getMaybeMePnUser } = window.require('WAWebUserPrefsMeUser')
+    const me = [getMaybeMeLidUser(), getMaybeMePnUser()].filter(Boolean).map((wid) => wid._serialized)
+    return window.require('WAWebCollections').Chat.getModelsArray()
+      .filter((chat) => chat.id?.server === 'g.us')
+      .filter((chat) => me.some((id) => chat.groupMetadata?.participants?.get(id)))
+      .map((chat) => ({ chatId: chat.id._serialized, name: chat.formattedTitle || chat.name || chat.groupMetadata?.subject || null }))
+  } catch (error) {
+    return []
+  }
+}
+
 const isGroupMember = async (client, groupId, sessionId) => {
   try {
     return await client.pupPage.evaluate(isGroupMemberInPage, groupId)
@@ -24,4 +38,13 @@ const isGroupMember = async (client, groupId, sessionId) => {
   }
 }
 
-module.exports = { isGroupChatId, isGroupMember, isGroupMemberInPage }
+const listMemberGroups = async (client, sessionId) => {
+  try {
+    return await client.pupPage.evaluate(listMemberGroupsInPage)
+  } catch (error) {
+    console.warn(`[panel] não foi possível listar grupos sessão=${sessionId}:`, error.message)
+    return []
+  }
+}
+
+module.exports = { isGroupChatId, isGroupMember, isGroupMemberInPage, listMemberGroups, listMemberGroupsInPage }
