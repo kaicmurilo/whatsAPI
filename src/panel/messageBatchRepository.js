@@ -1,7 +1,7 @@
 const { query } = require('../database')
 
 const BATCH_COLUMNS = `id, user_id AS "userId", chat_id AS "chatId", session_ids AS "sessionIds", is_balanced AS "isBalanced",
-  parts, credential_id AS "credentialId", flush_at AS "flushAt", attempts`
+  parts, credential_id AS "credentialId", flush_at AS "flushAt", attempts, created_at AS "createdAt"`
 
 /**
  * Junta o texto ao lote aberto do mesmo usuário + chat + remetente, ou abre um com a janela a partir de agora.
@@ -39,18 +39,19 @@ const claimDueBatches = async (limit) => {
 
 const deleteBatch = (id) => query('DELETE FROM api_message_batches WHERE id = $1', [id])
 
-// Falhou: volta para a fila daqui a delaySeconds. Se já existe outro lote aberto para o mesmo chat, junta nele.
-const releaseBatchForRetry = async (id, delaySeconds) => {
+// Volta para a fila daqui a delaySeconds. countAttempt=false (instância fora do ar) não gasta tentativa.
+// Se já existe outro lote aberto para o mesmo chat, junta nele.
+const releaseBatchForRetry = async (id, delaySeconds, countAttempt = true) => {
   await query(
     `WITH failed AS (DELETE FROM api_message_batches WHERE id = $1 RETURNING *)
      INSERT INTO api_message_batches (user_id, chat_id, sender_key, session_ids, is_balanced, parts, credential_id, flush_at, attempts, created_at)
      SELECT user_id, chat_id, sender_key, session_ids, is_balanced, parts, credential_id,
-            CURRENT_TIMESTAMP + make_interval(secs => $2::int), attempts + 1, created_at
+            CURRENT_TIMESTAMP + make_interval(secs => $2::int), attempts + CASE WHEN $3::boolean THEN 1 ELSE 0 END, created_at
      FROM failed
      ON CONFLICT (user_id, chat_id, sender_key) WHERE claimed_at IS NULL
      DO UPDATE SET parts = EXCLUDED.parts || api_message_batches.parts,
                    attempts = GREATEST(api_message_batches.attempts, EXCLUDED.attempts)`,
-    [id, delaySeconds]
+    [id, delaySeconds, countAttempt]
   )
 }
 

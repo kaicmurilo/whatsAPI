@@ -5,7 +5,7 @@ jest.mock('./settingsRepository', () => ({ getSettings: jest.fn() }))
 const { query } = require('../database')
 const { getSettings } = require('./settingsRepository')
 const { isBatchable, joinParts, senderKeyOf, parseBatchInput } = require('./messageBatchPolicy')
-const { queueIfBatching, flushBatch, MAX_ATTEMPTS } = require('./messageBatcher')
+const { queueIfBatching, flushBatch, MAX_ATTEMPTS, MAX_WAIT_OFFLINE_MS } = require('./messageBatcher')
 
 const GROUP = '120363413982189751@g.us'
 
@@ -18,7 +18,7 @@ const fakeDeps = (client) => ({
   releaseBatchForRetry: jest.fn(async () => {})
 })
 
-const batchOf = (overrides) => ({ id: 7, userId: 'user-1', chatId: GROUP, sessionIds: ['loja-a-0001'], isBalanced: false, parts: ['primeira', 'segunda'], credentialId: 3, attempts: 0, ...overrides })
+const batchOf = (overrides) => ({ id: 7, userId: 'user-1', chatId: GROUP, sessionIds: ['loja-a-0001'], isBalanced: false, parts: ['primeira', 'segunda'], credentialId: 3, attempts: 0, createdAt: new Date(), ...overrides })
 
 describe('message batching', () => {
   let logs
@@ -82,22 +82,29 @@ describe('message batching', () => {
     expect(deps.recordApiSend.mock.calls[0][0].sessionId).toBe('loja-b-0002')
   })
 
-  test('flush failures go back to the queue and are dropped with an error log only after the last attempt', async () => {
+  test('no connected instance never spends attempts: the batch waits up to 24h, even past the attempt limit', async () => {
     const deps = fakeDeps(null)
-    await flushBatch(batchOf({ sessionIds: ['offline-0001'] }), deps)
-    expect(deps.releaseBatchForRetry).toHaveBeenCalledWith(7, 60)
+    await flushBatch(batchOf({ sessionIds: ['offline-0001'], attempts: MAX_ATTEMPTS - 1 }), deps)
+    expect(deps.releaseBatchForRetry).toHaveBeenCalledWith(7, 60, false)
     expect(deps.deleteBatch).not.toHaveBeenCalled()
 
+    const expired = fakeDeps(null)
+    await flushBatch(batchOf({ sessionIds: ['offline-0001'], createdAt: new Date(Date.now() - MAX_WAIT_OFFLINE_MS - 1000) }), expired)
+    expect(expired.deleteBatch).toHaveBeenCalledWith(7)
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/descartado .*textos=2.*24h sem instância/))
+  })
+
+  test('real send errors spend attempts and drop with an error log after the last one', async () => {
     const broken = { sendMessage: jest.fn(async () => { throw new Error('rate-overlimit') }) }
     const brokenDeps = fakeDeps(broken)
     await flushBatch(batchOf(), brokenDeps)
-    expect(brokenDeps.releaseBatchForRetry).toHaveBeenCalledTimes(1)
+    expect(brokenDeps.releaseBatchForRetry).toHaveBeenCalledWith(7, 60, true)
     expect(brokenDeps.recordApiSend).not.toHaveBeenCalled()
 
-    const lastDeps = fakeDeps(null)
-    await flushBatch(batchOf({ sessionIds: ['offline-0001'], attempts: MAX_ATTEMPTS - 1 }), lastDeps)
+    const lastDeps = fakeDeps(broken)
+    await flushBatch(batchOf({ attempts: MAX_ATTEMPTS - 1 }), lastDeps)
     expect(lastDeps.deleteBatch).toHaveBeenCalledWith(7)
     expect(lastDeps.releaseBatchForRetry).not.toHaveBeenCalled()
-    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/desistindo .*textos=2/))
+    expect(console.error).toHaveBeenCalledWith(expect.stringMatching(/descartado .*textos=2.*10 tentativas com erro: rate-overlimit/))
   })
 })

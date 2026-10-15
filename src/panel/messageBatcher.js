@@ -9,8 +9,10 @@ const { enqueueBatchPart, claimDueBatches, deleteBatch, releaseBatchForRetry, re
 const TICK_MS = 10 * 1000
 const BATCHES_PER_TICK = 20
 const RETRY_DELAY_SECONDS = 60
-// ~10 min tentando (instância fora do ar, grupo sem membro conectado); depois desiste e loga
+// Erro de envio de verdade (WhatsApp recusou): ~10 min tentando, depois desiste e loga
 const MAX_ATTEMPTS = 10
+// Sem instância conectada (deploy, queda, QR) não gasta tentativa: espera ela voltar por até 24h
+const MAX_WAIT_OFFLINE_MS = 24 * 60 * 60 * 1000
 
 /**
  * Se o agrupamento está ligado e o envio é texto puro, guarda no lote do chat e devolve o horário do disparo.
@@ -46,20 +48,29 @@ const pickSender = async (batch, deps) => {
   return client ? { sessionId, client } : { error: `instância ${sessionId} não está conectada` }
 }
 
+const dropBatch = async (batch, why, deps) => {
+  await deps.deleteBatch(batch.id)
+  console.error(`[lote] descartado lote=${batch.id} chat=${batch.chatId} textos=${batch.parts.length} user=${batch.userId}: ${why}`)
+}
+
 const giveUpOrRetry = async (batch, reason, deps) => {
-  if (batch.attempts + 1 >= MAX_ATTEMPTS) {
-    await deps.deleteBatch(batch.id)
-    console.error(`[lote] desistindo após ${MAX_ATTEMPTS} tentativas lote=${batch.id} chat=${batch.chatId} textos=${batch.parts.length} user=${batch.userId}: ${reason}`)
-    return
-  }
-  await deps.releaseBatchForRetry(batch.id, RETRY_DELAY_SECONDS)
+  if (batch.attempts + 1 >= MAX_ATTEMPTS) return dropBatch(batch, `${MAX_ATTEMPTS} tentativas com erro: ${reason}`, deps)
+  await deps.releaseBatchForRetry(batch.id, RETRY_DELAY_SECONDS, true)
   console.warn(`[lote] nova tentativa em ${RETRY_DELAY_SECONDS}s lote=${batch.id} chat=${batch.chatId} tentativa=${batch.attempts + 1}: ${reason}`)
+}
+
+const waitForSender = async (batch, reason, deps) => {
+  const waitedMs = Date.now() - new Date(batch.createdAt).getTime()
+  if (waitedMs > MAX_WAIT_OFFLINE_MS) return dropBatch(batch, `24h sem instância para enviar: ${reason}`, deps)
+  await deps.releaseBatchForRetry(batch.id, RETRY_DELAY_SECONDS, false)
+  // Um aviso por ~10 min de espera, não a cada minuto
+  if (Math.round(waitedMs / 60000) % 10 === 0) console.warn(`[lote] aguardando instância conectada lote=${batch.id} chat=${batch.chatId} há ${Math.round(waitedMs / 60000)} min: ${reason}`)
 }
 
 /** Um lote vencido vira uma mensagem só. Falha devolve o lote para a fila; nada é descartado em silêncio. */
 const flushBatch = async (batch, deps) => {
   const sender = await pickSender(batch, deps)
-  if (sender.error) return giveUpOrRetry(batch, sender.error, deps)
+  if (sender.error) return waitForSender(batch, sender.error, deps)
   try {
     const message = await sender.client.sendMessage(batch.chatId, joinParts(batch.parts))
     await deps.deleteBatch(batch.id)
@@ -107,4 +118,4 @@ const startMessageBatcher = async () => {
 // Resposta da API quando o texto entrou no lote: nada foi enviado ainda
 const batchedResponse = (queued) => ({ success: true, batched: true, sendAt: queued.flushAt, batchSize: queued.size })
 
-module.exports = { queueIfBatching, batchedResponse, flushBatch, startMessageBatcher, MAX_ATTEMPTS }
+module.exports = { queueIfBatching, batchedResponse, flushBatch, startMessageBatcher, MAX_ATTEMPTS, MAX_WAIT_OFFLINE_MS }
