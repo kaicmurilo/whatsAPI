@@ -370,6 +370,24 @@ const ensureMessageBatchesTable = async () => {
   await query('CREATE INDEX IF NOT EXISTS idx_api_message_batches_due ON api_message_batches(flush_at) WHERE claimed_at IS NULL')
 }
 
+// Grupos vistos por cada instância (retrato do WhatsApp Web). Uma linha por instância: instância fora do ar
+// mantém o último retrato até expirar (24h). admins = [{ id, phone, name, isSuperAdmin }].
+const ensureGroupCacheTable = async () => {
+  await query(`
+    CREATE TABLE IF NOT EXISTS whatsapp_group_cache (
+      session_id VARCHAR(255) NOT NULL REFERENCES whatsapp_sessions(session_id) ON DELETE CASCADE,
+      chat_id VARCHAR(100) NOT NULL,
+      name VARCHAR(255),
+      participants_count INTEGER NOT NULL DEFAULT 0,
+      is_admin BOOLEAN NOT NULL DEFAULT false,
+      admins JSONB NOT NULL DEFAULT '[]'::jsonb,
+      refreshed_at TIMESTAMPTZ NOT NULL,
+      PRIMARY KEY (session_id, chat_id)
+    )
+  `)
+  await query('CREATE INDEX IF NOT EXISTS idx_whatsapp_group_cache_chat ON whatsapp_group_cache(chat_id)')
+}
+
 // Idempotente: roda a cada boot porque o init.sql só executa em volume novo do Postgres
 const ensurePanelSchema = async () => {
   await ensureMessagesTable()
@@ -382,6 +400,7 @@ const ensurePanelSchema = async () => {
   await ensureApiCredentialsTable()
   await ensureApiSendsTable()
   await ensureMessageBatchesTable()
+  await ensureGroupCacheTable()
 }
 
 module.exports = { ensurePanelSchema }

@@ -1,4 +1,4 @@
-import type { AuthTokens, ChatPage, Contact, ContactInput, ContactPage, ContactSyncInput, ContactSyncJob, MessagePage, OutgoingMessage, Paginated, WhatsAppGroup, WhatsAppSession } from '../types/api'
+import type { AuthTokens, ChatPage, Contact, ContactInput, ContactPage, ContactSyncInput, ContactSyncJob, MessagePage, OutgoingMessage, GroupAddResult, GroupCacheStatus, Paginated, WhatsAppGroup, WhatsAppSession } from '../types/api'
 import { requestData, requestRaw } from './apiClient'
 
 export const CHATS_PER_PAGE = 20
@@ -59,8 +59,20 @@ export function fetchContacts(token: string, query: PageQuery, perPage = CONTACT
 
 export const GROUP_PICKER_PER_PAGE = 10
 
-export function fetchGroups(token: string, query: PageQuery): Promise<Paginated<WhatsAppGroup>> {
-  return requestData<Paginated<WhatsAppGroup>>(`/panel/groups?${pageParams(query, GROUP_PICKER_PER_PAGE)}`, { token })
+export function fetchGroups(token: string, query: PageQuery, perPage: number): Promise<Paginated<WhatsAppGroup>> {
+  return requestData<Paginated<WhatsAppGroup>>(`/panel/groups?${pageParams(query, perPage)}`, { token })
+}
+
+export function fetchGroupCacheStatus(token: string): Promise<GroupCacheStatus> {
+  return requestData<GroupCacheStatus>('/panel/groups/status', { token })
+}
+
+export function refreshGroups(token: string): Promise<GroupCacheStatus> {
+  return requestData<GroupCacheStatus>('/panel/groups/refresh', { token, method: 'POST' })
+}
+
+export function addGroupMembers(token: string, chatId: string, sessionIds: string[]): Promise<GroupAddResult> {
+  return requestData<GroupAddResult>(`/panel/groups/${encodeURIComponent(chatId)}/members`, { token, method: 'POST', body: { sessionIds } })
 }
 
 export function saveContact(token: string, contact: ContactInput): Promise<Contact> {

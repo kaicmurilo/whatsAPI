@@ -7,6 +7,7 @@ import { ConversationPane } from '../components/ConversationPane'
 import { EmptyState } from '../components/EmptyState'
 import { CredentialsPane } from '../components/CredentialsPane'
 import { FilesPane } from '../components/FilesPane'
+import { GroupsPane } from '../components/GroupsPane'
 import { InstanceOverviewPane } from '../components/InstanceOverviewPane'
 import { SettingsPane } from '../components/SettingsPane'
 import { QrCard } from '../components/QrCard'
@@ -89,6 +90,16 @@ export function PanelPage() {
             search={tables.files.search}
             onPageChange={(page) => actions.setTablePage('files', page)}
             onSearchChange={(search) => actions.setTableSearch('files', search)}
+          />
+        ) : null}
+
+        {view === 'groups' ? (
+          <GroupsPane
+            sessions={sessionList}
+            page={tables.groups.page}
+            search={tables.groups.search}
+            onPageChange={(page) => actions.setTablePage('groups', page)}
+            onSearchChange={(search) => actions.setTableSearch('groups', search)}
           />
         ) : null}
 

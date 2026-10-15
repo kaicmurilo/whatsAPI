@@ -40,6 +40,9 @@ const enableAuth = (process.env.ENABLE_AUTH || 'true').toLowerCase() === 'true'
 
 // Sem HTTPS na frente (acesso direto por IP), o upgrade-insecure-requests da CSP faz o navegador
 // pedir os assets em https:// e o painel abre em branco. Desligue com FORCE_HTTPS=false.
+// Intervalo da atualização automática do cache de grupos (minutos)
+const groupRefreshMinutes = Math.max(5, parseInt(process.env.GROUP_REFRESH_MINUTES) || 60)
+
 const forceHttps = (process.env.FORCE_HTTPS || 'true').toLowerCase() === 'true'
 
 // Validações de segurança
@@ -81,5 +84,6 @@ module.exports = {
   jwtExpiresIn,
   jwtRefreshExpiresIn,
   enableAuth,
-  forceHttps
+  forceHttps,
+  groupRefreshMinutes
 }

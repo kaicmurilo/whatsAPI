@@ -52,7 +52,14 @@ const sessionScoped = [middleware.sessionNameValidation, middleware.requireSessi
 const connectedSession = [...sessionScoped, middleware.sessionValidation]
 
 panelRouter.get('/sessions', panelController.getSessions)
+// Grupos (cache de 24h). GET também serve à API; credencial restrita vê só as instâncias liberadas
+const groupRefreshRateLimiter = perUserLimiter(6, 'Muitas atualizações de grupos. Aguarde um minuto.')
+const groupMembersRateLimiter = perUserLimiter(10, 'Muitas inclusões em grupos. Aguarde um minuto.')
 panelRouter.get('/groups', groupController.getGroups)
+panelRouter.get('/groups/status', groupController.getGroupCacheStatus)
+panelRouter.post('/groups/refresh', groupRefreshRateLimiter, groupController.postRefreshGroups)
+panelRouter.get('/groups/:chatId', groupController.getGroup)
+panelRouter.post('/groups/:chatId/members', groupMembersRateLimiter, groupController.postGroupMembers)
 // Remover instância: logout no WhatsApp + apaga sessão e mensagens salvas
 const instanceRemovalRateLimiter = perUserLimiter(10, 'Muitas remoções de instância. Aguarde um minuto.')
 panelRouter.delete('/sessions/:sessionId', sessionScoped, instanceRemovalRateLimiter, panelController.deleteSession)

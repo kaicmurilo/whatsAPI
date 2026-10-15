@@ -3,7 +3,6 @@ jest.mock('../sessions', () => ({ sessions: new Map(), validateSession: jest.fn(
 
 const { createDownAlertWatcher } = require('./instanceDownAlert')
 const { parseAlertTarget, renderDownAlertMessage, parseDownAlertInput, DEFAULT_DOWN_ALERT_MESSAGE } = require('./downAlertMessage')
-const { mergeGroups, filterAndPage } = require('./groupController')
 
 const flush = () => new Promise((resolve) => jest.requireActual('timers').setImmediate(resolve))
 
@@ -38,17 +37,6 @@ describe('instance down alert', () => {
       expect(parseDownAlertInput({ downAlertTargets: Array.from({ length: 21 }, (_, index) => ({ ...contact, phone: `55119999900${String(index).padStart(2, '0')}` })) }).error).toMatch(/20/)
       expect(parseDownAlertInput({ downAlertEnabled: true, downAlertTargets: [contact], downAlertMessage: 'x'.repeat(1001) }).error).toMatch(/1000/)
       expect(parseDownAlertInput({ downAlertEnabled: 'sim' }).error).toBeDefined()
-    })
-
-    test('groups of all connected instances merge by id, sorted by name, searched and paged on the server', () => {
-      const merged = mergeGroups([
-        { sessionId: 'loja-a-0001', groups: [{ chatId: '2@g.us', name: 'Vendas' }, { chatId: '1@g.us', name: 'Ávisos' }] },
-        { sessionId: 'loja-b-0002', groups: [{ chatId: '2@g.us', name: null }, { chatId: '3@g.us', name: null }] }
-      ])
-      expect(merged.map((group) => group.chatId)).toEqual(['1@g.us', '2@g.us', '3@g.us'])
-      expect(merged[1]).toEqual({ chatId: '2@g.us', name: 'Vendas', sessionIds: ['loja-a-0001', 'loja-b-0002'] })
-      expect(filterAndPage(merged, { page: 1, perPage: 20, search: 'avisos' }).items.map((group) => group.chatId)).toEqual(['1@g.us'])
-      expect(filterAndPage(merged, { page: 2, perPage: 2, search: '' })).toMatchObject({ total: 3, items: [{ chatId: '3@g.us' }] })
     })
   })
 

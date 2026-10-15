@@ -15,17 +15,36 @@ const isGroupMemberInPage = (groupId) => {
   }
 }
 
-// Roda na página: grupos de que a instância participa, com o título que o WhatsApp mostra
-const listMemberGroupsInPage = () => {
+// Roda na página: grupos de que a instância participa, com tamanho, admins e se ela é admin.
+// null = não deu para ler (quem chama não pode confundir com "saiu de todos os grupos").
+const readGroupsInPage = () => {
   try {
+    const { Chat, Contact } = window.require('WAWebCollections')
     const { getMaybeMeLidUser, getMaybeMePnUser } = window.require('WAWebUserPrefsMeUser')
     const me = [getMaybeMeLidUser(), getMaybeMePnUser()].filter(Boolean).map((wid) => wid._serialized)
-    return window.require('WAWebCollections').Chat.getModelsArray()
+    const describe = (participant) => {
+      const id = participant.id._serialized
+      const contact = Contact.get(id)
+      const phone = participant.id.server === 'c.us' ? participant.id.user : (contact?.phoneNumber?.user || null)
+      return { id, phone, name: contact?.name || contact?.pushname || contact?.verifiedName || null, isSuperAdmin: Boolean(participant.isSuperAdmin) }
+    }
+    return Chat.getModelsArray()
       .filter((chat) => chat.id?.server === 'g.us')
-      .filter((chat) => me.some((id) => chat.groupMetadata?.participants?.get(id)))
-      .map((chat) => ({ chatId: chat.id._serialized, name: chat.formattedTitle || chat.name || chat.groupMetadata?.subject || null }))
+      .flatMap((chat) => {
+        const participants = chat.groupMetadata?.participants
+        const mine = participants && me.map((id) => participants.get(id)).find(Boolean)
+        if (!mine) return []
+        const all = typeof participants.getModelsArray === 'function' ? participants.getModelsArray() : []
+        return [{
+          chatId: chat.id._serialized,
+          name: chat.formattedTitle || chat.name || chat.groupMetadata?.subject || null,
+          size: all.length,
+          isAdmin: Boolean(mine.isAdmin || mine.isSuperAdmin),
+          admins: all.filter((participant) => participant.isAdmin || participant.isSuperAdmin).map(describe)
+        }]
+      })
   } catch (error) {
-    return []
+    return null
   }
 }
 
@@ -38,13 +57,14 @@ const isGroupMember = async (client, groupId, sessionId) => {
   }
 }
 
-const listMemberGroups = async (client, sessionId) => {
+// null = falhou a leitura (página fora do ar, Store mudou)
+const readGroups = async (client, sessionId) => {
   try {
-    return await client.pupPage.evaluate(listMemberGroupsInPage)
+    return await client.pupPage.evaluate(readGroupsInPage)
   } catch (error) {
-    console.warn(`[panel] não foi possível listar grupos sessão=${sessionId}:`, error.message)
-    return []
+    console.warn(`[grupos] não foi possível ler grupos sessão=${sessionId}:`, error.message)
+    return null
   }
 }
 
-module.exports = { isGroupChatId, isGroupMember, isGroupMemberInPage, listMemberGroups, listMemberGroupsInPage }
+module.exports = { isGroupChatId, isGroupMember, isGroupMemberInPage, readGroups, readGroupsInPage }

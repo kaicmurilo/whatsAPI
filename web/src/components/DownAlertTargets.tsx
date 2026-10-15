@@ -18,7 +18,7 @@ const contactOption = (contact: Contact): TargetOption => ({
 
 const groupOption = (group: WhatsAppGroup): TargetOption => ({
   target: { kind: 'group', chatId: group.chatId, name: group.name || group.chatId },
-  detail: `${group.sessionIds.length} instância(s)`,
+  detail: `${group.memberSessionIds.length} instância(s)`,
 })
 
 const describeTarget = (target: DownAlertTarget): string => (target.kind === 'group' ? `Grupo · ${target.name}` : `${target.name} · ${formatPhone(target.phone)}`)
@@ -39,7 +39,7 @@ export function DownAlertTargets({ targets, onChange }: DownAlertTargetsProps) {
   const contactSearch = usePagedSearch()
   const groupSearch = usePagedSearch()
   const contacts = useContacts(contactSearch.query, CONTACT_PICKER_PER_PAGE)
-  const groups = useGroups(groupSearch.query)
+  const groups = useGroups(groupSearch.query, GROUP_PICKER_PER_PAGE)
   const toggle = (target: DownAlertTarget) => onChange(toggleTarget(targets, target))
 
   return (

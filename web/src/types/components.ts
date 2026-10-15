@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { ApiCredential, BroadcastChannel, DownAlertTarget, MetricBucket, PanelSettings, CreatedApiCredential, SenderInstance, TelegramInstance, ContactSyncJob, BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
+import type { ApiCredential, BroadcastChannel, DownAlertTarget, MetricBucket, PanelSettings, WhatsAppGroup, CreatedApiCredential, SenderInstance, TelegramInstance, ContactSyncJob, BroadcastListMember, BroadcastListSummary, BroadcastPacing, MessageTemplateSummary, TemplateFile, BroadcastReportSummary, BroadcastRun, ReportSituation, ChatSummary, Contact, PanelFile, SessionStatus, StoredMessage, WhatsAppSession } from './api'
 import type { PanelView, ReportState, TableKey, TableState } from '../hooks/usePanelSearchParams'
 
 export interface StatusLampProps {
@@ -428,4 +428,13 @@ export interface VolumeCardProps {
 export interface IntegrationSummaryProps {
   bucket: MetricBucket
   periodLabel: string
+}
+
+export interface GroupsPaneProps extends TablePaneProps {
+  sessions: WhatsAppSession[]
+}
+
+export interface GroupAddInstancesProps {
+  group: WhatsAppGroup
+  sessions: WhatsAppSession[]
 }

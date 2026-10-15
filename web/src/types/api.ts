@@ -106,11 +106,36 @@ export interface Paginated<T> {
 
 export type ContactPage = Paginated<Contact>
 
-/** Grupo de que ao menos uma instância conectada participa; sessionIds = quais */
+export interface GroupAdmin {
+  id: string
+  phone: string | null
+  name: string | null
+  isSuperAdmin: boolean
+}
+
+/** Grupo do cache (24h): junta o que cada instância sua vê dele */
 export interface WhatsAppGroup {
   chatId: string
   name: string | null
-  sessionIds: string[]
+  participantsCount: number
+  admins: GroupAdmin[]
+  /** Suas instâncias que estão no grupo */
+  memberSessionIds: string[]
+  /** Suas instâncias que são admin do grupo */
+  adminSessionIds: string[]
+  refreshedAt: string
+}
+
+export interface GroupCacheStatus {
+  groups: number
+  refreshedAt: string | null
+}
+
+export type GroupAddStatus = 'added' | 'invited' | 'already' | 'offline' | 'failed'
+
+export interface GroupAddResult {
+  via: string
+  results: { sessionId: string; status: GroupAddStatus; message: string }[]
 }
 
 /** Destino do aviso de instância fora do ar; name é só o rótulo mostrado na tela */

@@ -8,6 +8,7 @@ import { TelegramRailItem } from './TelegramRailItem'
 const RAIL_VIEWS: { view: PanelView; label: string }[] = [
   { view: 'dashboard', label: 'Painel' },
   { view: 'contacts', label: 'Contatos' },
+  { view: 'groups', label: 'Grupos' },
   { view: 'templates', label: 'Mensagens' },
   { view: 'broadcasts', label: 'Transmissão' },
   { view: 'queue', label: 'Fila' },

@@ -546,3 +546,9 @@
   background: var(--color-surface);
   font-size: var(--text-sm);
 }
+
+/* ─── Grupos ────────────────────────────────────────────── */
+/* Listas de admins e instâncias quebram linha em vez de alargar a tabela */
+.groups__list { display: block; min-width: 10rem; font-size: var(--text-xs); color: var(--color-muted); white-space: normal; }
+/* Seletor de instâncias dentro de uma linha de tabela: mais estreito que o do histórico de disparos */
+.data-table .run-instances { min-width: min(16rem, 70vw); }

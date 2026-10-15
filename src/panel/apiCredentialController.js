@@ -38,8 +38,10 @@ const requirePanelLogin = (req, res, next) => {
 // Fora de /sessions/:sessionId as rotas do painel valem para a conta toda (contatos, listas, Telegram...):
 // credencial restrita a instâncias não entra nelas. Rota nova fica bloqueada por padrão.
 const SESSION_ROUTE = /^\/sessions\/[^/]+/
+// Grupos filtram pelas instâncias liberadas no próprio controller
+const GROUP_ROUTE = /^\/groups(\/|$)/
 const restrictToSessionRoutes = (req, res, next) => {
-  if (isRestrictedCredential(req.token) && !SESSION_ROUTE.test(req.path)) {
+  if (isRestrictedCredential(req.token) && !SESSION_ROUTE.test(req.path) && !GROUP_ROUTE.test(req.path)) {
     return sendErrorResponse(res, 403, 'Credencial restrita a instâncias: use as rotas da instância')
   }
   next()

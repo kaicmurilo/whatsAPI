@@ -11,7 +11,11 @@ Listagens paginadas aceitam `page` e `perPage` e devolvem `{ items, total }`.
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/panel/sessions` | Instâncias do usuário com status. O nome no painel é o `sessionId` definido na criação; `pushName` e `phone` aparecem só como detalhe, cada um na sua linha, sem reticências |
-| GET | `/panel/groups` | Grupos de que as instâncias conectadas participam (`page`, `perPage`, `search` pelo nome). Cada item traz `sessionIds` das instâncias que estão no grupo |
+| GET | `/panel/groups` | Grupos das suas instâncias, do cache (24h). `page`, `perPage`, `search` (nome ou id), `adminOnly=true` (só onde alguma instância sua é admin). Cada item: `chatId`, `name`, `participantsCount`, `admins` (`id`, `phone`, `name`, `isSuperAdmin`), `memberSessionIds`, `adminSessionIds`, `refreshedAt`. Também via API (`Bearer wak_...`); credencial restrita vê só as instâncias liberadas |
+| GET | `/panel/groups/:chatId` | Um grupo do cache (404 se nenhuma instância sua está nele) |
+| GET | `/panel/groups/status` | Quantos grupos há no cache e a última atualização |
+| POST | `/panel/groups/refresh` | Atualiza agora o cache das instâncias conectadas (aguarda terminar). Rate limit: 6/min |
+| POST | `/panel/groups/:chatId/members` | Corpo `{ "sessionIds": [...] }`: uma instância sua conectada que é admin adiciona as outras. Resposta `{ via, results: [{ sessionId, status: added\|invited\|already\|offline\|failed, message }] }`. 409 sem admin conectado. Rate limit: 10/min |
 | DELETE | `/panel/sessions/:sessionId` | Remove a instância do WhatsApp: logout, apaga a sessão e as mensagens salvas, e tira do rodízio dos disparos abertos. Rate limit: 10/min |
 | GET | `/panel/sessions/:sessionId/chats` | Conversas salvas. O nome do grupo é o título do WhatsApp, não o do último participante. |
 | GET | `/panel/sessions/:sessionId/chats/:chatId/messages` | Mensagens de uma conversa. `chatName` é o último título real do chat (vazio se só havia o JID). |

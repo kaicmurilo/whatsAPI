@@ -25,11 +25,12 @@ const TABLE_PARAMS = {
   queue: { page: 'qpage', search: 'qq' },
   sendReport: { page: 'spage', search: 'sq' },
   credentials: { page: 'kpage', search: 'kq' },
+  groups: { page: 'gpage', search: 'gq' },
 } as const
 
 export type TableKey = keyof typeof TABLE_PARAMS
 
-const PANEL_VIEWS = ['chats', 'contacts', 'templates', 'broadcasts', 'files', 'settings', 'dashboard', 'telegram', 'queue', 'credentials'] as const
+const PANEL_VIEWS = ['chats', 'contacts', 'templates', 'broadcasts', 'files', 'settings', 'dashboard', 'telegram', 'queue', 'credentials', 'groups'] as const
 export type PanelView = (typeof PANEL_VIEWS)[number]
 
 export interface TableState {
