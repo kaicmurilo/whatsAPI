@@ -345,31 +345,6 @@ const ensureApiSendsTable = async () => {
   await query('ALTER TABLE api_sent_messages ADD COLUMN IF NOT EXISTS batch_size INTEGER')
 }
 
-// Textos esperando a janela do agrupamento. No banco (não em memória) para sobreviver a deploy/reinício.
-// sender_key separa quem envia: instância fixa ("session:x") ou lista do balanceado ("balanced:a,b").
-// Lote em envio (claimed_at preenchido) sai do índice único: texto novo abre outro lote, nada se perde.
-const ensureMessageBatchesTable = async () => {
-  await query(`
-    CREATE TABLE IF NOT EXISTS api_message_batches (
-      id BIGSERIAL PRIMARY KEY,
-      user_id VARCHAR(255) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-      chat_id VARCHAR(255) NOT NULL,
-      sender_key VARCHAR(2200) NOT NULL,
-      session_ids TEXT[] NOT NULL,
-      is_balanced BOOLEAN NOT NULL,
-      parts TEXT[] NOT NULL,
-      credential_id BIGINT,
-      flush_at TIMESTAMPTZ NOT NULL,
-      claimed_at TIMESTAMPTZ,
-      attempts INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `)
-  await query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_api_message_batches_open
-    ON api_message_batches(user_id, chat_id, sender_key) WHERE claimed_at IS NULL`)
-  await query('CREATE INDEX IF NOT EXISTS idx_api_message_batches_due ON api_message_batches(flush_at) WHERE claimed_at IS NULL')
-}
-
 // Grupos vistos por cada instância (retrato do WhatsApp Web). Uma linha por instância: instância fora do ar
 // mantém o último retrato até expirar (24h). admins = [{ id, phone, name, isSuperAdmin }].
 const ensureGroupCacheTable = async () => {
@@ -399,7 +374,6 @@ const ensurePanelSchema = async () => {
   await ensureTelegramTables()
   await ensureApiCredentialsTable()
   await ensureApiSendsTable()
-  await ensureMessageBatchesTable()
   await ensureGroupCacheTable()
 }
 

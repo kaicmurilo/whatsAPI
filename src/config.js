@@ -45,6 +45,9 @@ const groupRefreshMinutes = Math.max(5, parseInt(process.env.GROUP_REFRESH_MINUT
 
 const forceHttps = (process.env.FORCE_HTTPS || 'true').toLowerCase() === 'true'
 
+// Lote do agrupamento que não saiu até sendAt + TTL é descartado: nunca envia atrasado (mínimo 30s)
+const messageBatchTtlSeconds = Math.max(30, parseInt(process.env.MESSAGE_BATCH_TTL_SECONDS) || 300)
+
 // Validações de segurança
 if (!jwtSecret) {
   console.error('❌ JWT_SECRET não configurado ou usando valor padrão inseguro')
@@ -85,5 +88,6 @@ module.exports = {
   jwtRefreshExpiresIn,
   enableAuth,
   forceHttps,
-  groupRefreshMinutes
+  groupRefreshMinutes,
+  messageBatchTtlSeconds
 }

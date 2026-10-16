@@ -1,10 +1,13 @@
 const Redis = require('ioredis')
 
-// Configuração do Redis
-const redisConfig = {
+// Conexão: REDIS_URL (string única); sem ela, host/porta/senha separados (docker-compose.local.yml)
+const redisUrl = process.env.REDIS_URL || null
+const redisAddress = {
   host: process.env.REDIS_HOST || 'localhost',
   port: process.env.REDIS_PORT || 6379,
-  password: process.env.REDIS_PASSWORD || null,
+  password: process.env.REDIS_PASSWORD || null
+}
+const redisConfig = {
   retryDelayOnFailover: 100,
   maxRetriesPerRequest: 3,
   lazyConnect: true,
@@ -67,7 +70,7 @@ let useRedis = false
 // Inicializar Redis
 const initRedis = async () => {
   try {
-    redisClient = new Redis(redisConfig)
+    redisClient = redisUrl ? new Redis(redisUrl, redisConfig) : new Redis({ ...redisAddress, ...redisConfig })
     
     redisClient.on('connect', () => {
       console.log('✅ Redis conectado com sucesso')
@@ -181,6 +184,9 @@ const cache = {
   }
 }
 
+// Cliente pronto para uso direto (filas); null quando o Redis está fora — quem chama decide o fallback
+const getRedisClient = () => (useRedis && redisClient?.status === 'ready' ? redisClient : null)
+
 // TTLs padrão para diferentes tipos de dados
 const CACHE_TTL = {
   CONTACTS: 600,        // 10 minutos
@@ -276,5 +282,6 @@ module.exports = {
   cacheHelpers,
   CACHE_TTL,
   initRedis,
+  getRedisClient,
   memoryCache
 } 

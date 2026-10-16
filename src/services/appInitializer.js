@@ -113,7 +113,7 @@ class AppInitializer {
       this.restoreSessions()
       startBroadcastScheduler()
       startMessageRetention()
-      await startMessageBatcher().catch((error) => console.error('❌ Falha ao ligar agrupamento de mensagens:', error.message))
+      startMessageBatcher()
       await startTelegramBots().catch((error) => console.error('❌ Falha ao ligar bots do Telegram:', error.message))
       await startTelegramAccounts().catch((error) => console.error('❌ Falha ao conectar contas do Telegram:', error.message))
       this.showServicesStatus()

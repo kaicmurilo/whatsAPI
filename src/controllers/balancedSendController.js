@@ -1,5 +1,5 @@
 const { sendErrorResponse } = require('../utils')
-const { isSessionAllowed } = require('../auth/credentialScope')
+const { isSessionAllowed, allowedSessionsOf } = require('../auth/credentialScope')
 const { CHAT_ID_PATTERN } = require('../panel/validators')
 const { parseSessionIds, listOwnedSessionIds } = require('../panel/broadcastSessions')
 const { getConnectedClient } = require('../panel/broadcastChannels')
@@ -42,7 +42,7 @@ const sendMessageBalanced = async (req, res) => {
     const accessError = await findAccessError(req, sessionIds)
     if (accessError) return sendErrorResponse(res, ...accessError)
     // Agrupado: a instância é escolhida na hora do disparo, com a carga daquele momento
-    const queued = await queueIfBatching({ userId: req.user.user_id, chatId: body.chatId, sessionIds, isBalanced: true, contentType: body.contentType, content: body.content, options: body.options, credentialId: req.token?.apiCredentialId })
+    const queued = await queueIfBatching({ userId: req.user.user_id, chatId: body.chatId, sessionIds, isBalanced: true, allowedSessionIds: allowedSessionsOf(req.token), contentType: body.contentType, content: body.content, options: body.options, credentialId: req.token?.apiCredentialId })
     if (queued) return res.status(202).json(batchedResponse(queued))
     const picked = await pickBalancedSender({
       sessionIds, chatId: body.chatId, getClient: getConnectedClient, isMember: isGroupMember, loadDaily: loadTodayApiSends

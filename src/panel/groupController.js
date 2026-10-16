@@ -1,6 +1,6 @@
 const AuthService = require('../auth/authService')
 const { sendErrorResponse } = require('../utils')
-const { isRestrictedCredential, isSessionAllowed } = require('../auth/credentialScope')
+const { isSessionAllowed, allowedSessionsOf } = require('../auth/credentialScope')
 const { getConnectedClient } = require('./broadcastChannels')
 const { parseSessionIds, listOwnedSessionIds } = require('./broadcastSessions')
 const { isGroupChatId } = require('./groupMembership')
@@ -12,7 +12,6 @@ const GROUPS_DEFAULT_PER_PAGE = 5
 const AFTER_ADD_REFRESH_MS = 5000
 
 // Credencial restrita só enxerga e mexe nas instâncias liberadas; login do painel e chave sem lista veem todas
-const allowedSessionsOf = (token) => (isRestrictedCredential(token) ? token.allowedSessionIds : null)
 
 // GET /panel/groups — também consumido pela API (Bearer wak_...)
 const getGroups = async (req, res) => {

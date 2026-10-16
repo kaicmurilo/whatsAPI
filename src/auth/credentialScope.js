@@ -3,4 +3,7 @@ const isRestrictedCredential = (token) => Array.isArray(token?.allowedSessionIds
 
 const isSessionAllowed = (token, sessionId) => !isRestrictedCredential(token) || token.allowedSessionIds.includes(sessionId)
 
-module.exports = { isRestrictedCredential, isSessionAllowed }
+// Instâncias liberadas da credencial; null = sem restrição
+const allowedSessionsOf = (token) => (isRestrictedCredential(token) ? token.allowedSessionIds : null)
+
+module.exports = { isRestrictedCredential, isSessionAllowed, allowedSessionsOf }

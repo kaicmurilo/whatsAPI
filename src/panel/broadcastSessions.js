@@ -45,4 +45,10 @@ const listOwnedSessionIds = async (userId, sessionIds) => {
   return new Set(result.rows.map((row) => row.session_id))
 }
 
-module.exports = { parseSessionIds, sessionsOf, listOwnedSessionIds, telegramInstanceId, botIdOfInstance, accountInstanceId, accountIdOfInstance, MAX_SESSIONS }
+// Todas as instâncias de WhatsApp do usuário (reserva do agrupamento quando as escolhidas caem)
+const listUserSessionIds = async (userId) => {
+  const result = await query('SELECT session_id FROM whatsapp_sessions WHERE user_id = $1', [userId])
+  return result.rows.map((row) => row.session_id)
+}
+
+module.exports = { parseSessionIds, sessionsOf, listOwnedSessionIds, listUserSessionIds, telegramInstanceId, botIdOfInstance, accountInstanceId, accountIdOfInstance, MAX_SESSIONS }
