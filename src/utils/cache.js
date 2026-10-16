@@ -84,7 +84,8 @@ const initRedis = async () => {
       useRedis = false
     })
     
-    // Testar conexão
+    // lazyConnect sem fila offline: o ping antes do connect falha sempre
+    await redisClient.connect()
     await redisClient.ping()
     useRedis = true
     
