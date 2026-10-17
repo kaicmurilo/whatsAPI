@@ -1,3 +1,5 @@
+const { withTimeout } = require('../utils/withTimeout')
+
 // Salvar o contato na conta do WhatsApp da instância (o mesmo "Salvar contato" do WhatsApp Web)
 const SAVE_BEFORE_SEND_TIMEOUT_MS = 10000
 
@@ -9,14 +11,6 @@ const splitName = (name) => {
 
 // Só os 4 últimos dígitos no log: telefone é dado pessoal
 const maskPhone = (phone) => `****${String(phone).slice(-4)}`
-
-const withTimeout = (promise, timeoutMs) => {
-  let timer
-  const timeout = new Promise((resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(`sem resposta em ${timeoutMs / 1000}s`)), timeoutMs)
-  })
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
-}
 
 /**
  * Antes de cada envio do disparo. Nunca bloqueia: erro ou demora só vira log e o envio segue.
