@@ -1,3 +1,8 @@
+const { withTimeout } = require('../utils/withTimeout')
+
+// Página travada (status connected mas sem responder) não pode segurar o envio balanceado
+const MEMBERSHIP_CHECK_TIMEOUT_MS = 5000
+
 const isGroupChatId = (chatId) => typeof chatId === 'string' && chatId.endsWith('@g.us')
 
 // Roda na página do WhatsApp Web. Mesma checagem da lib (GroupChat): o participante pode estar
@@ -50,7 +55,7 @@ const readGroupsInPage = () => {
 
 const isGroupMember = async (client, groupId, sessionId) => {
   try {
-    return await client.pupPage.evaluate(isGroupMemberInPage, groupId)
+    return await withTimeout(client.pupPage.evaluate(isGroupMemberInPage, groupId), MEMBERSHIP_CHECK_TIMEOUT_MS)
   } catch (error) {
     console.warn(`[send] não foi possível checar participação no grupo sessão=${sessionId}:`, error.message)
     return false

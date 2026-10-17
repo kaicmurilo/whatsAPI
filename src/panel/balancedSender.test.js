@@ -2,7 +2,7 @@ jest.mock('../database', () => ({ query: jest.fn() }))
 jest.mock('../sessions', () => ({ sessions: new Map(), validateSession: jest.fn() }))
 
 const { pickBalancedSender } = require('./balancedSender')
-const { isGroupMemberInPage } = require('./groupMembership')
+const { isGroupMember, isGroupMemberInPage } = require('./groupMembership')
 const { findBodyError } = require('../controllers/balancedSendController')
 
 const GROUP = '120363000000000000@g.us'
@@ -69,5 +69,14 @@ describe('balanced send', () => {
     expect(findBodyError({ sessionIds: ['loja-a-0001'], chatId: 'x y', contentType: 'string' })[1]).toMatch(/chatId/)
     expect(findBodyError({ sessionIds: ['loja-a-0001'], chatId: CONTACT, contentType: 'Audio' })[1]).toMatch(/contentType/)
     expect(findBodyError({ sessionIds: ['loja-a-0001'], chatId: GROUP, contentType: 'string' })).toBeNull()
+  })
+
+  test('group: a stuck page counts as non-member instead of holding the send', async () => {
+    jest.useFakeTimers()
+    const stuck = { pupPage: { evaluate: () => new Promise(() => {}) } }
+    const check = isGroupMember(stuck, GROUP, 'loja-a-0001')
+    jest.advanceTimersByTime(5000)
+    await expect(check).resolves.toBe(false)
+    jest.useRealTimers()
   })
 })
